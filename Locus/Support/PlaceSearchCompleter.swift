@@ -1,6 +1,7 @@
 import MapKit
 import Combine
 
+@MainActor
 final class PlaceSearchCompleter: NSObject, ObservableObject, MKLocalSearchCompleterDelegate {
     @Published var results: [MKLocalSearchCompletion] = []
     private let completer = MKLocalSearchCompleter()

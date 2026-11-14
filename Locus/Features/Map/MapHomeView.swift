@@ -1136,5 +1136,3 @@ private struct RouteMapPressGesture: UIGestureRecognizerRepresentable {
         }
     }
 }
-
-@MainActor

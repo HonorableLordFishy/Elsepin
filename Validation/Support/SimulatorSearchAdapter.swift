@@ -37,7 +37,7 @@ struct PlaceSearchResponse { let mapItems: [MKMapItem] }
 extension PlaceSearchIntent {
     var mapCategories: [MKPointOfInterestCategory] { [.restaurant] }
 }
-final class PlaceSearchCompleter: ObservableObject {
+@MainActor final class PlaceSearchCompleter: ObservableObject {
     @Published var results: [MKLocalSearchCompletion] = []
     var query = ""
     func setRegion(_ region: MKCoordinateRegion?) {}
