@@ -74,7 +74,7 @@ final class ElsepinFlowUITests: XCTestCase {
             if back.exists { back.tap() } else { break }
         }
         func open(_ label: String) {
-            let text = settings.staticTexts[label].firstMatch
+            let text = settings.staticTexts.matching(identifier: label).firstMatch
             for _ in 0..<7 {
                 if text.exists && text.isHittable { break }
                 settings.swipeUp()
@@ -83,7 +83,7 @@ final class ElsepinFlowUITests: XCTestCase {
             text.tap()
         }
         func toggle(_ label: String) {
-            let control = settings.switches[label].firstMatch
+            let control = settings.switches.matching(identifier: label).firstMatch
             for _ in 0..<4 {
                 if control.exists && control.isHittable { break }
                 settings.swipeUp()
