@@ -80,15 +80,14 @@ private struct ValidationHost: View {
             .environment(\.shiftVisualStyle, preferences.visualStyle)
             .environment(\.shiftIconDesign, preferences.iconSelection.design)
             .environment(\.dynamicTypeSize, ValidationFixture.largeText ? .accessibility5 : .large)
-            .environment(\.accessibilityReduceMotion, ValidationFixture.fallback)
-            .environment(\.accessibilityReduceTransparency, ValidationFixture.fallback)
-            .environment(\.colorSchemeContrast, ValidationFixture.fallback ? .increased : .standard)
             .preferredColorScheme(ValidationFixture.dark ? .dark : .light)
             .tint(ShiftPalette.color(.accent, style: preferences.visualStyle))
             .task {
                 guard !started else { return }; started = true
                 preferences.liveActivities = false; preferences.connectionAlerts = false
-                preferences.glassPanel = !ValidationFixture.fallback
+                // XCTest changes the simulator's real Accessibility settings.
+                // Keep glass requested so Reduce Transparency must supply the fallback.
+                preferences.glassPanel = true
                 if ["moving", "paused", "connecting", "failed"].contains(ValidationFixture.scenario) {
                     _ = session.followRoute(ValidationFixture.route, pairing: pairing, smoothing: false)
                     if ValidationFixture.scenario == "paused" {

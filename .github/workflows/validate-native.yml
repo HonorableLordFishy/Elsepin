@@ -45,7 +45,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' build \
             2>&1 | tee .build/validation-evidence/device-build.log | xcbeautify
           test -d .build/device-validation/Build/Products/Release-iphoneos/Locus.app/PlugIns/LocusActivity.appex
-          if strings .build/device-validation/Build/Products/Release-iphoneos/Locus.app/Locus | grep -q 'SIMULATOR TEST DATA'; then
+          if strings .build/device-validation/Build/Products/Release-iphoneos/Locus.app/Locus | grep -F 'SIMULATOR TEST DATA'; then
             echo 'Test-only fixture leaked into production binary'; exit 1
           fi
           test -z "$(find . -name '*.ipa' -print -quit)"
@@ -68,15 +68,24 @@ jobs:
           .build/validation-venv/bin/python scripts/make_validation_project.py
           xcodegen generate --spec project.validation.json
           python3 scripts/prepare_validation_simulator.py
-      - name: Run focused native UI checks
+      - name: Compile isolated simulator app and UI tests
         shell: bash
         run: |
           set -o pipefail
           mkdir -p .build/simulator-evidence
           xcodebuild -project ElsepinValidation.xcodeproj -scheme Locus -configuration Debug \
             -destination "platform=iOS Simulator,id=$VALIDATION_SIMULATOR" \
+            -derivedDataPath .build/simulator-validation \
+            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO build-for-testing \
+            2>&1 | tee .build/simulator-evidence/simulator-build.log | xcbeautify
+      - name: Run focused native UI checks
+        shell: bash
+        run: |
+          set -o pipefail
+          xcodebuild -project ElsepinValidation.xcodeproj -scheme Locus -configuration Debug \
+            -destination "platform=iOS Simulator,id=$VALIDATION_SIMULATOR" \
             -derivedDataPath .build/simulator-validation -resultBundlePath .build/simulator-evidence/UI.xcresult \
-            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test \
+            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test-without-building \
             2>&1 | tee .build/simulator-evidence/ui-tests.log | xcbeautify
       - name: Export screenshots and test results
         if: always()

@@ -37,8 +37,9 @@ unchanged into its own file so it can be excluded from this simulator target.
 ## UI coverage and evidence
 
 The fixture presents the real native views at 320pt width, with normal or maximum
-accessibility text, light/dark appearances, and injected Reduce Motion,
-Reduce Transparency and increased contrast environments. Tests exercise moving,
+accessibility text and light/dark appearances. The fallback test uses the native
+Settings app to enable Reduce Motion, Reduce Transparency and Increase Contrast,
+then restores them. Tests exercise moving,
 paused, connecting and failed states, long route/Library names, empty Library,
 search submit/retry, cancellation and dismissal/foreground interruption.
 Screenshots and accessibility trees are attached to the xcresult and exported

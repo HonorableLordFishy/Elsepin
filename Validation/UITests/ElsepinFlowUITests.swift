@@ -36,6 +36,9 @@ final class ElsepinFlowUITests: XCTestCase {
         launch("moving")
         reachable("session.pause"); reachable("session.stop")
         reachable("map.routeSearch"); reachable("map.follow")
+        reachable("Route details")
+        XCTAssertGreaterThanOrEqual(app.buttons["map.follow"].frame.minY,
+                                    app.buttons["Route details"].frame.maxY)
         capture("01-moving-narrow-light")
         app.buttons["session.pause"].tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier == 'session.pause' AND label CONTAINS 'Resume'")).firstMatch.waitForExistence(timeout: 10))
@@ -56,9 +59,48 @@ final class ElsepinFlowUITests: XCTestCase {
         capture("05-largest-text-paused")
     }
     func testDarkAccessibilityFallbackPaused() {
+        configureAccessibility(true)
+        defer { configureAccessibility(false) }
         launch("paused", large: true, dark: true, fallback: true)
         reachable("session.stop"); reachable("session.pause")
         capture("06-dark-reduced-motion-transparency-contrast")
+    }
+    private func configureAccessibility(_ enabled: Bool) {
+        let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+        settings.launch()
+        for _ in 0..<6 {
+            if settings.navigationBars["Settings"].exists { break }
+            let back = settings.navigationBars.buttons.firstMatch
+            if back.exists { back.tap() } else { break }
+        }
+        func open(_ label: String) {
+            let text = settings.staticTexts[label].firstMatch
+            for _ in 0..<7 {
+                if text.exists && text.isHittable { break }
+                settings.swipeUp()
+            }
+            XCTAssertTrue(text.waitForExistence(timeout: 5), "Settings: \(label)")
+            text.tap()
+        }
+        func toggle(_ label: String) {
+            let control = settings.switches[label].firstMatch
+            for _ in 0..<4 {
+                if control.exists && control.isHittable { break }
+                settings.swipeUp()
+            }
+            XCTAssertTrue(control.waitForExistence(timeout: 5), "Settings: \(label)")
+            let expected = enabled ? "1" : "0"
+            if control.value as? String != expected { control.tap() }
+            XCTAssertEqual(control.value as? String, expected, label)
+        }
+        open("Accessibility"); open("Display & Text Size")
+        toggle("Reduce Transparency"); toggle("Increase Contrast")
+        settings.navigationBars.buttons.firstMatch.tap()
+        open("Motion"); toggle("Reduce Motion")
+        let shot = XCTAttachment(screenshot: settings.screenshot())
+        shot.name = enabled ? "accessibility-settings-enabled" : "accessibility-settings-reset"
+        shot.lifetime = .keepAlways; add(shot)
+        settings.terminate()
     }
     func testConnectingIsNotPresentedAsMoving() {
         launch("connecting")
@@ -106,10 +148,23 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["OBSOLETE TEST RESULT"].waitForExistence(timeout: 4))
         capture("12-search-dismissed-and-resumed")
     }
+    func testSearchInterruptedWhilePendingThenReplaced() {
+        launch("search")
+        let field = app.textFields["route.searchField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText("slow\n")
+        XCTAssertTrue(app.buttons["Cancel search"].waitForExistence(timeout: 5))
+        XCUIDevice.shared.press(.home); app.activate()
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        app.buttons["Clear search"].tap(); field.tap(); field.typeText("cafe\n")
+        XCTAssertTrue(app.staticTexts["Test cafe result for cafe"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["OBSOLETE TEST RESULT"].waitForExistence(timeout: 4))
+        capture("15-search-background-interruption-replaced")
+    }
     func testLibraryEmptyState() {
         launch("empty")
         app.buttons["Library"].tap()
         XCTAssertTrue(app.staticTexts["Star a pin to find it here."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Star a saved route to find it here."].exists)
         capture("13-library-empty")
     }
     func testLibraryLongNamesLargeDark() {

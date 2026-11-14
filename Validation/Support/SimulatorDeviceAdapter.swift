@@ -8,6 +8,14 @@ import UniformTypeIdentifiers
 /// Only the separate validation app links this adapter; normal builds fail
 /// closed without an idevice implementation rather than inventing success.
 enum LocationEngine {
+    private static let lock = NSLock()
+    private static var acceptedWrites = 0
+    private static func shouldFailWrite() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        let fail = ValidationFixture.scenario == "failed" && acceptedWrites > 0
+        if !fail { acceptedWrites += 1 }
+        return fail
+    }
     static var setupCheckIsRunning: Bool { false }
     static func checkConnection(pairingPath: String, deviceIP: String,
                                 cancellation: SetupConnectionCancellation) async -> SetupIssue? {
@@ -21,7 +29,9 @@ enum LocationEngine {
             return .failure(.tunnelUnreachable)
         }
         try? await Task.sleep(for: .milliseconds(60))
-        if ValidationFixture.scenario == "failed" { return .failure(.tunnelUnreachable) }
+        // Fail after one accepted test command so recovery includes a location
+        // that may remain, rather than the separate never-started case.
+        if shouldFailWrite() { return .failure(.tunnelUnreachable) }
         return Result.success(()) // TEST ONLY: UI command acceptance, not device spoofing.
     }
     static func clear(pairingPath: String, deviceIP: String) async -> Result<Void, LocationEngineError> {
