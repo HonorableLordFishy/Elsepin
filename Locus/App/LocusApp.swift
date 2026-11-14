@@ -246,6 +246,3 @@ final class SessionLifecycleDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
-extension Notification.Name {
-    static let locusImportGPX = Notification.Name("locusImportGPX")
-}
