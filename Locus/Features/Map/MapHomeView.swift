@@ -7,6 +7,7 @@ struct MapHomeView: View {
     var isVisible = true
     @Binding var incomingPlace: RoutePlace?
     @Binding var incomingSearch: Bool
+    var onToolsHeightChange: (CGFloat) -> Void = { _ in }
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.elsepinReducedResources) private var reducedResources
     @EnvironmentObject private var session: SpoofSession
@@ -555,21 +556,25 @@ struct MapHomeView: View {
                 }.buttonStyle(.plain)
             }
             if !planner.isDrawing {
-                HStack {
+                MapToolbarLayout() {
                     controls
-                    if session.journey != nil {
-                        Button { showRouteSearch = true } label: {
-                            Image(systemName: "magnifyingglass").frame(width: 46, height: 46)
-                        }.buttonStyle(.plain).locusGlass(.interactive, in: Circle())
-                            .accessibilityLabel("Search along route")
+                        .accessibilityIdentifier("map.primaryControls")
+                    HStack(spacing: 8) {
+                        if session.journey != nil {
+                            Button { showRouteSearch = true } label: {
+                                Image(systemName: "magnifyingglass").frame(width: 46, height: 46)
+                            }.buttonStyle(.plain).locusGlass(.interactive, in: Circle())
+                                .accessibilityLabel("Search along route")
+                                .accessibilityIdentifier("map.routeSearch")
+                        }
+                        undoJumpButton
+                        Button { followMovement = true; selection = nil; centerOnLocation() } label: {
+                            Image(systemName: followMovement ? "location.fill" : "location").frame(width: 46, height: 46).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain).locusGlass(.interactive, in: Circle())
+                        .accessibilityLabel("Follow latest location")
+                        .accessibilityIdentifier("map.follow")
                     }
-                    Spacer(minLength: 8)
-                    undoJumpButton
-                    Button { followMovement = true; selection = nil; centerOnLocation() } label: {
-                        Image(systemName: followMovement ? "location.fill" : "location").frame(width: 46, height: 46).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain).locusGlass(.interactive, in: Circle())
-                    .accessibilityLabel("Follow latest location")
                 }
                 MapScaleView(scope: mapScope)
                     .mapControlVisibility(.visible)
@@ -584,6 +589,10 @@ struct MapHomeView: View {
             }
         }
         .padding(.horizontal, 16).safeAreaPadding(.top, 8)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+            guard height.isFinite, height >= 0 else { return }
+            onToolsHeightChange(height)
+        }
     }
 
     private var controls: some View {
@@ -838,6 +847,36 @@ struct MapHomeView: View {
         let region = MKCoordinateRegion(center: coordinate, latitudinalMeters: 1000, longitudinalMeters: 1000)
         if reduceMotion { position = .region(region) }
         else { withAnimation(.linear(duration: 0.4)) { position = .region(region) } }
+    }
+}
+
+/// Keep one instance of each control when the toolbar wraps. A conditional pair
+/// of HStacks would recreate menus/favorite dialogs during a width/state change.
+private struct MapToolbarLayout: Layout {
+    private let spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 2 else { return .zero }
+        let first = subviews[0].sizeThatFits(.unspecified)
+        let second = subviews[1].sizeThatFits(.unspecified)
+        // Layout also probes with zero/infinity. Report a finite minimum width
+        // instead of shrinking touch targets or returning infinite geometry.
+        let proposed = proposal.width.flatMap { $0.isFinite ? $0 : nil }
+        let width = max(max(first.width, second.width), proposed ?? first.width + spacing + second.width)
+        let wraps = first.width + spacing + second.width > width
+        return CGSize(width: width, height: wraps ? first.height + spacing + second.height : max(first.height, second.height))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+        let first = subviews[0].sizeThatFits(.unspecified)
+        let second = subviews[1].sizeThatFits(.unspecified)
+        let wraps = first.width + spacing + second.width > bounds.width
+        subviews[0].place(at: CGPoint(x: bounds.minX, y: wraps ? bounds.minY : bounds.midY - first.height / 2),
+                          proposal: ProposedViewSize(first))
+        subviews[1].place(at: CGPoint(x: bounds.maxX - second.width,
+                                     y: wraps ? bounds.minY + first.height + spacing : bounds.midY - second.height / 2),
+                          proposal: ProposedViewSize(second))
     }
 }
 
@@ -1099,33 +1138,3 @@ private struct RouteMapPressGesture: UIGestureRecognizerRepresentable {
 }
 
 @MainActor
-final class PlaceSearchCompleter: NSObject, ObservableObject, MKLocalSearchCompleterDelegate {
-    @Published var results: [MKLocalSearchCompletion] = []
-    private let completer = MKLocalSearchCompleter()
-
-    func setRegion(_ region: MKCoordinateRegion?) {
-        completer.region = region ?? MKCoordinateRegion(.world)
-        completer.regionPriority = region == nil ? .default : .required
-    }
-
-    var query: String = "" {
-        didSet {
-            completer.queryFragment = query
-        }
-    }
-
-    override init() {
-        super.init()
-        completer.delegate = self
-        completer.resultTypes = [.address, .pointOfInterest]
-    }
-
-    nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        let items = completer.results
-        Task { @MainActor in self.results = items }
-    }
-
-    nonisolated func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
-        Task { @MainActor in self.results = [] }
-    }
-}

@@ -10,6 +10,8 @@ outputs/
 Payload/
 .build/
 .swiftpm/
+project.validation.json
+ElsepinValidation.xcodeproj/
 
 *Pairing*.json
 *RPPairing*.plist

@@ -362,7 +362,13 @@ struct PlacesView: View {
                             pinEditor = PinDraft(place: nil, center: session.pin ?? session.simulated ?? session.realCoordinate)
                         }
                     }
-                    if shownPins.isEmpty { Text(category == .favorites ? "Star a pin to find it here." : "Name pins on the map, or add one here.").foregroundStyle(.secondary) }
+                    if shownPins.isEmpty {
+                        Text(category == .favorites ? "Star a pin to find it here."
+                             : !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No pins match this search."
+                             : selectedFolder != nil ? "No pins in this folder."
+                             : "Name pins on the map, or add one here.")
+                            .foregroundStyle(.secondary)
+                    }
                     ForEach(shownPins) { place in pinRow(place) }
                 }
             }
@@ -401,7 +407,8 @@ struct PlacesView: View {
             }.buttonStyle(.borderless)
             Button { session.togglePinFavorite(place) } label: {
                 Image(systemName: place.isFavorite ? "star.fill" : "star").frame(width: 44, height: 44)
-            }.buttonStyle(.borderless).accessibilityLabel(place.isFavorite ? "Remove favorite" : "Favorite pin")
+            }.buttonStyle(.borderless)
+                .accessibilityLabel(place.isFavorite ? "Unfavorite \(place.displayName)" : "Favorite \(place.displayName)")
             Menu {
                 Button("Edit pin", systemImage: "pencil") { pinEditor = PinDraft(place: place, center: place.coordinate) }
                 Button("Move to folder…", systemImage: "folder") { folderPlace = place }

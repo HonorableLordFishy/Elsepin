@@ -16,6 +16,7 @@ struct RouteSearchField: View {
                 .textFieldStyle(.plain).focused($focused).submitLabel(.search)
                 .autocorrectionDisabled().onSubmit(submit)
                 .accessibilityLabel(prompt)
+                .accessibilityIdentifier("route.searchField")
             if !query.isEmpty {
                 Button { query = "" } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)

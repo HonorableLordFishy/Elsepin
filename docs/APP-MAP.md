@@ -3,6 +3,13 @@
 Current status: [handoff](CURRENT-WORK.md) and [build history](BUILD-HISTORY.md).
 See CURRENT-WORK for the latest exact source/build evidence and pending phone
 acceptance; do not infer delivery from a version change alone.
+
+Local post-82 flow refinement: `Shared/RouteFlowPresentation.swift` owns preview
+readiness and evidence-aware route subtitles (presentation only). `RootView`
+keeps active commands outside bounded scrolling details; `MapHomeView` reports
+toolbar height and uses a two-group `MapToolbarLayout` without replacing menu
+state. Search submission guards/keyboard handling remain in the two search
+sheets. Feature/state inventory and pending native acceptance: [UI-POLISH](UI-POLISH.md).
 Historical cleanup: [review](CLEANUP-AND-ORBS-REVIEW.md) and [native progress](NATIVE-PROGRESS.md).
 
 Annotation safety: `SavedPinMapIcon` takes explicit presentation values; do not

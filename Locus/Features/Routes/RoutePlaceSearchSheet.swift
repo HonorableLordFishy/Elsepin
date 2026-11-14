@@ -132,6 +132,7 @@ struct RoutePlaceSearchSheet: View {
                         .disabled(isResolving || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                 RouteSearchField(query: $query, focused: $searchFocused,
@@ -211,7 +212,7 @@ struct RoutePlaceSearchSheet: View {
 
     private func searchAll() {
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty, !isResolving else { return }
         // Keyboard Search and the list button share one path. A general query
         // never opens a dialog or picks the first business/address implicitly.
         searchFocused = false
@@ -304,7 +305,7 @@ struct RoutePlaceSearchSheet: View {
 
     /// Broad categories use a short nearby query first, then Apple's POI index.
     /// The fallback explicitly labels broader results instead of claiming every restaurant is fast food.
-    @MainActor private func response(_ operation: PlaceSearchRequest, request: MKLocalSearch.Request, general: Bool) async throws -> MKLocalSearch.Response {
+    @MainActor private func response(_ operation: PlaceSearchRequest, request: MKLocalSearch.Request, general: Bool) async throws -> PlaceSearchResponse {
         var firstError: Error?
         do {
             let result = try await operation.start()
@@ -341,6 +342,7 @@ struct RoutePlaceSearchSheet: View {
         activeSearch = search
         isResolving = true
         error = nil
+        resultNote = nil
         DeveloperLogStore.shared.record("place_search_started", ["kind": chooseSingleResult ? "suggestion" : "general"])
         searchTask = Task { @MainActor in
             do {

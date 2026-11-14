@@ -1,5 +1,42 @@
 # Elsepin current handoff
 
+## Post-build-82 flow refinement - local only, 14 November 2026
+
+Owner requested an evidence-led native refinement, explicitly **no IPA, release,
+signing/billing changes or other-app edits**. Started on clean `19de0e0`; no
+version bump or remote push. Build 82 remains the latest delivered artifact.
+
+- Map toolbar wraps its existing control groups on narrow layouts without
+  replacing menus/dialog state. Native map scale, saved-pin range and refresh
+  policy are untouched. The map viewport remains fixed beneath the overlays.
+- Active-route details scroll only when necessary below the measured top tools;
+  Pause/Resume, Stop and connection retry stay outside the scrollable content.
+  Regular glass improves the text surface's separation; Solid/accessibility
+  fallbacks and approved compact pin/holding trays are retained.
+- A route awaiting its first location confirmation says Starting route rather
+  than Following route. Connection evidence also wins over stale arrival text.
+  `Shared/RouteFlowPresentation.swift` owns these presentation rules.
+- Failed directions retain their chosen endpoints and offer Retry directions.
+  Previous-path restore and explicit Show/Start remain. Repeated Search submissions
+  are ignored while in flight; editing query/area still cancels obsolete work.
+- Native keyboard dismissal in both search lists, long-name/accessibility layouts,
+  item-specific VoiceOver favorite labels and accurate filtered-empty Library text.
+
+Validation: 17 resource/package tests passed; nine changed/new Swift files passed
+tree-sitter syntax checks; app/extension identities, appearance resources, source
+encoding and `git diff --check` passed. Logs are in `.build/artifacts/flow-review-*`.
+Nine new
+Swift behavioral tests cover preview recovery and connection-first route status;
+they have **not run** because this workstation has no Swift/Xcode/Simulator or
+installed WSL. Syntax parsing is not native type checking. The existing GitHub
+workflow always packages an IPA, so it was not dispatched for this task.
+
+The [UI review and feature inventory](UI-POLISH.md) records source findings,
+preserved owners, official Apple references and pending device acceptance.
+No current screenshots or measured performance evidence are available. Test the
+small-phone/large-text tray, wrapped toolbar, keyboard interruption/retry and
+build-82 scale/slider on a signed phone after native validation is authorized.
+
 ## Build 82 validated and delivered - 13 November 2026
 
 GitHub run 43525893260 succeeded at 1a3195273ffc7e8f692e91844d169530379f320a.

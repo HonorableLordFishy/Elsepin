@@ -1,0 +1,98 @@
+name: Validate Elsepin (no IPA)
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/pins-search-69]
+    paths:
+      - 'Locus/**'
+      - 'LocusActivity/**'
+      - 'Shared/**'
+      - 'Tests/**'
+      - 'Validation/**'
+      - 'scripts/*validation*'
+      - 'project.yml'
+      - '.github/workflows/validate-native.yml'
+permissions:
+  contents: read
+jobs:
+  regression-device:
+    runs-on: xcode-27
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain and native dependencies
+        run: |
+          xcodebuild -version
+          brew install xcodegen xcbeautify
+          mkdir -p .build/validation-evidence
+          file Vendor/idevice/libidevice_ffi.a | tee .build/validation-evidence/vendor-library.txt
+      - name: Resource and regression checks
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/check_app_identity.py
+          python3 scripts/check_appearance.py
+          python3 scripts/package_helpers.py --check
+          python3 -m unittest discover -s scripts/tests -v 2>&1 | tee .build/validation-evidence/resource-tests.log
+          swift test 2>&1 | tee .build/validation-evidence/swift-tests.log
+      - name: Compile production app and extension without packaging
+        shell: bash
+        run: |
+          set -o pipefail
+          xcodegen generate
+          xcodebuild -project Locus.xcodeproj -scheme Locus -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath .build/device-validation \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' build \
+            2>&1 | tee .build/validation-evidence/device-build.log | xcbeautify
+          test -d .build/device-validation/Build/Products/Release-iphoneos/Locus.app/PlugIns/LocusActivity.appex
+          if strings .build/device-validation/Build/Products/Release-iphoneos/Locus.app/Locus | grep -q 'SIMULATOR TEST DATA'; then
+            echo 'Test-only fixture leaked into production binary'; exit 1
+          fi
+          test -z "$(find . -name '*.ipa' -print -quit)"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: device-validation-evidence
+          path: .build/validation-evidence
+          retention-days: 7
+  simulator:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare isolated simulator project
+        run: |
+          brew install xcodegen xcbeautify
+          python3 -m venv .build/validation-venv
+          .build/validation-venv/bin/pip install 'PyYAML==6.0.2'
+          .build/validation-venv/bin/python scripts/make_validation_project.py
+          xcodegen generate --spec project.validation.json
+          python3 scripts/prepare_validation_simulator.py
+      - name: Run focused native UI checks
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p .build/simulator-evidence
+          xcodebuild -project ElsepinValidation.xcodeproj -scheme Locus -configuration Debug \
+            -destination "platform=iOS Simulator,id=$VALIDATION_SIMULATOR" \
+            -derivedDataPath .build/simulator-validation -resultBundlePath .build/simulator-evidence/UI.xcresult \
+            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test \
+            2>&1 | tee .build/simulator-evidence/ui-tests.log | xcbeautify
+      - name: Export screenshots and test results
+        if: always()
+        shell: bash
+        run: |
+          if test -d .build/simulator-evidence/UI.xcresult; then
+            xcrun xcresulttool export attachments --path .build/simulator-evidence/UI.xcresult --output-path .build/simulator-evidence/attachments
+            xcrun xcresulttool get test-results summary --path .build/simulator-evidence/UI.xcresult > .build/simulator-evidence/summary.json
+          fi
+          if test -n "${VALIDATION_SIMULATOR:-}"; then
+            xcrun simctl shutdown "$VALIDATION_SIMULATOR" || true
+            xcrun simctl delete "$VALIDATION_SIMULATOR"
+          fi
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: simulator-validation-evidence
+          path: .build/simulator-evidence
+          retention-days: 7

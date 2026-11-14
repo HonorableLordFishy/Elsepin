@@ -1,5 +1,10 @@
 import MapKit
 
+/// Value boundary shared by the real MapKit request and the isolated UI-test adapter.
+struct PlaceSearchResponse {
+    let mapItems: [MKMapItem]
+}
+
 /// One owner per native request. Cancellation and deadlines cancel MapKit too;
 /// an obsolete request never cancels a replacement search or changes movement.
 @MainActor final class PlaceSearchRequest {
@@ -8,7 +13,7 @@ import MapKit
     init(_ request: MKLocalSearch.Request) { search = MKLocalSearch(request: request) }
     init(pointsOfInterest request: MKLocalPointsOfInterestRequest) { search = MKLocalSearch(request: request) }
     func cancel() { search.cancel() }
-    func start(seconds: Double = 7) async throws -> MKLocalSearch.Response {
+    func start(seconds: Double = 7) async throws -> PlaceSearchResponse {
         let deadline = Task { @MainActor [weak self] in
             do { try await Task.sleep(for: .seconds(seconds)) } catch { return }
             self?.timedOut = true
@@ -20,7 +25,7 @@ import MapKit
                 try Task.checkCancellation()
                 let response = try await search.start()
                 try Task.checkCancellation()
-                return response
+                return PlaceSearchResponse(mapItems: response.mapItems)
             } catch {
                 try Task.checkCancellation()
                 if timedOut { throw URLError(.timedOut) }

@@ -81,6 +81,7 @@ struct RouteStopSearchSheet: View {
                 }.shiftSettingsRows()
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .shiftSettingsScreen().loggedNavigationTitle(browsing ? "Along your route" : "Find a stop")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -353,7 +354,7 @@ private final class RouteStopSearchModel: ObservableObject {
 
     func search() {
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty, !isSearching else { return }
         cancel()
         let ticket = generation
         let alongRoute = scope == .alongRoute

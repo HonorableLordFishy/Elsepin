@@ -3,6 +3,99 @@
 Read this before applying new design skills or continuing the video-inspired
 polish. Current implementation and device evidence are in [CURRENT-WORK](CURRENT-WORK.md).
 
+## Post-build-82 flow review - 14 November 2026 (local, not natively built)
+
+Scope: refine the continuous Map -> search/select -> planner -> active route ->
+Library flow. The existing themes, compact tray, larger Settings identity card,
+native pushed editors, explicit movement confirmation and full product remain.
+This is not a new design system or a settings redesign.
+
+### Feature and state inventory
+
+This inventory identifies owners and boundaries, not a claim of device acceptance
+or an exhaustive audit of every implementation in the product.
+
+| Feature | Current owners | States and constraints carried forward |
+| --- | --- | --- |
+| Map / Library / Settings shell | `RootView`, `MapHomeView`, `PlacesView`, `SettingsView` | Idle, selected pin, held location, prepared/moving/interrupted route; one persistent map and tab shell, overlays do not resize the map. |
+| Setup / pairing | `SetupFlowView`, `PairOnDeviceView`, `SetupConnectionModel` | Discovery, connected, awaiting code, success, retry; notification/Live Activity pairing code; no pairing or credential changes. |
+| Connection and clearing | `SpoofSession`, `LocationEngine`, `ConnectionDetailsView`, `SessionPresentation` | Connecting, confirmed, reconnecting, unverified, stopping, failed; fresh commands and uncertain-clear evidence remain authoritative. |
+| Dropped / saved pins | `PinEditor`, `PinDraft`, `SavedPinMapIcon`, `PinLocationLookup`, `MapFavoriteButton` | Explicit Save/Cancel; manual taps do not name or look up addresses; search fills only a blank name; optional custom emoji/color. |
+| Pin range / map scale | `SavedPinVisibility`, `SessionPreferences`, `MapHomeView`, `AppearanceSettingsView` | Ground width, 0.5-20 mi, default 5; draft/selected pin separate; native scale and camera-end refresh preserved. Phone acceptance is still pending. |
+| Search / Recents | `RoutePlaceSearchSheet`, `RouteStopSearchSheet`, `PlaceSearchRequest` | Suggestions, submitted results, chosen search area, cancel/failure/empty states; pin actions differ from stored routes; no implicit movement. |
+| Route planning / editing | `RoutePlanner`, `RoutePlannerSheet`, `RouteLegEditing`, `RouteStopSearchSheet` | Start/stops/destination, per-leg mode/speed, keep/recalculate, saved-path restore, practice preview, explicit Show then Start. |
+| Drawing / GPX / map expansion | `MapHomeView`, `SketchMapView`, `PathEditorSheet`, `GPXCodec` | Draft drawing, undo/redo, import/export, full-map Save/Cancel and camera continuity; no new gesture recognizers. |
+| Playback / joystick / next route | `SpoofSession`, `TravelControls`, `TripViews`, `NextRouteEditor` | Start, pause/resume, stops, hold, clear, jump/undo and next-route confirmation/cancellation; canceling next never stops the current trip. |
+| Library / favorites / folders | `TripLibrary`, `PlacesView`, `SavedTripsSection`, `MapFavoriteButton` | Save vs favorite on the same record, named pins/routes, filtered and empty lists, history and guarded deletion. |
+| Areas / Recently Deleted | `NamedAreasView`, `AreaCornerHistory`, `RecentlyDeletedView`, `DeletedItemsSelectionSweep` | Draft corner undo/redo, search/expansion, overlap validation, restoration and confirmed deletion; selection coordinates unchanged. |
+| Backups / themes / privacy / demo | `LibraryBackupView`, `BackupImportReviewView`, `ShiftAppearance`, `AppPrivacyController`, `DevModeController` | Selective import, compatibility and current-value comparison, approved themes, lock/unlock, workspace isolation and stale-write guards; persistence untouched. |
+| Widgets / Live Activity / helpers | `HomeWidgetPublisher`, `LocusHomeWidgets`, `SessionActivityController`, `LocusLiveActivity`, `CompanionClient`, `RemoteFindMyController`, `CloudFindMy` | Widget actions prepare only, signed App Group limits, stale activity evidence, optional provider/helper authentication; no new permissions, polling or movement authority. |
+
+### Findings addressed in this slice
+
+- **Narrow toolbar overflow:** five 44-point controls plus along-route Search,
+  jump Undo and Follow require about 420 points including margins. A single
+  HStack could not fit them on narrower phones. `MapToolbarLayout` measures its
+  two existing groups and wraps the auxiliary group only when needed. It keeps
+  control/dialog identity, 44-point targets, the scale and all actions.
+- **Long active-route tray:** details and commands shared one unbounded stack.
+  Details now scroll only when they cannot fit below the measured map toolbar;
+  Pause/Resume, Stop and connection retry remain outside that scroll area.
+  The map's native viewport remains an overlay host, never resized by the tray.
+- **Misleading initial route state:** the worker creates `.moving` before its
+  first write succeeds. `RouteJourneyPresentation` gives connection evidence
+  precedence, showing Starting/Checking/Unverified rather than Following route.
+  Recovery, pause and confirmed arrival retain their meanings.
+- **Directions failure dead end:** a failed preview with both endpoints chosen
+  still said to choose endpoints. `RoutePlanningReadiness` now offers Find/Retry
+  directions and acknowledges the retained places. Existing restore-previous-path
+  behavior and Show -> Start confirmation remain intact.
+- **Search interruption:** repeated keyboard submission no longer cancels and
+  restarts the same in-flight request. Query/area changes still cancel and replace
+  it. Both search lists use native interactive keyboard dismissal. A fresh search
+  clears an old category-fallback note.
+- **Library clarity:** filtered-empty pins/routes explicitly say no matches or
+  an empty folder, instead of implying that saved data is missing. Pin favorite
+  buttons include the item name in their VoiceOver label.
+- **Readability/adaptivity:** the text-bearing map tray uses regular rather than
+  clear glass. Solid, Reduce Transparency and increased-contrast fallbacks remain.
+  Long route/next-route names wrap; accessibility-size shortcuts stack; custom
+  tray entry respects Reduce Motion. No decorative motion or new haptics added.
+
+### Evidence and remaining acceptance
+
+Source review began on clean `19de0e0`, using the current worktree. Codebase Memory
+project `C-Users-naith-Documents-GitHub-Elsepin` initially reported generation
+`2026-11-14T21:51:55Z`; architecture/caller traces and exact-path coverage were
+checked. Generic Swift `map`/`point` call edges were not treated as authoritative;
+the actual source was read. Excluded docs were read directly. When the MCP
+transport closed later, the installed CLI successfully refreshed the index.
+Unchanged partial parses in LocationEngine/WidgetLibrary and an existing probe
+test are limitations, not evidence of dead code or complete coverage.
+
+Lead workflow: Impeccable native polish/audit guidance, supplemented by the
+installed Build iOS Apps UI-pattern and Liquid Glass guides. Axiom/Apple Look
+were absent from the current catalog. Historical owner screenshots informed
+the retained compact spacing; no screenshot is presented as this revision.
+
+Apple's [materials guidance](https://developer.apple.com/design/human-interface-guidelines/materials)
+supports regular glass for text legibility over varied backgrounds. Its
+[motion guidance](https://developer.apple.com/design/human-interface-guidelines/motion)
+supports brief, purposeful, interruptible feedback and optional movement. Native
+[Layout](https://developer.apple.com/documentation/swiftui/layout) and
+[ViewThatFits](https://developer.apple.com/documentation/swiftui/viewthatfits)
+provide the bounded adaptations without new libraries. Research checked 14 November.
+
+Pending: native compile and nine new Swift regression tests, iPhone/iPad small
+window layout at default/max text, light/dark/Solid/Glass, Reduce Motion/Transparency,
+VoiceOver traversal, interrupting a search, and retry after unavailable directions.
+Keep build 82's separate physical scale/zoom/slider checks pending. No measured
+smoothness, battery or crash-free claim follows from these source changes.
+
+Optional future visual alternatives are deferred until those interactions are
+seen on a device. No Awwwards/web composition or new animation was needed to
+resolve these source-confirmed problems.
+
 ## Build 82 visibility feedback (compiled; phone acceptance pending)
 
 - Keep pins visible across wider neighborhood views. Base the cutoff on visible

@@ -2,16 +2,19 @@ import SwiftUI
 import MapKit
 
 struct ArrivalControls: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var planner: RoutePlanner
     @EnvironmentObject private var pairing: PairingStore
     var body: some View {
         if let next = session.nextRoutePlan {
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
+                let layout = typeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 8))
+                layout {
                     Label("Next: \(next.route.destination.name)", systemImage: "arrow.turn.down.right")
-                        .font(.subheadline.weight(.semibold)).lineLimit(1)
-                    Spacer(minLength: 8)
+                        .font(.subheadline.weight(.semibold)).lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Button("Cancel next route") { session.cancelNextRoute() }.font(.caption).frame(minHeight: 44)
                 }
                 if let due = session.nextRouteDueAt, due > Date() {
@@ -68,18 +71,25 @@ struct SavedTripsSection: View {
     @State private var name = ""
     @State private var copyNotice: String?
 
+    private var shownTrips: [SavedTrip] {
+        library.trips.filter {
+            (!favoritesOnly || $0.isFavorite) && (folder == nil || $0.folder == folder) && SavedNameSearch.matches(search, trip: $0)
+        }
+    }
+
     var body: some View {
         Section {
-            if library.trips.filter({ !favoritesOnly || $0.isFavorite }).isEmpty {
-                Text(favoritesOnly ? "Star a saved route to find it here." : "Name a route in the planner to save its path, speed, and stops.").foregroundStyle(.secondary)
+            if shownTrips.isEmpty {
+                Text(!search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No routes match this search."
+                     : folder != nil ? "No routes in this folder."
+                     : favoritesOnly ? "Star a saved route to find it here."
+                     : "Create a route here, or save one from the map.").foregroundStyle(.secondary)
             }
             if let onCreate, !favoritesOnly {
                 Button("Create a route", systemImage: "point.topleft.down.to.point.bottomright.curvepath", action: onCreate)
                     .frame(minHeight: 44)
             }
-            ForEach(library.trips.filter {
-                (!favoritesOnly || $0.isFavorite) && (folder == nil || $0.folder == folder) && SavedNameSearch.matches(search, trip: $0)
-            }) { trip in
+            ForEach(shownTrips) { trip in
                 HStack(spacing: 4) {
                 Button { onChoose(trip) } label: {
                     HStack {

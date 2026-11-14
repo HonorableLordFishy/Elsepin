@@ -82,6 +82,10 @@ struct RoutePlannerSheet: View {
     private var displayMode: TravelMode { hasJourney ? session.travelMode : planner.draftMode }
     private var displaySpeed: Double { hasJourney ? session.speedMPH(for: session.travelMode) : planner.draftSpeedMPH }
     private var displaySmooth: Bool { hasJourney ? session.currentSmoothMovement : planner.draftSmoothMovement }
+    private var readiness: RoutePlanningReadiness {
+        .resolve(hasOrigin: planner.origin != nil, hasDestination: planner.destination != nil,
+                 hasRoute: route != nil, isLoading: planner.isLoading, hasError: planner.error != nil)
+    }
 
     var body: some View {
         NavigationStack {
@@ -655,6 +659,14 @@ struct RoutePlannerSheet: View {
                             .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
                     }
                 }
+                if readiness.offersDirections {
+                    Button(planner.error == nil ? "Find directions" : "Retry directions", systemImage: "arrow.clockwise") {
+                        guard readiness.offersDirections else { return }
+                        planner.rebuild(mode: displayMode)
+                    }
+                    .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
+                    .accessibilityHint("Keeps your chosen places and requests a new preview. Does not start movement.")
+                }
                 if let route {
                     if let note = route.source.playbackNote(mode: route.travelSections.first?.mode ?? displayMode) {
                         Text(note).font(.caption.weight(.medium)).foregroundStyle(LocusTheme.statusWarn)
@@ -666,10 +678,7 @@ struct RoutePlannerSheet: View {
                 }
                 .buttonStyle(ShiftActionStyle(compact: true))
                 .disabled(!canShowRoute)
-                Text(planner.isLoading ? "Building your preview. No movement has started."
-                     : planner.cyclingUnavailable ? "Try a nearby street or path on the map."
-                     : route == nil ? "Choose a start and destination."
-                     : nextRouteMode ? "Returns to next-route setup." : "Next: tap Start route on the map.")
+                Text(readiness.guidance(nextRoute: nextRouteMode, cyclingUnavailable: planner.cyclingUnavailable))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
