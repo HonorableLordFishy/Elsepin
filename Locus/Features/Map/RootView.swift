@@ -25,59 +25,7 @@ struct RootView: View {
     @State private var noticeID = UUID()
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-        Tab("Map", systemImage: "map.fill", value: RootTab.map) {
-        MapHomeView(isVisible: selectedTab == .map && !planner.isPresented && !showSessionDetails && privacy.canOpenContent,
-                    incomingPlace: $mapPreview, incomingSearch: $searchMap,
-                    onToolsHeightChange: { mapToolsHeight = $0 })
-        // Keep the native map's viewport fixed while the controls change height.
-        // Resizing it through safeAreaInset during a glass animation can expose
-        // an empty map frame and also moves its gesture coordinate space.
-        .overlay(alignment: .bottom) {
-            if !planner.isDrawing {
-                GeometryReader { geometry in
-                    VStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        BottomControlsView(showPlaces: $showPlaces, showNotice: showNotice,
-                            controlsEnabled: selectedTab == .map && !planner.isPresented && !showSessionDetails && privacy.canOpenContent,
-                            availableHeight: max(0, geometry.size.height - mapToolsHeight - 38))
-                    }
-                    .padding(.horizontal, 16)
-                    // Keep a strip of the map visible below the tray for its
-                    // system attribution and legal link.
-                    .padding(.bottom, 30)
-                }
-                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        }
-        Tab("Library", systemImage: "square.stack.fill", value: RootTab.library) {
-        PlacesView(isRoot: true, onTrip: { trip in
-            guard session.journey == nil, !session.isBusy else { showNotice("End the current route before opening another."); return }
-            selectedTab = .map
-            planner.useSaved(trip)
-        }, onPlace: { place in
-            guard session.journey == nil, !session.isBusy else { showNotice("End the current route before choosing another place."); return }
-            selectedTab = .map
-            planner.discardPreparedRoute()
-            session.selectPin(place.coordinate, name: place.displayName)
-            mapPreview = RoutePlace(name: place.name, coordinate: place.coordinate)
-        }, onFindPlace: {
-            guard session.journey == nil, !session.isBusy, !planner.isDrawing else { showNotice("End the current route or close its editor before choosing another place."); return }
-            selectedTab = .map
-            searchMap = true
-        }, onCreateRoute: {
-            guard session.journey == nil, !session.isBusy, !planner.isDrawing else { showNotice("End the current route or close its editor before creating another."); return }
-            selectedTab = .map
-            planner.discardDraft()
-            planner.savesToLibraryOnCompletion = true
-            planner.isPresented = true
-        })
-        }
-        Tab("Settings", systemImage: "gearshape.fill", value: RootTab.settings) {
-            SettingsView(isRoot: true)
-        }
-        }
+        tabs
         // Keep one TabView alive. Solid navigation replaces only its chrome, never
         // the map or session. OS-owned menus and alerts still follow iOS settings.
         .modifier(ShiftTabBarBehavior())
@@ -159,6 +107,51 @@ struct RootView: View {
         }
     }
 
+    // Keep the tab tree small enough for Debug/simulator type checking. These
+    // callbacks still act on the same RootView-owned planner and library.
+    private var tabs: some View {
+        TabView(selection: $selectedTab) {
+            Tab("Map", systemImage: "map.fill", value: RootTab.map) {
+                MapTabContent(incomingPlace: $mapPreview, incomingSearch: $searchMap,
+                    showPlaces: $showPlaces, toolsHeight: $mapToolsHeight,
+                    isVisible: selectedTab == .map && !planner.isPresented && !showSessionDetails && privacy.canOpenContent,
+                    isDrawing: planner.isDrawing, showNotice: showNotice)
+            }
+            Tab("Library", systemImage: "square.stack.fill", value: RootTab.library) {
+                PlacesView(isRoot: true, onTrip: openSavedTrip, onPlace: openSavedPin,
+                           onFindPlace: findPlace, onCreateRoute: createRoute)
+            }
+            Tab("Settings", systemImage: "gearshape.fill", value: RootTab.settings) {
+                SettingsView(isRoot: true)
+            }
+        }
+    }
+
+    private func openSavedTrip(_ trip: SavedTrip) {
+        guard session.journey == nil, !session.isBusy else { showNotice("End the current route before opening another."); return }
+        selectedTab = .map
+        planner.useSaved(trip)
+    }
+    private func openSavedPin(_ place: SavedPlace) {
+        guard session.journey == nil, !session.isBusy else { showNotice("End the current route before choosing another place."); return }
+        selectedTab = .map
+        planner.discardPreparedRoute()
+        session.selectPin(place.coordinate, name: place.displayName)
+        mapPreview = RoutePlace(name: place.name, coordinate: place.coordinate)
+    }
+    private func findPlace() {
+        guard session.journey == nil, !session.isBusy, !planner.isDrawing else { showNotice("End the current route or close its editor before choosing another place."); return }
+        selectedTab = .map
+        searchMap = true
+    }
+    private func createRoute() {
+        guard session.journey == nil, !session.isBusy, !planner.isDrawing else { showNotice("End the current route or close its editor before creating another."); return }
+        selectedTab = .map
+        planner.discardDraft()
+        planner.savesToLibraryOnCompletion = true
+        planner.isPresented = true
+    }
+
     private var solidNavigation: Bool { !preferences.glassPanel || reduceTransparency }
     private var solidTabBar: some View {
         HStack(spacing: 0) {
@@ -233,6 +226,39 @@ struct RootView: View {
         DeveloperLogStore.shared.record("popup_requested", ["message": message])
         withAnimation(.easeOut(duration: 0.15)) { notice = message }
         noticeID = UUID()
+    }
+}
+
+private struct MapTabContent: View {
+    @Binding var incomingPlace: RoutePlace?
+    @Binding var incomingSearch: Bool
+    @Binding var showPlaces: Bool
+    @Binding var toolsHeight: CGFloat
+    let isVisible: Bool
+    let isDrawing: Bool
+    let showNotice: (String) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        MapHomeView(isVisible: isVisible, incomingPlace: $incomingPlace,
+                    incomingSearch: $incomingSearch, onToolsHeightChange: { toolsHeight = $0 })
+        // Preserve a fixed map viewport while the overlay's content changes.
+        .overlay(alignment: .bottom) {
+            if !isDrawing {
+                GeometryReader { geometry in
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        BottomControlsView(showPlaces: $showPlaces, showNotice: showNotice,
+                            controlsEnabled: isVisible,
+                            availableHeight: max(0, geometry.size.height - toolsHeight - 38))
+                    }
+                    .padding(.horizontal, 16)
+                    // Preserve the map attribution/legal strip below the tray.
+                    .padding(.bottom, 30)
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            }
+        }
     }
 }
 

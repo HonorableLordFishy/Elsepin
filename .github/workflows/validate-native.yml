@@ -82,6 +82,8 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          xcrun simctl boot "$VALIDATION_SIMULATOR"
+          xcrun simctl bootstatus "$VALIDATION_SIMULATOR" -b
           xcodebuild -project ElsepinValidation.xcodeproj -scheme Locus -configuration Debug \
             -destination "platform=iOS Simulator,id=$VALIDATION_SIMULATOR" \
             -derivedDataPath .build/simulator-validation -resultBundlePath .build/simulator-evidence/UI.xcresult \

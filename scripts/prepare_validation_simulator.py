@@ -21,6 +21,6 @@ device_type = next((t for t in types if t['name'] == 'iPhone 17'), types[-1])
 device = run('xcrun', 'simctl', 'create', 'Elsepin disposable validation', device_type['identifier'], runtime['identifier'])
 with open(os.environ['GITHUB_ENV'], 'a') as env:
     env.write('VALIDATION_SIMULATOR=' + device + '\n')
-subprocess.run(['xcrun', 'simctl', 'boot', device], check=True)
-subprocess.run(['xcrun', 'simctl', 'bootstatus', device, '-b'], check=True)
+# Compile against the destination while it is shut down. Booting afterwards
+# leaves the small hosted Mac's memory/CPU available to the Swift compiler.
 print(f"Validation simulator: {device_type['name']}, {runtime['name']}; disposable data only")
