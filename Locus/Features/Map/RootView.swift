@@ -25,6 +25,26 @@ struct RootView: View {
     @State private var noticeID = UUID()
 
     var body: some View {
+        presentedTabs
+        .onReceive(NotificationCenter.default.publisher(for: .locusImportGPX), perform: importGPX)
+        .onChange(of: incomingSessionDetails) { _, _ in openShortcutIfAllowed() }
+        .onChange(of: incomingShortcut) { _, _ in openShortcutIfAllowed() }
+        .onChange(of: privacy.canOpenContent) { _, _ in openShortcutIfAllowed() }
+        .loggedAlert("Session needs attention", isPresented: Binding(
+            get: { session.lastError != nil },
+            set: { if !$0 { session.lastError = nil } }
+        )) {
+            Button("Connection details") {
+                session.lastError = nil
+                incomingSessionDetails = true
+            }
+            Button("OK", role: .cancel) { session.lastError = nil }
+        } message: { Text(session.lastError ?? "") }
+        .overlay(alignment: .center) { noticeOverlay }
+        .task(id: noticeID) { await dismissNoticeAfterDelay() }
+    }
+
+    private var navigationTabs: some View {
         tabs
         // Keep one TabView alive. Solid navigation replaces only its chrome, never
         // the map or session. OS-owned menus and alerts still follow iOS settings.
@@ -37,6 +57,10 @@ struct RootView: View {
         .tint(ShiftPalette.color(.accent, style: visualStyle))
         .environmentObject(planner)
         .environmentObject(tripLibrary)
+    }
+
+    private var presentedTabs: some View {
+        navigationTabs
         .onChange(of: showPlaces) { _, show in if show { selectedTab = .library; showPlaces = false } }
         .fullScreenCover(isPresented: $planner.isPresented, onDismiss: {
             if session.journey == nil { planner.rememberDraft(in: session) }
@@ -57,54 +81,44 @@ struct RootView: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { showSessionDetails = false } }
             } }.presentationDetents([.large])
         }
-        .onReceive(NotificationCenter.default.publisher(for: .locusImportGPX)) { note in
-            guard !reset.isResetting else { return }
-            guard let url = note.object as? URL else { return }
-            guard session.journey == nil, !session.isBusy, !planner.isDrawing, !planner.isPresented else {
-                session.lastError = "Close the current editor and end any moving route before importing a GPX file."
-                return
-            }
-            do {
-                let points = try GPXCodec.parse(url)
-                selectedTab = .map
-                planner.useCustom(points, source: .gpx)
-            } catch { session.lastError = error.localizedDescription }
+    }
+
+    private func importGPX(_ note: Notification) {
+        guard !reset.isResetting else { return }
+        guard let url = note.object as? URL else { return }
+        guard session.journey == nil, !session.isBusy, !planner.isDrawing, !planner.isPresented else {
+            session.lastError = "Close the current editor and end any moving route before importing a GPX file."
+            return
         }
-        .onChange(of: incomingSessionDetails) { _, _ in openShortcutIfAllowed() }
-        .onChange(of: incomingShortcut) { _, _ in openShortcutIfAllowed() }
-        .onChange(of: privacy.canOpenContent) { _, _ in openShortcutIfAllowed() }
-        .loggedAlert("Session needs attention", isPresented: Binding(
-            get: { session.lastError != nil },
-            set: { if !$0 { session.lastError = nil } }
-        )) {
-            Button("Connection details") {
-                session.lastError = nil
-                incomingSessionDetails = true
-            }
-            Button("OK", role: .cancel) { session.lastError = nil }
-        } message: { Text(session.lastError ?? "") }
-        .overlay(alignment: .center) {
-            if let notice {
-                Text(notice)
-                    .font(.subheadline.weight(.medium))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 20).padding(.vertical, 14)
-                    .background(Color(uiColor: .systemGray5), in: RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
-                    .frame(maxWidth: 290)
-                    .padding(24)
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
-            }
+        do {
+            let points = try GPXCodec.parse(url)
+            selectedTab = .map
+            planner.useCustom(points, source: .gpx)
+        } catch { session.lastError = error.localizedDescription }
+    }
+
+    @ViewBuilder private var noticeOverlay: some View {
+        if let notice {
+            Text(notice)
+                .font(.subheadline.weight(.medium))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 20).padding(.vertical, 14)
+                .background(Color(uiColor: .systemGray5), in: RoundedRectangle(cornerRadius: 16))
+                .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+                .frame(maxWidth: 290)
+                .padding(24)
+                .allowsHitTesting(false)
+                .transition(.opacity)
         }
-        .task(id: noticeID) {
-            guard let notice else { return }
-            UIAccessibility.post(notification: .announcement, argument: notice)
-            do { try await Task.sleep(nanoseconds: 2_500_000_000) } catch { return }
-            DeveloperLogStore.shared.record("popup_dismissed", ["message": notice])
-            withAnimation(.easeOut(duration: 0.15)) { self.notice = nil }
-        }
+    }
+
+    private func dismissNoticeAfterDelay() async {
+        guard let notice else { return }
+        UIAccessibility.post(notification: .announcement, argument: notice)
+        do { try await Task.sleep(nanoseconds: 2_500_000_000) } catch { return }
+        DeveloperLogStore.shared.record("popup_dismissed", ["message": notice])
+        withAnimation(.easeOut(duration: 0.15)) { self.notice = nil }
     }
 
     // Keep the tab tree small enough for Debug/simulator type checking. These
