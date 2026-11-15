@@ -53,7 +53,6 @@ struct RootView: View {
         // the map or session. OS-owned menus and alerts still follow iOS settings.
         .modifier(ShiftTabBarBehavior())
         .background(ShiftCanvas())
-        .toolbar(planner.isDrawing || solidNavigation ? .hidden : .visible, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if solidNavigation && !planner.isDrawing { solidTabBar }
         }
@@ -133,13 +132,16 @@ struct RootView: View {
                     showPlaces: $showPlaces, toolsHeight: $mapToolsHeight,
                     isVisible: selectedTab == .map && !planner.isPresented && !showSessionDetails && privacy.canOpenContent,
                     isDrawing: planner.isDrawing, showNotice: showNotice)
+                    .toolbar(planner.isDrawing || solidNavigation ? .hidden : .visible, for: .tabBar)
             }
             Tab("Library", systemImage: "square.stack.fill", value: RootTab.library) {
                 PlacesView(isRoot: true, onTrip: openSavedTrip, onPlace: openSavedPin,
                            onFindPlace: findPlace, onCreateRoute: createRoute)
+                    .toolbar(solidNavigation ? .hidden : .visible, for: .tabBar)
             }
             Tab("Settings", systemImage: "gearshape.fill", value: RootTab.settings) {
                 SettingsView(isRoot: true)
+                    .toolbar(solidNavigation ? .hidden : .visible, for: .tabBar)
             }
         }
     }
@@ -346,11 +348,11 @@ struct StatusBarView: View {
             Button { showDetails = true } label: {
             HStack(spacing: 10) {
                 Image(systemName: session.showsClosedSessionNotice ? "info.circle" : phase.symbol)
-                    .font(.subheadline.weight(.semibold))
+                    .font(typeSize.isAccessibilitySize ? .system(size: 20, weight: .semibold) : .subheadline.weight(.semibold))
                     .foregroundStyle(session.showsClosedSessionNotice ? Color.secondary : phase.color)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(typeSize.isAccessibilitySize ? compactStatusTitle : session.statusTitle)
-                        .font(typeSize.isAccessibilitySize ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
+                        .font(typeSize.isAccessibilitySize ? .caption2.weight(.semibold) : .subheadline.weight(.semibold))
                     if !typeSize.isAccessibilitySize {
                     if remote.enabled && remote.paired && session.remoteCheckSessionRequested {
                         Text(remote.state.title).font(.footnote)
@@ -523,6 +525,7 @@ struct BottomControlsView: View {
                     ScrollView {
                         journeyDetails(route: route, trip: trip)
                     }.scrollBounceBehavior(.basedOnSize)
+                        .accessibilityIdentifier("route.detailsScroll")
                 }
                 journeyActions(trip: trip).fixedSize(horizontal: false, vertical: true).layoutPriority(1)
             }
@@ -536,21 +539,24 @@ struct BottomControlsView: View {
 
     private func journeyDetails(route: PlannedRoute, trip: JourneyProgress) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+            let headerLayout = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+            headerLayout {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(route.destination.name).font(.headline)
                         .lineLimit(typeSize.isAccessibilitySize ? nil : routeDetailsCollapsed ? 1 : 2)
+                        .multilineTextAlignment(.leading)
                     Text(RouteJourneyPresentation.subtitle(phase: session.effectivePhase, state: trip.state,
                         restored: session.restoredRouteAwaitingConnection, recovering: session.recoveringRoute))
                         .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
                 Button {
                     // Presentation only: never change the map viewport or route commands.
                     withAnimation(session.lowPower ? nil : panelAnimation) { routeDetailsCollapsed.toggle() }
                 } label: {
                     Image(systemName: routeDetailsCollapsed ? "chevron.up" : "chevron.down")
-                        .font(.body.weight(.semibold))
+                        .font(.system(size: 20, weight: .semibold))
                         .frame(width: 44, height: 44).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -571,8 +577,9 @@ struct BottomControlsView: View {
                         Button { activate(item) } label: { Label(shortcutTitle(item), systemImage: shortcutIcon(item)) }
                     }
                 } label: {
-                    Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Rectangle())
+                    Image(systemName: "ellipsis").font(.system(size: 20)).frame(width: 44, height: 44).contentShape(Rectangle())
                 }.accessibilityLabel("Route controls and shortcuts")
+                }
             }
             if !routeDetailsCollapsed {
                 let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(alignment: .top, spacing: 20))
@@ -641,8 +648,14 @@ struct BottomControlsView: View {
                 }
                 if session.routeActive && !session.routeStopping {
                     Button { session.toggleRoutePause() } label: {
+                        Group {
+                        if typeSize.isAccessibilitySize {
+                            Text(trip.state == .pausing ? "Pausing…" : session.routePaused ? "Resume" : "Pause")
+                        } else {
                         Label(trip.state == .pausing ? "Pausing…" : session.routePaused ? "Resume" : "Pause",
                               systemImage: session.routePaused ? "play.fill" : "pause.fill")
+                        }
+                        }
                             .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
                     }
                     .buttonStyle(ShiftActionStyle(immediatePress: true))
@@ -830,7 +843,7 @@ struct BottomControlsView: View {
         Button { session.stop(pairing: pairing) } label: {
             HStack(spacing: 6) {
                 if session.isStopping { ProgressView().controlSize(.small) }
-                else { Image(systemName: "stop.circle") }
+                else { Image(systemName: "stop.circle").font(typeSize.isAccessibilitySize ? .system(size: 20) : .subheadline) }
                 Text(typeSize.isAccessibilitySize ? (session.isStopping ? "Stopping" : session.effectivePhase == .active ? "Stop" : "Clear") : session.stopButtonTitle)
             }
                 .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, minHeight: 44)
@@ -964,7 +977,7 @@ struct SessionSpotNameButton: View {
             showEditor = true
         } label: {
             Image(systemName: "tag")
-                .font(.body.weight(.medium)).frame(width: 44, height: 44).contentShape(Rectangle())
+                .font(.system(size: 20, weight: .medium)).frame(width: 44, height: 44).contentShape(Rectangle())
         }
         .buttonStyle(.plain).foregroundStyle(.primary)
         .disabled(session.isBusy || session.status == .stopping || session.routeJumping)

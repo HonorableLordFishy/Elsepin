@@ -402,7 +402,7 @@ struct PlacesView: View {
             Button { onPlace(place); if !isRoot { dismiss() } } label: {
                 HStack(spacing: 12) {
                     if !typeSize.isAccessibilitySize { SavedPlaceBadge(symbol: place.symbol, tint: place.tint, emoji: place.emoji) }
-                    Text(place.displayName).foregroundStyle(.primary)
+                    Text(place.displayName).foregroundStyle(.primary).multilineTextAlignment(.leading)
                     Spacer()
                 }.frame(minHeight: 48).contentShape(Rectangle())
             }.buttonStyle(.borderless)

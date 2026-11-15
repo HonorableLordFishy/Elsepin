@@ -69,6 +69,11 @@ final class ElsepinFlowUITests: XCTestCase {
         reachable("session.pause"); reachable("session.stop")
         reachable("map.routeSearch"); reachable("map.follow")
         capture("04-largest-text-long-route")
+        let details = app.scrollViews["route.detailsScroll"]
+        XCTAssertTrue(details.exists)
+        details.swipeUp()
+        reachable("session.pause"); reachable("session.stop")
+        capture("04b-largest-text-details-scrolled")
         app.buttons["session.pause"].tap()
         reachable("session.stop")
         capture("05-largest-text-paused")
@@ -78,6 +83,8 @@ final class ElsepinFlowUITests: XCTestCase {
         configureAccessibility(true)
         launch("paused", large: true, dark: true, fallback: true)
         reachable("session.stop"); reachable("session.pause")
+        XCTAssertFalse(app.tabBars.buttons["Library"].isHittable, "Only the solid fallback navigation should be visible")
+        XCTAssertLessThan(app.buttons["session.pause"].frame.height, 85, "Resume should fit on one line")
         capture("06-dark-reduced-motion-transparency-contrast")
     }
     private func configureAccessibility(_ enabled: Bool) {
@@ -194,13 +201,14 @@ final class ElsepinFlowUITests: XCTestCase {
     func testLibraryLongNamesLargeDark() {
         launch("idle", large: true, dark: true, fallback: true)
         openLibrary()
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch.waitForExistence(timeout: 10))
-        XCTAssertGreaterThan(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch.frame.width, 180)
+        let longItem = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch
+        XCTAssertTrue(longItem.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(longItem.frame.width, 180)
         capture("14-library-long-names-largest-text")
         app.descendants(matching: .any).matching(identifier: "library.category").firstMatch.tap()
         app.buttons["Routes"].tap()
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch.waitForExistence(timeout: 10))
-        XCTAssertGreaterThan(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch.frame.width, 180)
+        XCTAssertTrue(longItem.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(longItem.frame.width, 180)
         capture("14b-library-long-route-largest-text")
     }
     private func openLibrary() {

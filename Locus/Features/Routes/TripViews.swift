@@ -104,7 +104,8 @@ struct SavedTripsSection: View {
                         }
                         Spacer()
                         if !typeSize.isAccessibilitySize { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
-                    }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                    }.multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless).disabled(session.journey != nil || session.isBusy)
                 Menu { tripActions(trip) } label: {
