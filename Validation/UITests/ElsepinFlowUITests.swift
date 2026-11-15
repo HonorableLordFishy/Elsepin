@@ -66,14 +66,17 @@ final class ElsepinFlowUITests: XCTestCase {
         func value(_ id: String) -> Int { Int(app.staticTexts[id].label) ?? -1 }
         expectPins(true)
         capture("18-pins-near-active-route")
+        let pinchArea = app.otherElements["validation.pinchSurface"]
+        XCTAssertLessThan(pinchArea.frame.maxY, app.buttons["Expand route details"].frame.minY - 16,
+                          "Both pinch fingers must stay above the route tray")
         let hides = value("validation.pinLiveHides")
-        app.otherElements["validation.pinchSurface"].pinch(withScale: 0.2, velocity: -0.5)
+        pinchArea.pinch(withScale: 0.2, velocity: -0.5)
         expectPins(false)
         XCTAssertGreaterThan(Double(app.staticTexts["validation.pinWidth"].label) ?? 0, 1)
         XCTAssertGreaterThan(value("validation.pinLiveHides"), hides, "Pins must hide in a continuous callback, before camera settles")
         capture("19-pins-hidden-after-live-crossing")
         let shows = value("validation.pinLiveShows")
-        app.otherElements["validation.pinchSurface"].pinch(withScale: 5, velocity: 0.5)
+        pinchArea.pinch(withScale: 5, velocity: 0.5)
         expectPins(true)
         XCTAssertLessThan(Double(app.staticTexts["validation.pinWidth"].label) ?? 2, 1)
         XCTAssertGreaterThan(value("validation.pinLiveShows"), shows, "Pins must reappear in a continuous callback, before camera settles")

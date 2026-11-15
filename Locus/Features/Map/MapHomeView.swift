@@ -259,7 +259,7 @@ struct MapHomeView: View {
             .overlay(alignment: .topLeading) {
                 if ValidationFixture.scenario == "map-pins" {
                     ValidationPinchSurface()
-                        .frame(width: 250, height: 150)
+                        .frame(width: 300, height: 90)
                         .padding(.leading, 16).padding(.top, 280)
                 }
             }
