@@ -53,9 +53,6 @@ struct RootView: View {
         // the map or session. OS-owned menus and alerts still follow iOS settings.
         .modifier(ShiftTabBarBehavior())
         .background(ShiftCanvas())
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if solidNavigation && !planner.isDrawing { solidTabBar }
-        }
         .tint(ShiftPalette.color(.accent, style: visualStyle))
         .environmentObject(planner)
         .environmentObject(tripLibrary)
@@ -133,15 +130,24 @@ struct RootView: View {
                     isVisible: selectedTab == .map && !planner.isPresented && !showSessionDetails && privacy.canOpenContent,
                     isDrawing: planner.isDrawing, showNotice: showNotice)
                     .toolbar(planner.isDrawing || solidNavigation ? .hidden : .visible, for: .tabBar)
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if solidNavigation && !planner.isDrawing { solidTabBar }
+                    }
             }
             Tab("Library", systemImage: "square.stack.fill", value: RootTab.library) {
                 PlacesView(isRoot: true, onTrip: openSavedTrip, onPlace: openSavedPin,
                            onFindPlace: findPlace, onCreateRoute: createRoute)
                     .toolbar(solidNavigation ? .hidden : .visible, for: .tabBar)
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if solidNavigation { solidTabBar }
+                    }
             }
             Tab("Settings", systemImage: "gearshape.fill", value: RootTab.settings) {
                 SettingsView(isRoot: true)
                     .toolbar(solidNavigation ? .hidden : .visible, for: .tabBar)
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if solidNavigation { solidTabBar }
+                    }
             }
         }
     }

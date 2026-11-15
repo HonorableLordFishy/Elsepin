@@ -2,11 +2,18 @@ import XCTest
 
 final class ElsepinFlowUITests: XCTestCase {
     private var app: XCUIApplication!
+    private var restoreAccessibility = false
     override func setUpWithError() throws { continueAfterFailure = false }
     override func tearDownWithError() throws {
         if let app, app.state == .runningForeground {
             capture("final-" + name)
             app.terminate()
+        }
+        // XCTest can abort through Objective-C when continueAfterFailure is false;
+        // a Swift defer in the test method is not a reliable cleanup boundary.
+        if restoreAccessibility {
+            configureAccessibility(false)
+            restoreAccessibility = false
         }
     }
     private func launch(_ scenario: String, large: Bool = false, dark: Bool = false, fallback: Bool = false) {
@@ -84,7 +91,7 @@ final class ElsepinFlowUITests: XCTestCase {
         capture("05-largest-text-paused")
     }
     func testDarkAccessibilityFallbackPaused() {
-        defer { configureAccessibility(false) }
+        restoreAccessibility = true
         configureAccessibility(true)
         launch("paused", large: true, dark: true, fallback: true)
         reachable("session.stop"); reachable("session.pause")
