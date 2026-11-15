@@ -3,9 +3,9 @@
   "sourceRepository": "N3moStudio/Elsepin",
   "releaseRepository": "N3moStudio/Elsepin-Releases",
   "primaryIcon": "AppIconPrismJumpgate",
-  "defaultTheme": "glacier",
-  "version": "2.6.0",
-  "build": 59,
+  "defaultTheme": "bloom",
+  "version": "2.6.1",
+  "build": 85,
   "releaseState": "development",
   "compatibility": {
     "bundleIdentifier": "com.n3mostudio.shift",

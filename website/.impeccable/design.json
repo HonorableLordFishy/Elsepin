@@ -1,0 +1,357 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-15T08:45:35.762Z",
+  "title": "Design System: Elsepin Website",
+  "extensions": {
+    "colorMeta": {
+      "mint": {
+        "role": "primary",
+        "displayName": "Route mint",
+        "tonalRamp": [
+          "oklch(15% 0.035 164)",
+          "oklch(26% 0.065 164)",
+          "oklch(38% 0.085 164)",
+          "oklch(49% 0.100 164)",
+          "oklch(61% 0.100 164)",
+          "oklch(72% 0.085 164)",
+          "oklch(84% 0.055 164)",
+          "oklch(95% 0.020 164)"
+        ]
+      },
+      "action-ink": {
+        "role": "neutral",
+        "displayName": "Deep green action ink",
+        "tonalRamp": [
+          "oklch(15% 0.012 165)",
+          "oklch(26% 0.023 165)",
+          "oklch(38% 0.030 165)",
+          "oklch(49% 0.035 165)",
+          "oklch(61% 0.035 165)",
+          "oklch(72% 0.030 165)",
+          "oklch(84% 0.019 165)",
+          "oklch(95% 0.007 165)"
+        ]
+      },
+      "focus-violet": {
+        "role": "secondary",
+        "displayName": "Focus violet",
+        "tonalRamp": [
+          "oklch(15% 0.056 295)",
+          "oklch(26% 0.104 295)",
+          "oklch(38% 0.136 295)",
+          "oklch(49% 0.160 295)",
+          "oklch(61% 0.160 295)",
+          "oklch(72% 0.136 295)",
+          "oklch(84% 0.088 295)",
+          "oklch(95% 0.032 295)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Midnight paper",
+        "tonalRamp": [
+          "oklch(15% 0.012 255)",
+          "oklch(26% 0.023 255)",
+          "oklch(38% 0.030 255)",
+          "oklch(49% 0.035 255)",
+          "oklch(61% 0.035 255)",
+          "oklch(72% 0.030 255)",
+          "oklch(84% 0.019 255)",
+          "oklch(95% 0.007 255)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Pearl ink",
+        "tonalRamp": [
+          "oklch(15% 0.006 255)",
+          "oklch(26% 0.012 255)",
+          "oklch(38% 0.015 255)",
+          "oklch(49% 0.018 255)",
+          "oklch(61% 0.018 255)",
+          "oklch(72% 0.015 255)",
+          "oklch(84% 0.010 255)",
+          "oklch(95% 0.004 255)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Blue-gray secondary ink",
+        "tonalRamp": [
+          "oklch(15% 0.012 255)",
+          "oklch(26% 0.023 255)",
+          "oklch(38% 0.030 255)",
+          "oklch(49% 0.035 255)",
+          "oklch(61% 0.035 255)",
+          "oklch(72% 0.030 255)",
+          "oklch(84% 0.019 255)",
+          "oklch(95% 0.007 255)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Pearl divider",
+        "tonalRamp": [
+          "oklch(15% 0.000 255)",
+          "oklch(26% 0.000 255)",
+          "oklch(38% 0.000 255)",
+          "oklch(49% 0.000 255)",
+          "oklch(61% 0.000 255)",
+          "oklch(72% 0.000 255)",
+          "oklch(84% 0.000 255)",
+          "oklch(95% 0.000 255)"
+        ]
+      },
+      "studio": {
+        "role": "neutral",
+        "displayName": "Deep studio",
+        "tonalRamp": [
+          "oklch(15% 0.012 255)",
+          "oklch(26% 0.023 255)",
+          "oklch(38% 0.030 255)",
+          "oklch(49% 0.035 255)",
+          "oklch(61% 0.035 255)",
+          "oklch(72% 0.030 255)",
+          "oklch(84% 0.019 255)",
+          "oklch(95% 0.007 255)"
+        ]
+      },
+      "glass-solid": {
+        "role": "neutral",
+        "displayName": "Opaque blue glass",
+        "tonalRamp": [
+          "oklch(15% 0.013 245)",
+          "oklch(26% 0.025 245)",
+          "oklch(38% 0.032 245)",
+          "oklch(49% 0.038 245)",
+          "oklch(61% 0.038 245)",
+          "oklch(72% 0.032 245)",
+          "oklch(84% 0.021 245)",
+          "oklch(95% 0.008 245)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Hero display",
+        "purpose": "Large balanced homepage headline; document titles use their own observed clamp."
+      },
+      "headline": {
+        "displayName": "Section headline",
+        "purpose": "Wide section headings; responsive and story overrides remain in styles.css."
+      },
+      "title": {
+        "displayName": "Feature title",
+        "purpose": "Short setup and feature headings."
+      },
+      "body": {
+        "displayName": "Website body",
+        "purpose": "Manrope prose; native illustration typography stays separate."
+      },
+      "label": {
+        "displayName": "Primary action label",
+        "purpose": "Main button labels; smaller control labels retain component-specific sizing."
+      }
+    },
+    "shadows": [
+      {
+        "name": "glass",
+        "value": "inset 0 1px 0 #ffffff35, 0 12px 40px #00000024",
+        "purpose": "Shared glass navigation and map status surfaces."
+      },
+      {
+        "name": "primary-highlight",
+        "value": "inset 0 1px 0 #ffffffa0",
+        "purpose": "Pale mint primary actions."
+      },
+      {
+        "name": "phone-frame",
+        "value": "0 30px 100px #0007, 0 0 0 5px #bfcce814, 0 0 0 6px #ffffff20",
+        "purpose": "Illustrated phone frame."
+      },
+      {
+        "name": "dialog",
+        "value": "0 30px 100px #0009, inset 0 1px 0 #ffffff30",
+        "purpose": "Modal preview surface above the page."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(.23,1,.32,1)",
+        "purpose": "Existing website easing for transforms and pointer feedback."
+      },
+      {
+        "name": "control-state",
+        "value": "160ms",
+        "purpose": "Button transforms use ease-out; background-color uses default ease."
+      },
+      {
+        "name": "pointer-settle",
+        "value": "180ms",
+        "purpose": "Interruptible opacity feedback from 0.86 or current opacity to 1; skipped for keyboard and reduced motion."
+      },
+      {
+        "name": "dialog-enter",
+        "value": "250ms",
+        "purpose": "Pointer opening fades and moves from translateY(10px) scale(.97) to rest; skipped for keyboard and reduced motion."
+      },
+      {
+        "name": "preview-dot",
+        "value": "450ms",
+        "purpose": "Simulated teleport dot transform; disabled by reduced motion and keyboard-input CSS."
+      },
+      {
+        "name": "scroll-story",
+        "value": "passive scroll + requestAnimationFrame",
+        "purpose": "At most one queued frame while hero/story is visible and document active; no idle loop or scroll interception."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "static",
+        "purpose": "No CSS animations/transitions, no scripted feedback or parallax; map story becomes ordinary static chapters."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-columns",
+        "value": "1100px"
+      },
+      {
+        "name": "stacked-layout",
+        "value": "760px"
+      },
+      {
+        "name": "narrow-actions",
+        "value": "360px"
+      },
+      {
+        "name": "content-fit",
+        "value": "24em"
+      },
+      {
+        "name": "phone-container",
+        "value": "20em"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Mint hero and setup action; specimen appearance only.",
+      "html": "<button class=\"ds-primary\" type=\"button\">Open preview <svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14m-6-6 6 6-6 6\"/></svg></button>",
+      "css": ".ds-primary{display:inline-flex;align-items:center;justify-content:space-between;gap:1.8rem;padding:1rem 1.4rem;min-height:52px;max-width:100%;border:0;border-radius:1.1rem;background:var(--mint,#b5f9dc);color:#10251e;box-shadow:inset 0 1px 0 #ffffffa0}.ds-primary{font-family:Manrope,Arial,sans-serif;font-size:.875rem;font-weight:700;line-height:1.65;cursor:pointer;transition:transform 160ms var(--ease-out,cubic-bezier(.23,1,.32,1)),background-color 160ms}.ds-primary:active:not(:disabled){transform:scale(.98)}.ds-primary:disabled{opacity:.65;cursor:default}.ds-primary:focus-visible{outline:3px solid #a989ff;outline-offset:5px}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none!important;animation:none!important}}.ds-icon{display:block;width:1.35em;height:1.35em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}@media(hover:hover) and (pointer:fine){.ds-primary:hover{background:#fff}}@media(forced-colors:active){.ds-primary{border:1px solid ButtonText}}"
+    },
+    {
+      "name": "Ghost action",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary translucent action adjacent to the primary action.",
+      "html": "<a class=\"ds-ghost\" href=\"guide.html\">Read the setup guide <svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14m-6-6 6 6-6 6\"/></svg></a>",
+      "css": ".ds-ghost{display:inline-flex;align-items:center;justify-content:space-between;gap:1.8rem;padding:1rem 1.4rem;min-height:52px;max-width:100%;border:1px solid #ffffff48;border-radius:1.1rem;background:#ffffff0a;color:var(--ink,#f2f6fb);text-decoration:none;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}.ds-ghost{font-family:Manrope,Arial,sans-serif;font-size:.875rem;font-weight:700;line-height:1.65;cursor:pointer;transition:transform 160ms var(--ease-out,cubic-bezier(.23,1,.32,1)),background-color 160ms}.ds-ghost:active:not(:disabled){transform:scale(.98)}.ds-ghost:disabled{opacity:.65;cursor:default}.ds-ghost:focus-visible{outline:3px solid #a989ff;outline-offset:5px}@media(prefers-reduced-motion:reduce){.ds-ghost{transition:none!important;animation:none!important}}.ds-icon{display:block;width:1.35em;height:1.35em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}@media(hover:hover) and (pointer:fine){.ds-ghost:hover{background:#ffffff20}}@media(prefers-reduced-transparency:reduce){.ds-ghost{background:var(--glass-solid,#172635);-webkit-backdrop-filter:none;backdrop-filter:none}}@supports not(backdrop-filter:blur(1px)){.ds-ghost{background:#172635}}@media(forced-colors:active){.ds-ghost{background:Canvas;color:CanvasText;border:1px solid CanvasText;box-shadow:none}}"
+    },
+    {
+      "name": "Navigation preview action",
+      "kind": "button",
+      "refersTo": "button-navigation",
+      "description": "Compact pearl action in the site header.",
+      "html": "<button class=\"ds-nav-action\" type=\"button\">Open preview <svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14m-6-6 6 6-6 6\"/></svg></button>",
+      "css": ".ds-nav-action{display:inline-flex;align-items:center;gap:.7rem;padding:.65rem 1rem;min-height:44px;background:#f5f9ff;color:#152032;border:0;border-radius:1rem}.ds-nav-action{font-family:Manrope,Arial,sans-serif;font-size:.875rem;font-weight:700;line-height:1.65;cursor:pointer;transition:transform 160ms var(--ease-out,cubic-bezier(.23,1,.32,1)),background-color 160ms}.ds-nav-action:active:not(:disabled){transform:scale(.98)}.ds-nav-action:disabled{opacity:.65;cursor:default}.ds-nav-action:focus-visible{outline:3px solid #a989ff;outline-offset:5px}@media(prefers-reduced-motion:reduce){.ds-nav-action{transition:none!important;animation:none!important}}.ds-nav-action{font-size:.8rem}.ds-icon{display:block;width:1.35em;height:1.35em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}@media(hover:hover) and (pointer:fine){.ds-nav-action:hover{background:#fff}}"
+    },
+    {
+      "name": "Text action",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Underlined secondary action with a generous target.",
+      "html": "<button class=\"ds-text-action\" type=\"button\">Open full preview <svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14m-6-6 6 6-6 6\"/></svg></button>",
+      "css": ".ds-text-action{display:inline-flex;align-items:center;gap:.8rem;min-height:44px;border:0;background:none;color:var(--ink,#f2f6fb);padding:.35rem 0;text-decoration:underline;text-underline-offset:.35em}.ds-text-action{font-family:Manrope,Arial,sans-serif;font-size:.875rem;font-weight:700;line-height:1.65;cursor:pointer;transition:transform 160ms var(--ease-out,cubic-bezier(.23,1,.32,1)),background-color 160ms}.ds-text-action:active:not(:disabled){transform:scale(.98)}.ds-text-action:disabled{opacity:.65;cursor:default}.ds-text-action:focus-visible{outline:3px solid #a989ff;outline-offset:5px}@media(prefers-reduced-motion:reduce){.ds-text-action{transition:none!important;animation:none!important}}.ds-text-action{font-weight:650}.ds-icon{display:block;width:1.35em;height:1.35em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}@media(hover:hover) and (pointer:fine){.ds-text-action:hover{color:var(--mint,#b5f9dc)}}"
+    },
+    {
+      "name": "Selected theme choice",
+      "kind": "chip",
+      "refersTo": "theme-choice",
+      "description": "Bloom selection specimen; three native palette swatches and an accessible pressed state.",
+      "html": "<button class=\"ds-theme\" type=\"button\" aria-label=\"Bloom\" aria-pressed=\"true\"><span class=\"ds-swatches\" aria-hidden=\"true\"><i></i><i></i><i></i></span>Bloom</button>",
+      "css": ".ds-theme{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:.8rem;min-height:5rem;padding:.9rem .8rem;border:1px solid #ffffff35;border-radius:.85rem;background:#ffffff04;color:var(--ink,#f2f6fb)}.ds-theme{font-family:Manrope,Arial,sans-serif;font-size:.875rem;font-weight:700;line-height:1.65;cursor:pointer;transition:transform 160ms var(--ease-out,cubic-bezier(.23,1,.32,1)),background-color 160ms}.ds-theme:active:not(:disabled){transform:scale(.98)}.ds-theme:disabled{opacity:.65;cursor:default}.ds-theme:focus-visible{outline:3px solid #a989ff;outline-offset:5px}@media(prefers-reduced-motion:reduce){.ds-theme{transition:none!important;animation:none!important}}.ds-theme{font-size:.75rem;font-weight:400}.ds-theme[aria-pressed=true]{border-color:var(--mint,#b5f9dc);background:#b5f9dc16;box-shadow:inset 0 0 0 1px var(--mint,#b5f9dc)}.ds-swatches{display:flex;gap:.15rem}.ds-swatches i{width:.75rem;height:.75rem;border:1px solid #ffffff30;border-radius:50%}.ds-swatches i:nth-child(1){background:#a62e76}.ds-swatches i:nth-child(2){background:#fff9fc}.ds-swatches i:nth-child(3){background:#352131}@media(hover:hover) and (pointer:fine){.ds-theme:hover{transform:translateY(-2px);background:#ffffff0c}}@media(forced-colors:active){.ds-theme[aria-pressed=true]{outline:2px solid Highlight;outline-offset:1px}}"
+    },
+    {
+      "name": "Appearance select",
+      "kind": "input",
+      "refersTo": "appearance-select",
+      "description": "A real native select in a divided row; the phone search field is not a real input.",
+      "html": "<label class=\"ds-field\"><span>Surfaces</span><select class=\"ds-select\"><option>Solid</option><option>Glass</option></select></label>",
+      "css": ".ds-field{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem 0;border-top:1px solid var(--line,#ffffff26);font-family:Manrope,Arial,sans-serif;line-height:1.65;font-size:.85rem;color:var(--ink,#f2f6fb)}.ds-select{font:1rem/1.65 Manrope,Arial,sans-serif;color:inherit;min-height:44px;border:0;border-radius:.25rem;padding:.35rem .25rem;background:transparent;max-width:100%}.ds-select option{background:#182431;color:#f2f6fb}.ds-select:disabled{opacity:.65;cursor:default}.ds-select:focus-visible{outline:3px solid #a989ff;outline-offset:5px}"
+    },
+    {
+      "name": "Glass navigation",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Wide navigation specimen; production adds approved icon artwork and a native mobile disclosure button.",
+      "html": "<nav class=\"ds-navigation\" aria-label=\"Example navigation\"><a class=\"ds-wordmark\" href=\"index.html\">elsepin</a><span class=\"ds-nav-links\"><a href=\"#experience\">Explore</a><a href=\"guide.html\">Setup guide</a></span></nav>",
+      "css": ".ds-navigation{background:linear-gradient(135deg,#ffffff14,#ffffff05),#172635d9;border:1px solid #ffffff36;box-shadow:inset 0 1px 0 #ffffff35,0 12px 40px #00000024;-webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);color:var(--ink,#f2f6fb);font-family:Manrope,Arial,sans-serif;line-height:1.65;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:2rem;padding:.7rem 1rem .7rem 1.1rem;border-radius:1.5rem}.ds-navigation a{color:inherit;text-decoration:none}.ds-wordmark{display:inline-flex;align-items:center;min-height:44px;font-size:1.6rem;font-weight:750;letter-spacing:-.04em;line-height:1.2}.ds-nav-links{display:flex;align-items:center;gap:2rem;flex-wrap:wrap}.ds-nav-links a{font-size:.8rem;padding:.7rem 0}.ds-navigation a:focus-visible{outline:3px solid #a989ff;outline-offset:5px}@media(hover:hover) and (pointer:fine){.ds-nav-links a:hover{color:var(--mint,#b5f9dc)}}@media(prefers-reduced-transparency:reduce){.ds-navigation{background:var(--glass-solid,#172635);-webkit-backdrop-filter:none;backdrop-filter:none}}@supports not(backdrop-filter:blur(1px)){.ds-navigation{background:#172635}}@media(forced-colors:active){.ds-navigation{background:Canvas;color:CanvasText;border:1px solid CanvasText;box-shadow:none}}"
+    },
+    {
+      "name": "Map status card",
+      "kind": "card",
+      "refersTo": "glass-status",
+      "description": "Pearl-edged story status above map content; chapter copy changes in the production story.",
+      "html": "<div class=\"ds-status\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0Z\"/><circle cx=\"12\" cy=\"10\" r=\"2.5\"/></svg><div><strong>A place to begin</strong><span>Search. Select. Make it yours.</span></div><small>01 / 03</small></div>",
+      "css": ".ds-status{background:linear-gradient(135deg,#ffffff14,#ffffff05),#172635d9;border:1px solid #ffffff36;box-shadow:inset 0 1px 0 #ffffff35,0 12px 40px #00000024;-webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);color:var(--ink,#f2f6fb);font-family:Manrope,Arial,sans-serif;line-height:1.65;display:flex;align-items:center;gap:1rem;padding:1.15rem 1.3rem;border-radius:1.25rem}.ds-status strong,.ds-status span{display:block}.ds-status strong{font-size:.95rem}.ds-status span{font-size:.75rem;color:var(--muted,#afbdcd)}.ds-status small{font-size:.75rem;color:var(--mint,#b5f9dc);margin-left:1rem;font-variant-numeric:tabular-nums}.ds-status>.ds-icon{color:var(--mint,#b5f9dc)}.ds-icon{display:block;width:1.35em;height:1.35em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}@media(prefers-reduced-transparency:reduce){.ds-status{background:var(--glass-solid,#172635);-webkit-backdrop-filter:none;backdrop-filter:none}}@supports not(backdrop-filter:blur(1px)){.ds-status{background:#172635}}@media(forced-colors:active){.ds-status{background:Canvas;color:CanvasText;border:1px solid CanvasText;box-shadow:none}}"
+    },
+    {
+      "name": "Preview badge",
+      "kind": "chip",
+      "refersTo": "preview-badge",
+      "description": "Small noninteractive label identifying the illustrated web preview.",
+      "html": "<span class=\"ds-badge\">Web preview</span>",
+      "css": ".ds-badge{display:inline-block;padding:.25rem .55rem;border:1px solid var(--line,#ffffff26);border-radius:2rem;color:var(--ink,#f2f6fb);font:.75rem/1.65 Manrope,Arial,sans-serif}"
+    },
+    {
+      "name": "Preview dialog surface",
+      "kind": "custom",
+      "refersTo": "preview-dialog",
+      "description": "Static surface specimen; the production native dialog moves the existing live studio and restores focus and scroll.",
+      "html": "<section class=\"ds-dialog\" aria-label=\"Preview dialog surface\"><div class=\"ds-dialog-top\"><div><h2>Make Elsepin yours</h2><p>Interactive illustration. Your real location never changes.</p></div><button class=\"ds-dialog-close\" type=\"button\" aria-label=\"Close preview\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m6 6 12 12M18 6 6 18\"/></svg></button></div></section>",
+      "css": ".ds-dialog{max-width:1100px;border:1px solid #ffffff45;border-radius:1.6rem;color:var(--ink,#f2f6fb);background:#101b2bed;box-shadow:0 30px 100px #0009,inset 0 1px 0 #ffffff30;-webkit-backdrop-filter:blur(28px);backdrop-filter:blur(28px);font:1rem/1.65 Manrope,Arial,sans-serif;overflow:hidden}.ds-dialog-top{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:1.3rem 2rem;background:#132032;border-bottom:1px solid var(--line,#ffffff26)}.ds-dialog h2{margin:0;font:500 1.15rem/1.12 Sora,Manrope,sans-serif;letter-spacing:-.025em}.ds-dialog p{margin:.25rem 0 0;font-size:.75rem;color:var(--muted,#afbdcd)}.ds-dialog-close{width:44px;height:44px;flex-shrink:0;display:grid;place-items:center;padding:0;border:1px solid var(--line,#ffffff26);border-radius:50%;background:none;color:inherit}.ds-dialog-close{font-family:Manrope,Arial,sans-serif;font-size:.875rem;font-weight:700;line-height:1.65;cursor:pointer;transition:transform 160ms var(--ease-out,cubic-bezier(.23,1,.32,1)),background-color 160ms}.ds-dialog-close:active:not(:disabled){transform:scale(.98)}.ds-dialog-close:disabled{opacity:.65;cursor:default}.ds-dialog-close:focus-visible{outline:3px solid #a989ff;outline-offset:5px}@media(prefers-reduced-motion:reduce){.ds-dialog-close{transition:none!important;animation:none!important}}.ds-icon{display:block;width:1.35em;height:1.35em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}@media(prefers-reduced-transparency:reduce){.ds-dialog{background:var(--glass-solid,#172635);-webkit-backdrop-filter:none;backdrop-filter:none}}@supports not(backdrop-filter:blur(1px)){.ds-dialog{background:#172635}}@media(forced-colors:active){.ds-dialog{background:Canvas;color:CanvasText;border:1px solid CanvasText;box-shadow:none}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The map is the stage",
+    "overview": "Deep-blue cartography supplies the setting; mint routes, the approved prism artwork, and pearl-edged glass controls bring the foreground into focus. Sora headlines give the website a geometric, open character while Manrope carries readable instructions and compact controls. The direction is taken from `DIRECTION.md`, not from a catalog seed or an inferred standing preference.\n\nThis system belongs only to `website/`: its homepage, guide, privacy page, and error page. It does not replace the repository's native design system. The phone is an explicitly labeled web illustration; its eight source-derived native themes, thirteen approved icons, and rounded preview typography are a contained product demonstration. Bloom, solid surfaces, and Prism Jumpgate are the illustrated defaults. The website itself remains dark independently of the illustrated device setting.",
+    "keyCharacteristics": [
+      "Detailed blue cartography behind readable foreground content.",
+      "Pearl-edged glass, mint actions, and visible violet keyboard focus.",
+      "Large geometric headings with calm, compact supporting text.",
+      "Ordinary scrolling with a three-chapter map story and a static reduced-motion presentation.",
+      "One live appearance studio shared by the page and a native browser dialog."
+    ],
+    "rules": [
+      {
+        "name": "The Preview Boundary Rule",
+        "body": "Website colors style the surrounding page; native catalog colors stay scoped to the phone illustration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Legible Glass Rule",
+        "body": "Preserve an opaque fallback and readable foreground content whenever a translucent surface is used.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep website tokens separate from source-derived native preview palettes.",
+      "**Do** preserve approved icon artwork and the Bloom, Solid, Prism Jumpgate reset state.",
+      "**Do** keep map content behind glass and provide opaque, reduced-motion, and forced-colors presentations.",
+      "**Do** preserve native scrolling, keyboard focus, dialog state, and narrow or enlarged-text layouts.",
+      "**Do** label the illustrated preview and distinguish development design from the public release."
+    ],
+    "donts": [
+      "**Don't** apply this website system to the native app or overwrite the repository's native design guidance.",
+      "**Don't** restore the superseded cream editorial website direction.",
+      "**Don't** add real-location claims, a functional-looking unimplemented search form, or a native font picker.",
+      "**Don't** duplicate the live studio, persist preview choices without a new requirement, or replace links with click-only navigation.",
+      "**Don't** treat local screenshots, component specimens, or this document as proof of physical-device behavior or permission to publish."
+    ]
+  }
+}

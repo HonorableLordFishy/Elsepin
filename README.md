@@ -21,6 +21,10 @@ The new appearance system adds theme-specific color modes, solid/glass surfaces,
 
 Approved public downloads and help belong in [Elsepin-Releases](https://github.com/N3moStudio/Elsepin-Releases). This private repository contains implementation and validation work. No new IPA is published merely because source changes are pushed. The paid Veypax product uses its own private repository, versioning and plan policies.
 
+## Stop and reconnect
+
+If Elsepin can’t clear the location, connect to Wi-Fi, reconnect LocalDevVPN, and try again. Connecting to another device’s Wi-Fi hotspot can also work. Closing or force-quitting Elsepin doesn’t confirm that it cleared. Check the location in another app too.
+
 ## Licenses and provenance
 
 Elsepin continues Shift and includes code derived from Locus and the idevice project. Inherited and previously MIT-licensed work retains its [MIT license](LICENSE). Only expressly listed new original additions use the separate [rights notice](NEW-ADDITIONS-LICENSE.md). Third-party notices remain packaged in the app. This is not a claim that inherited code is proprietary or that prior permissions have been revoked.
