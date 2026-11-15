@@ -214,6 +214,13 @@ final class ElsepinFlowUITests: XCTestCase {
         app.buttons["Routes"].tap()
         XCTAssertTrue(longItem.waitForExistence(timeout: 10))
         XCTAssertGreaterThan(longItem.frame.width, 180)
+        // The Create route row can fill the initial viewport at maximum text.
+        // Bring the saved route itself into view before accepting its screenshot.
+        for _ in 0..<4 {
+            if longItem.isHittable && longItem.frame.minY < 300 { break }
+            app.collectionViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(longItem.isHittable)
         capture("14b-library-long-route-largest-text")
     }
     private func openLibrary() {
