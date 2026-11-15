@@ -1,5 +1,30 @@
 # Elsepin build history
 
+## Build 86 validated and delivered - 15 November 2026
+
+GitHub run `43773626417` built `7be3991623901b445fae1afed71991d8c66f9109` on
+`codex/pins-search-69`. 724 checks passed: 580 Swift, 104 cloud, 18 Companion and
+22 resource/helper tests; one Windows-only Companion case skipped. Production
+app and activity extension compiled with no compiler warnings/errors.
+
+Saved pins now refresh during camera gestures and use horizontal ground scale
+instead of the rotated map rectangle's bounding width. Threshold crossings update
+immediately in either direction; repeated spatial scans are limited to 10 Hz.
+The home map and pin editor share this logic. The existing 13 simulator UI checks
+and the new live pinch/rotation case passed across the prior validation runs;
+see NATIVE-VALIDATION.md for receipts and fixture corrections. Only build metadata
+changed for packaging; no full simulator rerun was needed for that metadata bump.
+
+Package checks verified both bundles as 2.6.1 (86), arm64 device code, SDK 27.1,
+expected IDs/icons/resources and no simulator test controls. Delivered only
+`Elsepin 2.6.1 build 86.ipa` (19,179,478 bytes) to the usual Desktop folder and
+removed build 85 after checking the delivered replacement. Other projects were
+preserved. Source, run, package and delivery evidence: `.build/artifacts/build86/`.
+
+No app release/tag, website deployment or billing changes. The IPA uses the usual
+ad-hoc placeholders and requires device signing (the owner uses FlareStore).
+Native spoofing, signed installation and battery acceptance remain phone checks.
+
 ## Build 85 validated and delivered - 15 November 2026
 
 GitHub run `43752876339` built `72b9b95265e1964ed9e46ecf3185a5be843b69c3` on

@@ -1,14 +1,22 @@
 # Elsepin current handoff
 
-## Build 86 requested - 15 November 2026
+## Build 86 delivered - 15 November 2026
 
 Owner requested a new IPA with the validated live pin-visibility changes, delivered
 to the normal Desktop folder replacing only Elsepin's older IPA. No app release
 is authorized. Both app and extension metadata are now 2.6.1 (86); there are no
-functional changes after the completed simulator validation below. Use the manual
-build workflow for regression checks, native packaging and verification. Build and
-delivery receipt pending; existing build 85 stays in place until its replacement
-is ready. No need to repeat the full simulator suite for this metadata-only bump.
+functional changes after the completed simulator validation below.
+
+GitHub manual build `43773626417` succeeded at `7be3991623901b445fae1afed71991d8c66f9109`.
+724 checks passed: 580 Swift, 104 cloud, 18 Companion and 22 resource tests; one
+Windows-only Companion case skipped. Release app and extension compiled cleanly.
+Verified actual IPA versions, arm64 device executables/SDK 27.1, icons, bundled
+resources and absence of simulator fixtures. Delivered only `Elsepin 2.6.1 build
+86.ipa` (19,179,478 bytes) to the Desktop IPA folder; build 85 was removed only
+after verifying the replacement. Other projects were untouched. No app release,
+tag or website deployment. Evidence: `.build/artifacts/build86/`. Installation,
+real movement/Stop and device battery remain physical-phone checks; the focused
+pinch/rotation simulator results below are separate evidence.
 
 ## Live saved-pin visibility - 15 November 2026 (validated, no IPA)
 

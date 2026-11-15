@@ -13,8 +13,8 @@ data boundary, triggers, screenshot coverage and physical-device limits.
 ## Current build access - 15 November 2026
 
 The owner authorized making `N3moStudio/Elsepin` public. GitHub Actions run
-`43752876339` succeeded on `xcode-27` for test build 85 at `72b9b95`, including
-pairing cancellation recovery and the approved copy. See BUILD-HISTORY.md for receipts.
+`43773626417` succeeded on `xcode-27` for test build 86 at `7be3991`, including
+the validated live pin-visibility fixes. See BUILD-HISTORY.md for receipts.
 Use the manual workflow on `codex/pins-search-69` for the current development
 source; `main` is older. This does not publish a release. GitLab remains private.
 The earlier private-build billing failures below are historical. Codemagic's
