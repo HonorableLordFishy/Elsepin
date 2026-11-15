@@ -7,7 +7,8 @@ It does not archive, package, sign for distribution, publish a release or deploy
 Changes on `codex/pins-search-69` to the scoped source/workflow paths trigger it;
 manual dispatch is available on that branch. Its default `all` focus runs both jobs.
 The `search` focus reruns the four search cases; `home` runs the solid/glass idle
-tray cases. Both compile the isolated simulator app and skip the production job,
+tray cases; `pins` runs the live zoom/rotation visibility case. These focused runs
+compile the isolated simulator app and skip the production job,
 so already validated production code need not be rebuilt for fixture-only checks.
 
 ## Production and simulator boundaries
@@ -49,6 +50,13 @@ route-place search submit/retry, cancellation and dismissal/foreground interrupt
 Screenshots and accessibility trees are attached to the xcresult and exported
 with `xcresulttool`. Actual inspection/findings belong in the run receipt below;
 a test plan or fixture is not a passed check.
+
+The `map-pins` scenario runs the real MapHomeView with disposable saved pins and
+a synthetic moving route. Its simulator-only probe observes actual visible-pin
+changes from continuous camera callbacks. The UI test pinches across the one-mile
+cutoff in both directions, checks those live transitions, then rotates a map near
+the cutoff and compares ground width. The probe and camera-position controls are
+excluded from production compilation. This measures map behavior, not spoofing.
 
 These results cannot prove physical-device location injection, developer pairing,
 VPN transitions, signing/App Groups, provider apps, VoiceOver navigation or battery

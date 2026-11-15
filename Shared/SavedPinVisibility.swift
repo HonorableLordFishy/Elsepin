@@ -12,10 +12,13 @@ enum SavedPinVisibility {
         value.isFinite ? min(rangeMiles.upperBound, max(rangeMiles.lowerBound, value)) : defaultMiles
     }
 
-    static func mapWidthMeters(mapPoints: Double, metersPerMapPoint: Double) -> Double? {
-        let meters = mapPoints * metersPerMapPoint
-        guard mapPoints.isFinite, mapPoints > 0, metersPerMapPoint.isFinite,
-              metersPerMapPoint > 0, meters.isFinite else { return nil }
+    /// Extrapolate a short horizontal sample at screen center. A camera's map
+    /// rect is an axis-aligned bounding box, not its screen width when rotated.
+    static func mapWidthMeters(sampleMeters: Double, samplePoints: Double, viewportPoints: Double) -> Double? {
+        guard sampleMeters.isFinite, sampleMeters > 0, samplePoints.isFinite,
+              samplePoints > 0, viewportPoints.isFinite, viewportPoints >= samplePoints else { return nil }
+        let meters = sampleMeters * (viewportPoints / samplePoints)
+        guard meters.isFinite else { return nil }
         return meters
     }
 
@@ -26,5 +29,21 @@ enum SavedPinVisibility {
 
     static func label(miles: Double) -> String {
         "\(miles.formatted(.number.precision(.fractionLength(0...1)))) mi across"
+    }
+}
+
+/// Crossing the cutoff is immediate in either direction. Only repeated spatial
+/// filtering while panning is throttled; a settled camera always gets a final pass.
+struct SavedPinRefreshCadence {
+    static let interval: TimeInterval = 0.1
+    private var lastRefresh: TimeInterval?
+    private var lastVisibility: Bool?
+
+    mutating func shouldRefresh(visible: Bool, now: TimeInterval, force: Bool = false) -> Bool {
+        let elapsed = now - (lastRefresh ?? -.infinity)
+        guard force || lastVisibility != visible || (visible && elapsed >= Self.interval) else { return false }
+        lastRefresh = now
+        lastVisibility = visible
+        return true
     }
 }

@@ -1,5 +1,21 @@
 # Elsepin current handoff
 
+## Live saved-pin visibility - 15 November 2026 (validation pending)
+
+Owner reported delayed/asymmetric visibility when pinching and asked whether the
+simulator can test it. Source confirmed camera-end-only saved-pin refresh plus
+axis-aligned map-rectangle width, which varies with heading on a tall screen.
+Home and pin-editor maps now sample horizontal ground scale at screen center and
+refresh during camera motion. Threshold crossings are immediate both directions;
+spatial filtering is capped at 10 Hz with a final settled refresh. Camera samples
+are non-observed and only changed pin arrays publish. Active route markers, real
+location engine, stored visibility preference and scale bar remain intact.
+
+Local 22 Python checks and identity/appearance checks passed. Added six Swift
+regressions (plus revised geometry test) and a simulator-only live-pinch/rotation
+probe/UI test. Mac validation is pending; do not claim these have passed yet.
+No IPA packaging, build-number bump, website change or app release in this pass.
+
 ## Approved copy, website publication and build 85 - 15 November 2026
 
 Owner approved Humanizer edits 2 (pairing cleanup), 5 (Stop/reconnection) and

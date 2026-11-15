@@ -37,8 +37,9 @@ struct PinEditor: View {
     @EnvironmentObject private var preferences: SessionPreferences
     @Environment(\.dismiss) private var dismiss
     @State private var position: MapCameraPosition = .automatic
-    @State private var visibleMapRect: MKMapRect?
-    @State private var visibleMapWidthMeters: Double?
+    @State private var savedPinViewport = SavedPinMapViewport()
+    @State private var visiblePins: [SavedPlace] = []
+    @State private var mapSize = CGSize.zero
     @State private var search = false
     @State private var expanded = false
     @State private var retainedCamera: MapCamera?
@@ -151,18 +152,33 @@ struct PinEditor: View {
                 select(coordinate)
             }
             .onMapCameraChange(frequency: .onEnd) { context in
-                visibleMapRect = context.rect; retainedCamera = context.camera
-                visibleMapWidthMeters = SavedPinVisibility.mapWidthMeters(mapPoints: context.rect.size.width,
-                    metersPerMapPoint: MKMetersPerMapPointAtLatitude(context.region.center.latitude))
+                retainedCamera = context.camera
+                updateSavedPinViewport(context, proxy: proxy, force: true)
             }
+            .onMapCameraChange(frequency: .continuous) { context in
+                updateSavedPinViewport(context, proxy: proxy, force: false)
+            }
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+                mapSize = size
+                if let rect = savedPinViewport.rect {
+                    savedPinViewport.update(rect: rect, size: size) { proxy.convert($0, from: .named("pinEditorMap")) }
+                    refreshSavedPins()
+                }
+            }
+            .coordinateSpace(name: "pinEditorMap")
+            .onChange(of: session.savedPins) { _, _ in refreshSavedPins() }
+            .onChange(of: preferences.mapPinVisibilityMiles) { _, _ in refreshSavedPins() }
         }
     }
-    private var visiblePins: [SavedPlace] {
-        guard SavedPinVisibility.isVisible(mapWidthMeters: visibleMapWidthMeters,
-            maximumMiles: preferences.mapPinVisibilityMiles) else { return [] }
-        return session.savedPins.filter { pin in
-            pin.id != draft.existing?.id && (visibleMapRect?.contains(MKMapPoint(pin.coordinate)) ?? true)
-        }
+    private func updateSavedPinViewport(_ context: MapCameraUpdateContext, proxy: MapProxy, force: Bool) {
+        savedPinViewport.update(rect: context.rect, size: mapSize) { proxy.convert($0, from: .named("pinEditorMap")) }
+        refreshSavedPins(force: force)
+    }
+    private func refreshSavedPins(force: Bool = true) {
+        guard savedPinViewport.shouldRefresh(maximumMiles: preferences.mapPinVisibilityMiles, force: force) else { return }
+        let pins = savedPinViewport.isVisible(maximumMiles: preferences.mapPinVisibilityMiles)
+            ? session.savedPins.filter { $0.id != draft.existing?.id && savedPinViewport.contains($0.coordinate) } : []
+        if visiblePins != pins { visiblePins = pins }
     }
     private func center(_ coordinate: CLLocationCoordinate2D) {
         retainedCamera = nil

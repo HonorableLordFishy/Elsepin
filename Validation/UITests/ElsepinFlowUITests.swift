@@ -31,7 +31,7 @@ final class ElsepinFlowUITests: XCTestCase {
             let button = springboard.buttons[label]
             if button.exists { button.tap() }
         }
-        if ["moving", "paused", "connecting", "failed"].contains(scenario) {
+        if ["moving", "paused", "connecting", "failed", "map-pins"].contains(scenario) {
             let start = app.buttons["validation.start"]
             if !start.isEnabled, springboard.buttons["Allow"].waitForExistence(timeout: 5) {
                 springboard.buttons["Allow"].tap()
@@ -47,6 +47,52 @@ final class ElsepinFlowUITests: XCTestCase {
         add(attachment)
         let tree = XCTAttachment(string: app.debugDescription)
         tree.name = name + "-accessibility-tree"; tree.lifetime = .keepAlways; add(tree)
+    }
+
+    func testSavedPinsCrossCutoffDuringPinchAndStayVisibleWhenRotated() {
+        launch("map-pins", narrow: false)
+        reachable("session.pause"); reachable("session.stop")
+        app.buttons["validation.pin.near"].tap()
+        let count = app.staticTexts["validation.pinCount"]
+        func expectPins(_ shown: Bool) {
+            let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                guard let number = Int(count.label) else { return false }
+                return shown ? number > 0 : number == 0
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 8), .completed)
+        }
+        func value(_ id: String) -> Int { Int(app.staticTexts[id].label) ?? -1 }
+        expectPins(true)
+        capture("18-pins-near-active-route")
+        let hides = value("validation.pinLiveHides")
+        app.maps.firstMatch.pinch(withScale: 0.2, velocity: -0.5)
+        expectPins(false)
+        XCTAssertGreaterThan(value("validation.pinLiveHides"), hides, "Pins must hide in a continuous callback, before camera settles")
+        capture("19-pins-hidden-after-live-crossing")
+        let shows = value("validation.pinLiveShows")
+        app.maps.firstMatch.pinch(withScale: 5, velocity: 0.5)
+        expectPins(true)
+        XCTAssertGreaterThan(value("validation.pinLiveShows"), shows, "Pins must reappear in a continuous callback, before camera settles")
+        app.buttons["validation.pin.edge"].tap()
+        expectPins(true)
+        // Wait for this camera's settled sample before comparing its heading.
+        let width = app.staticTexts["validation.pinWidth"]
+        let edge = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let miles = Double(width.label) ?? 0
+            return miles > 0.85 && miles < 0.95
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [edge], timeout: 8), .completed)
+        let before = Double(width.label)!
+        let settled = value("validation.pinSettled")
+        app.buttons["validation.pin.rotate"].tap()
+        let rotated = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            value("validation.pinSettled") > settled
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [rotated], timeout: 8), .completed)
+        expectPins(true)
+        XCTAssertEqual(Double(width.label) ?? 0, before, accuracy: 0.03, "Rotation alone must not change visible-up-to width")
+        reachable("session.pause"); reachable("session.stop")
+        capture("20-pins-rotated-at-same-ground-scale")
     }
     private func reachable(_ id: String) {
         let button = app.buttons[id]

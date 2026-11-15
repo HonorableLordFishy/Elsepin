@@ -62,7 +62,7 @@ private struct ValidationHost: View {
     @State private var started = false
     @State private var runSession = false
     @State private var permissionsReady = false
-    private var sessionScenario: Bool { ["moving", "paused", "connecting", "failed"].contains(ValidationFixture.scenario) }
+    private var sessionScenario: Bool { ["moving", "paused", "connecting", "failed", "map-pins"].contains(ValidationFixture.scenario) }
     var body: some View {
         RootView(incomingShortcut: $shortcut, incomingSessionDetails: $details)
             .modifier(AppearancePresentation())

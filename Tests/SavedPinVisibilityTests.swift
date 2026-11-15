@@ -27,12 +27,61 @@ final class SavedPinVisibilityTests: XCTestCase {
     }
 
     func testMapSpanUsesLocalGroundScaleAndRejectsInvalidGeometry() {
-        XCTAssertEqual(SavedPinVisibility.mapWidthMeters(mapPoints: 20_000, metersPerMapPoint: 0.2), 4_000)
-        XCTAssertEqual(SavedPinVisibility.mapWidthMeters(mapPoints: 20_000, metersPerMapPoint: 0.1), 2_000)
-        XCTAssertNil(SavedPinVisibility.mapWidthMeters(mapPoints: .infinity, metersPerMapPoint: 0.2))
-        XCTAssertNil(SavedPinVisibility.mapWidthMeters(mapPoints: 0, metersPerMapPoint: 0.2))
-        XCTAssertNil(SavedPinVisibility.mapWidthMeters(mapPoints: 100, metersPerMapPoint: -1))
-        XCTAssertNil(SavedPinVisibility.mapWidthMeters(mapPoints: .greatestFiniteMagnitude, metersPerMapPoint: 2))
+        XCTAssertEqual(SavedPinVisibility.mapWidthMeters(sampleMeters: 320, samplePoints: 32, viewportPoints: 400), 4_000)
+        XCTAssertEqual(SavedPinVisibility.mapWidthMeters(sampleMeters: 160, samplePoints: 32, viewportPoints: 400), 2_000)
+        for invalid in [Double.nan, .infinity, -.infinity, 0, -1] {
+            XCTAssertNil(SavedPinVisibility.mapWidthMeters(sampleMeters: invalid, samplePoints: 32, viewportPoints: 400))
+            XCTAssertNil(SavedPinVisibility.mapWidthMeters(sampleMeters: 32, samplePoints: invalid, viewportPoints: 400))
+            XCTAssertNil(SavedPinVisibility.mapWidthMeters(sampleMeters: 32, samplePoints: 32, viewportPoints: invalid))
+        }
+        XCTAssertNil(SavedPinVisibility.mapWidthMeters(sampleMeters: 32, samplePoints: 32, viewportPoints: 16))
+        XCTAssertNil(SavedPinVisibility.mapWidthMeters(sampleMeters: .greatestFiniteMagnitude, samplePoints: 1, viewportPoints: 2))
+    }
+
+    func testWidthTracksScreenSizeInsteadOfBoundingRectangleHeight() {
+        XCTAssertEqual(SavedPinVisibility.mapWidthMeters(sampleMeters: 32, samplePoints: 32, viewportPoints: 320), 320)
+        XCTAssertEqual(SavedPinVisibility.mapWidthMeters(sampleMeters: 32, samplePoints: 32, viewportPoints: 640), 640)
+        // A different sample length at the same ground scale gives the same width.
+        XCTAssertEqual(SavedPinVisibility.mapWidthMeters(sampleMeters: 16, samplePoints: 16, viewportPoints: 320), 320)
+    }
+
+    func testCutoffCrossingsBypassThrottleInBothDirections() {
+        var cadence = SavedPinRefreshCadence()
+        for (index, miles) in [0.99, 1.01, 0.99, 1.01, 1.0].enumerated() {
+            let visible = SavedPinVisibility.isVisible(mapWidthMeters: miles * SavedPinVisibility.metersPerMile, maximumMiles: 1)
+            XCTAssertTrue(cadence.shouldRefresh(visible: visible, now: Double(index) * 0.001))
+        }
+    }
+
+    func testPanningScansAtMostTenTimesPerSecondButAlwaysSettles() {
+        var cadence = SavedPinRefreshCadence()
+        XCTAssertTrue(cadence.shouldRefresh(visible: true, now: 0))
+        for step in 1..<10 {
+            XCTAssertFalse(cadence.shouldRefresh(visible: true, now: Double(step) / 100))
+        }
+        XCTAssertTrue(cadence.shouldRefresh(visible: true, now: 0.1))
+        XCTAssertTrue(cadence.shouldRefresh(visible: true, now: 0.101, force: true))
+    }
+
+    func testHiddenPinsDoNotContinuouslyRescanLibrary() {
+        var cadence = SavedPinRefreshCadence()
+        XCTAssertTrue(cadence.shouldRefresh(visible: false, now: 0))
+        XCTAssertFalse(cadence.shouldRefresh(visible: false, now: 1))
+        XCTAssertFalse(cadence.shouldRefresh(visible: false, now: 60))
+        XCTAssertTrue(cadence.shouldRefresh(visible: false, now: 61, force: true))
+    }
+
+    func testPreferenceChangeDoesNotWaitForAnotherCameraGesture() {
+        var cadence = SavedPinRefreshCadence()
+        let width = 3 * SavedPinVisibility.metersPerMile
+        XCTAssertTrue(cadence.shouldRefresh(visible: SavedPinVisibility.isVisible(mapWidthMeters: width, maximumMiles: 1), now: 0))
+        XCTAssertTrue(cadence.shouldRefresh(visible: SavedPinVisibility.isVisible(mapWidthMeters: width, maximumMiles: 5), now: 0.01))
+    }
+
+    func testWorldScaleStaysHiddenInsteadOfWrappingToASmallWidth() {
+        let width = SavedPinVisibility.mapWidthMeters(sampleMeters: 3_200_000, samplePoints: 32, viewportPoints: 400)
+        XCTAssertEqual(width, 40_000_000)
+        XCTAssertFalse(SavedPinVisibility.isVisible(mapWidthMeters: width, maximumMiles: 20))
     }
 
     func testPreferenceBoundsRecoverFromInvalidStoredValues() {

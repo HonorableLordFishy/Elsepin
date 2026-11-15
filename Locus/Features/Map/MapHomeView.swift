@@ -22,8 +22,7 @@ struct MapHomeView: View {
     @State private var showRouteSearch = false
     @State private var selectedSavedPin: String?
     @State private var thermallyLimited = ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue
-    @State private var visibleMapRect: MKMapRect?
-    @State private var visibleMapWidthMeters: Double?
+    @State private var savedPinViewport = SavedPinMapViewport()
     @Namespace private var mapScope
     @State private var visibleSavedPins: [SavedPlace] = []
     @State private var savedMapAreas: [SavedMapArea] = []
@@ -54,6 +53,9 @@ struct MapHomeView: View {
     @State private var pinAdjusting = false
     @State private var adjustedPin: CLLocationCoordinate2D?
     @State private var pinAdjustmentCamera: MKMapCamera?
+#if ELSEPIN_UI_TESTING
+    @StateObject private var pinVisibilityProbe = ValidationPinVisibilityProbe()
+#endif
 
     private var visualUpdatesEnabled: Bool {
         isVisible && scenePhase == .active && !showSearch && !showRouteSearch && !showPathEditor
@@ -212,10 +214,11 @@ struct MapHomeView: View {
         mapWithGestures(proxy)
             .onMapCameraChange(frequency: .onEnd) { context in
                 guard visualUpdatesEnabled else { return }
-                visibleMapRect = context.rect
-                visibleMapWidthMeters = SavedPinVisibility.mapWidthMeters(mapPoints: context.rect.size.width,
-                    metersPerMapPoint: MKMetersPerMapPointAtLatitude(context.region.center.latitude))
+                updateSavedPinViewport(context, proxy: proxy)
                 refreshSavedPins(session.savedPins)
+#if ELSEPIN_UI_TESTING
+                pinVisibilityProbe.didSettle()
+#endif
                 DeveloperLogStore.shared.record("map_viewport_settled", [
                     "style": String(session.mapStyleIndex), "distance": String(context.camera.distance),
                     "visible_pins": String(visibleSavedPins.count), "saved_areas": String(savedMapAreas.count),
@@ -224,6 +227,9 @@ struct MapHomeView: View {
             }
             .onMapCameraChange(frequency: .continuous) { context in
                 mapCameraChanged(context.camera, proxy: proxy)
+                guard visualUpdatesEnabled else { return }
+                updateSavedPinViewport(context, proxy: proxy)
+                refreshSavedPins(session.savedPins, force: false)
             }
             // Keep this overlay on the actual Map, with the same named origin
             // as the gestures and coordinate conversion.
@@ -232,6 +238,24 @@ struct MapHomeView: View {
             .onChange(of: selection) { (_: RouteSeek?, value: RouteSeek?) in
                 routeSelectionChanged(value, proxy: proxy)
             }
+#if ELSEPIN_UI_TESTING
+            .overlay(alignment: .bottomTrailing) {
+                if ValidationFixture.scenario == "map-pins" {
+                    ValidationPinVisibilityControls(probe: pinVisibilityProbe) { action in
+                        followMovement = false
+                        preferences.mapPinVisibilityMiles = 1
+                        let camera = sketchViewport.camera
+                        let distance = camera?.centerCoordinateDistance ?? 1_500
+                        let width = savedPinViewport.widthMeters ?? SavedPinVisibility.metersPerMile
+                        let targetDistance = action == "near" ? 1_500 :
+                            (action == "edge" ? distance * (0.9 * SavedPinVisibility.metersPerMile / width) : distance)
+                        position = .camera(MapCamera(centerCoordinate: ValidationFixture.points[1],
+                            distance: targetDistance, heading: action == "rotate" ? 45 : 0, pitch: 0))
+                    }
+                    .padding(.bottom, 200)
+                }
+            }
+#endif
     }
 
     private func mapCameraChanged(_ camera: MapCamera, proxy: MapProxy) {
@@ -245,14 +269,23 @@ struct MapHomeView: View {
             fromDistance: camera.distance, pitch: camera.pitch, heading: camera.heading)
     }
 
-    private func refreshSavedPins(_ pins: [SavedPlace]) {
+    private func updateSavedPinViewport(_ context: MapCameraUpdateContext, proxy: MapProxy) {
+        savedPinViewport.update(rect: context.rect, size: mapSize) {
+            proxy.convert($0, from: .named("routeMap"))
+        }
+    }
+
+    private func refreshSavedPins(_ pins: [SavedPlace], force: Bool = true) {
         guard visualUpdatesEnabled else { return }
-        // Refresh only after a pan, library edit or visibility change. Movement
-        // ticks reuse this list instead of repeatedly scanning the whole library.
-        let visible = preferences.showSavedPinsOnMap && SavedPinVisibility.isVisible(
-            mapWidthMeters: visibleMapWidthMeters, maximumMiles: preferences.mapPinVisibilityMiles)
-            ? pins.filter { visibleMapRect?.contains(MKMapPoint($0.coordinate)) ?? true } : []
+        guard savedPinViewport.shouldRefresh(maximumMiles: preferences.mapPinVisibilityMiles,
+            enabled: preferences.showSavedPinsOnMap, force: force) else { return }
+        let visible = preferences.showSavedPinsOnMap && savedPinViewport.isVisible(
+            maximumMiles: preferences.mapPinVisibilityMiles)
+            ? pins.filter { savedPinViewport.contains($0.coordinate) } : []
         if visibleSavedPins != visible { visibleSavedPins = visible }
+#if ELSEPIN_UI_TESTING
+        pinVisibilityProbe.record(width: savedPinViewport.widthMeters, pins: visible.count, continuous: !force)
+#endif
         if let selectedSavedPin, !visible.contains(where: { $0.id == selectedSavedPin }) {
             self.selectedSavedPin = nil
         }
@@ -313,7 +346,13 @@ struct MapHomeView: View {
             magnifierOverlay(proxy, size: geometry.size)
             routeMarkerOverlay(proxy, size: geometry.size)
         }
-        .onGeometryChange(for: CGSize.self) { $0.size } action: { mapSize = $0 }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            mapSize = size
+            if let rect = savedPinViewport.rect {
+                savedPinViewport.update(rect: rect, size: size) { proxy.convert($0, from: .named("routeMap")) }
+                refreshSavedPins(session.savedPins)
+            }
+        }
     }
 
     @ViewBuilder private func magnifierOverlay(_ proxy: MapProxy, size: CGSize) -> some View {
