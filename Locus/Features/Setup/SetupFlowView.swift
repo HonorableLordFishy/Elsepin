@@ -77,7 +77,7 @@ struct SetupFlowView: View {
                             Button("Import pairing file") { showImporter = true }.frame(minHeight: 44)
                             Button("Paste pairing file") {
                                 do { try pairing.importPairingFromClipboard(); importHelp = nil; wantsNewPairing = false }
-                                catch { importHelp = "Copy a valid RPPairing file and try again." }
+                                catch { importHelp = error.localizedDescription }
                             }.frame(minHeight: 44)
                             if pairing.hasPairingFile && supportsOnDevicePairing {
                                 Button(wantsNewPairing ? "Use saved pairing" : "Pair again") {
@@ -130,7 +130,7 @@ struct SetupFlowView: View {
                 do {
                     try pairing.importPairing(from: url)
                     importHelp = nil; wantsNewPairing = false; pairingOptionsExpanded = false
-                } catch { importHelp = "Choose a valid RPPairing file for this iPhone." }
+                } catch { importHelp = error.localizedDescription }
             }, onCancel: { showImporter = false }).ignoresSafeArea()
         }
     }
@@ -177,9 +177,11 @@ struct SetupFlowView: View {
     @ViewBuilder private var pairingProgress: some View {
         switch pairingHost.phase {
         case .idle, .succeeded: EmptyView()
-        case .failed:
-            Label("Pairing failed. Try again.", systemImage: "exclamationmark.circle")
+        case .failed(let message):
+            Label(message, systemImage: "exclamationmark.circle")
                 .font(.subheadline).foregroundStyle(LocusTheme.statusWarn)
+        case .stopping:
+            ProgressView("Finishing the previous pairing attempt…")
         case .advertising:
             VStack(alignment: .leading, spacing: 10) {
                 ProgressView("Waiting to pair…")

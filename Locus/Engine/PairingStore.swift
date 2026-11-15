@@ -46,8 +46,8 @@ final class PairingStore: ObservableObject {
     func refresh() {
         try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         hasPairingFile = FileManager.default.fileExists(atPath: pairingURL.path)
-        // On-device pairing writes outside this store, then calls refresh.
-        // Conservatively invalidate any proof made before that refresh.
+        // A manual refresh conservatively invalidates prior connection proof
+        // and any on-device result prepared against an older file revision.
         revision = UUID()
     }
 
@@ -87,6 +87,7 @@ final class PairingStore: ObservableObject {
     }
 
     func removePairing() throws {
+        PairOnDeviceService.cancelCurrentAttempt()
         if FileManager.default.fileExists(atPath: pairingURL.path) {
             try FileManager.default.removeItem(at: pairingURL)
         }
@@ -94,7 +95,14 @@ final class PairingStore: ObservableObject {
         revision = UUID()
     }
 
-    private func installPairingData(_ data: Data) throws {
+    func installOnDevicePairing(from stagedURL: URL) throws {
+        let file = try FileHandle(forReadingFrom: stagedURL)
+        defer { try? file.close() }
+        let data = try file.read(upToCount: PairingFileImport.maximumBytes + 1) ?? Data()
+        try installPairingData(data, replacingOnDeviceAttempt: true)
+    }
+
+    private func installPairingData(_ data: Data, replacingOnDeviceAttempt: Bool = false) throws {
         try PairingFileImport.install(data, at: pairingURL) { staged in
             var handle: OpaquePointer?
             let error = staged.path.withCString { rp_pairing_file_read($0, &handle) }
@@ -108,6 +116,8 @@ final class PairingStore: ObservableObject {
         hasPairingFile = true
         revision = UUID()
         lastError = nil
+        DeveloperLogStore.shared.record("pairing_file_installed", ["source": replacingOnDeviceAttempt ? "on_device" : "import"])
+        if !replacingOnDeviceAttempt { PairOnDeviceService.cancelCurrentAttempt() }
     }
 }
 

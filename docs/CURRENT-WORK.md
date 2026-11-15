@@ -1,5 +1,85 @@
 # Elsepin current handoff
 
+## Approved copy, website publication and build 85 - 15 November 2026
+
+Owner approved Humanizer edits 2 (pairing cleanup), 5 (Stop/reconnection) and
+6 (area-editor reassurance) only, then requested Wi-Fi/hotspot guidance across
+website, GitHub README and app. Other proposed copy edits are not authorized.
+Hotspot copy says another device's Wi-Fi hotspot "can also work", not guaranteed.
+Only display strings changed in this pass; existing pairing fixes below remain.
+
+Owner explicitly authorized pushing the website first, publishing it to Render
+workspace tea-db4nt1l9fdbs73a8oj50, and building a new test IPA. This supersedes
+the earlier local-only boundary for this work. No new public app release/tag.
+Build metadata is 2.6.1 (85). GitHub manual build on codex/pins-search-69 will
+validate Swift, production app/extension and package; phone checks remain separate.
+Local identity/appearance checks and 22 Python repository tests passed. Website
+Python export tests passed 9 with 1 Windows symlink skip. Build/deploy receipts
+will be recorded after completion. Preserve the existing dirty public checkout's
+SETUP.md; publishing uses its isolated release-website-85 worktree.
+
+## Pairing cancellation recovery - local only, 15 November 2026
+
+Owner reported that stopping initial pairing prevents a new attempt and points
+to a Settings prompt that no longer exists. Also requested a pairing-file audit.
+The fix below is local; no new IPA, push, deployment or release for this task.
+Existing website work is preserved separately below.
+
+- Stop previously detached UI callbacks without releasing the native accept
+  worker. Stop now closes the relay and sends a bounded loopback EOF to wake
+  that attempt's listener, including cancellation before its port callback.
+  Retry waits up to five seconds for cleanup, then gives an honest app-reopen
+  recovery message if native work has not returned. No nonexistent Settings
+  prompt is required. Native/device validation of the EOF wake is still pending;
+  the bundled FFI has no cancellation handle and its ABI/library are unchanged.
+- Late callbacks cannot update a replacement attempt. Listener ownership is
+  main-actor isolated; discovery failures surface, and a second inbound peer
+  no longer cancels the Settings connection already pairing.
+- Native output goes to an attempt-specific temporary file. Only the current,
+  uncancelled attempt with the same pairing-store revision can validate and
+  atomically install it. Import, paste and Open In share the existing validated
+  install path; a successful import cancels pending on-device work. Invalid
+  imports leave the prior file and current attempt untouched. Removal cancels
+  pending work too. No pairing keys or PINs were added to developer logs.
+- Setup displays actual recovery/import errors; Settings has Stop pairing and
+  both views show cleanup progress. Simulator adds only the matching phase and
+  still cannot perform or claim successful physical pairing.
+- Validation: 22 Python repository tests passed, identity/appearance checks and
+  git diff --check passed. Seven new Swift lifecycle regression cases were
+  added, not run: this Windows host has neither Swift/Xcode nor WSL. Run them
+  with existing PairingFileImportTests and compile production app/extension on
+  the Mac validation workflow before packaging. No native build claim.
+- Physical acceptance: cancel before Settings connects, retry; cancel while
+  entering the PIN, retry; stop then import/paste a valid file and ensure a late
+  attempt cannot replace it; reject an invalid import without losing a good
+  pairing; complete pairing and check the real LocalDevVPN connection.
+
+## Website replacement - 15 November 2026
+
+Owner explicitly rejected the first refinement and authorized a full website
+rewrite with scroll-driven animation, better illustrated maps, glass surfaces
+and a working preview. Implemented locally in `website/`; native behavior is
+unchanged. **No publication, push, deployment or IPA is authorized by this task.**
+
+- Local preview: http://127.0.0.1:8770/; the Render live URL remains unchanged.
+- New map-led homepage, three scroll chapters, state-preserving native preview
+  dialog, interactive example pins, actual eight themes/thirteen icons, revised
+  supporting pages, responsive and accessibility fallbacks.
+- Brand inventory corrected to development 2.6.1 build 84/Bloom; public release
+  2.6.0 stays separately recorded in `website/release.json` (checked 14 November).
+- Export remains static and allowlisted. Source icon artwork and licenses intact.
+- Python: 9 passed/1 Windows symlink test skipped. Main browser suite: 47 passed,
+  29 axe scans/zero violations, zero browser errors. After responsive corrections,
+  another 8 focused check groups and 8 axe scans passed. Details and evidence are
+  in `website/VERIFICATION.md`.
+- Independent visual review returned ship for **local review**, not publication.
+- Website-specific design/product/direction docs live under `website/`, separate
+  from native branding. Before/after screenshots and logs remain in ignored
+  `.build/website-qa/`; none are in `website/dist`.
+
+Use `website/README.md` and `website/VERIFICATION.md` for reproducible commands,
+source contracts, review evidence and remaining physical-browser limits.
+
 ## Native validation follow-up - 14 November 2026
 
 Owner authorized GitHub macOS validation and fixes, initially with no packaging.

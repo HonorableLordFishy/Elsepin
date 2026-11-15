@@ -61,7 +61,7 @@ enum PairingImportError: LocalizedError {
 }
 @MainActor final class PairOnDeviceService: ObservableObject {
     enum Phase: Equatable {
-        case idle, advertising, deviceConnected, awaitingPIN(String), succeeded, failed(String)
+        case idle, stopping, advertising, deviceConnected, awaitingPIN(String), succeeded, failed(String)
     }
     static var nativeWorkOutstanding: Bool { false }
     @Published private(set) var phase: Phase = .idle

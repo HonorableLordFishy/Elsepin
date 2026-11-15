@@ -654,7 +654,7 @@ final class SpoofSession: ObservableObject {
                 monitorTask?.cancel()
                 monitorTask = nil
             case .failure(let error):
-                let message = "Could not confirm Stop. The last location may still be set. Reconnect LocalDevVPN, then tap Try clearing location. " + error.localizedDescription
+                let message = "Could not confirm Stop. The last location may still be set. Connect to Wi-Fi, reconnect LocalDevVPN, then tap Try clearing location. Connecting to another device’s Wi-Fi hotspot can also work. Closing or force-quitting Elsepin doesn’t confirm that it cleared. " + error.localizedDescription
                 status = .unverified
                 lastError = message
                 warn(title: "Elsepin could not confirm Stop", message: message)

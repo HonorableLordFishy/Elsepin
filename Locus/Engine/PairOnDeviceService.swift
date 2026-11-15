@@ -3,6 +3,7 @@ import idevice
 import UIKit
 import UserNotifications
 import CoreLocation
+import Network
 
 /// Runs idevice's iOS 27+ pairable-host flow on-device.
 ///
@@ -12,9 +13,11 @@ import CoreLocation
 @MainActor
 final class PairOnDeviceService: ObservableObject {
     nonisolated private static let workerGate = AppResetWorkGate()
+    private static weak var currentService: PairOnDeviceService?
     static var nativeWorkOutstanding: Bool { workerGate.isBusy }
     enum Phase: Equatable {
         case idle
+        case stopping
         case advertising
         case deviceConnected
         case awaitingPIN(String)
@@ -28,6 +31,7 @@ final class PairOnDeviceService: ObservableObject {
 
     private var worker: Thread?
     private var callbackBox: PairCallbackBox?
+    private var restartTask: Task<Void, Never>?
     private var activityOwner: UUID?
     private var activityVisibilityTask: Task<Void, Never>?
     private var pinNotificationIdentifier = "locus.pairing.pin.\(UUID().uuidString)"
@@ -39,15 +43,39 @@ final class PairOnDeviceService: ObservableObject {
 
     var isBusy: Bool {
         switch phase {
-        case .advertising, .deviceConnected, .awaitingPIN: return true
+        case .stopping, .advertising, .deviceConnected, .awaitingPIN: return true
         default: return false
         }
     }
 
     func start(pairingStore: PairingStore, preferences: SessionPreferences) {
         guard !isBusy else { return }
+        DeveloperLogStore.shared.record("pairing_start_requested")
+        // A pairing file can be imported from another screen or via Open In.
+        // There must only ever be one native accept worker in this process.
+        Self.currentService?.resetToIdle()
+        Self.currentService = self
         guard Self.workerGate.begin() else {
-            phase = .failed("The previous pairing is still finishing. Close its prompt in iPhone Settings, then try again.")
+            DeveloperLogStore.shared.record("pairing_waiting_for_cleanup")
+            phase = .stopping
+            restartTask = Task { [weak self] in
+                // Bounded cleanup wait, not an indefinite busy/polling state.
+                for _ in 0..<50 {
+                    do { try await Task.sleep(for: .milliseconds(100)) }
+                    catch { return }
+                    guard let self, !Task.isCancelled else { return }
+                    if !Self.workerGate.isBusy {
+                        self.restartTask = nil
+                        self.phase = .idle
+                        self.start(pairingStore: pairingStore, preferences: preferences)
+                        return
+                    }
+                }
+                guard let self, !Task.isCancelled else { return }
+                self.restartTask = nil
+                self.phase = .failed("Elsepin could not finish stopping the previous attempt. Close and reopen Elsepin, then try pairing again. Your saved pairing has not changed.")
+                DeveloperLogStore.shared.record("pairing_cleanup_timeout")
+            }
             return
         }
         phase = .advertising
@@ -56,7 +84,7 @@ final class PairOnDeviceService: ObservableObject {
         pinNotificationIdentifier = "locus.pairing.pin.\(UUID().uuidString)"
         // A distinct box per attempt prevents a late native callback from an old
         // attempt attaching itself to a new attempt after Cancel/Retry.
-        let box = PairCallbackBox()
+        let box = PairCallbackBox(pairingStore: pairingStore)
         box.owner = self
         callbackBox = box
 
@@ -78,10 +106,17 @@ final class PairOnDeviceService: ObservableObject {
             withIntermediateDirectories: true
         )
 
-        let outputPath = pairingStore.pairingURL.path
+        // The worker never writes the live pairing. Only the current attempt
+        // may validate and install its staged result on the main actor.
+        let outputPath = box.stagedURL.path
+        _ = box.nativeWork.begin()
 
         worker = Thread {
-            defer { Self.workerGate.end() }
+            defer {
+                box.nativeWork.end()
+                Self.workerGate.end()
+                DispatchQueue.main.async { box.workerFinished() }
+            }
             autoreleasepool {
                 Self.runBlockingAccept(outputPath: outputPath, box: box)
             }
@@ -100,10 +135,19 @@ final class PairOnDeviceService: ObservableObject {
     }
 
     func resetToIdle() {
+        if isBusy { DeveloperLogStore.shared.record("pairing_cancel_requested") }
+        restartTask?.cancel()
+        restartTask = nil
         teardown()
         phase = .idle
         pin = nil
         debugPort = nil
+    }
+
+    /// Called after a valid file import, or before explicit pairing removal.
+    /// Invalid imports deliberately leave the current pairing attempt untouched.
+    static func cancelCurrentAttempt() {
+        currentService?.resetToIdle()
     }
 
     fileprivate func handleListening(
@@ -117,6 +161,7 @@ final class PairOnDeviceService: ObservableObject {
     ) {
         guard isBusy else { return }
         debugPort = port
+        phase = .advertising
         advertiser.publish(
             port: port,
             serviceIdentifier: serviceIdentifier,
@@ -124,9 +169,9 @@ final class PairOnDeviceService: ObservableObject {
             model: model,
             authTag: authTag,
             ver: ver,
-            minVer: minVer
+            minVer: minVer,
+            onFailure: { [weak self] message in self?.handleFailure(message) }
         )
-        phase = .advertising
         NSLog("[Elsepin] listening on %u, Bonjour id=%@", port, serviceIdentifier)
     }
 
@@ -153,8 +198,20 @@ final class PairOnDeviceService: ObservableObject {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
-    fileprivate func handleSuccess() {
-        guard isBusy else { return }
+    fileprivate func handleSuccess(_ box: PairCallbackBox) {
+        guard callbackBox === box, box.state.acceptsCallbacks else { return }
+        guard let store = box.pairingStore,
+              box.state.canInstall(startingRevision: box.startingRevision, currentRevision: store.revision) else {
+            handleFailure("Your saved pairing changed during this attempt. Use the saved pairing or start a new attempt.")
+            return
+        }
+        do {
+            try store.installOnDevicePairing(from: box.stagedURL)
+        } catch {
+            handleFailure("Pairing could not be saved. \(error.localizedDescription)")
+            return
+        }
+        box.state.finish()
         pin = nil
         phase = .succeeded
         teardown()
@@ -166,18 +223,21 @@ final class PairOnDeviceService: ObservableObject {
 
     fileprivate func handleFailure(_ message: String) {
         guard isBusy else { return }
+        DeveloperLogStore.shared.record("pairing_failed")
         pin = nil
         phase = .failed(message)
         teardown()
     }
 
     private func teardown() {
+        callbackBox?.cancel()
         callbackBox?.owner = nil
         callbackBox = nil
         finishActivity()
         clearPINNotification()
         advertiser.stop()
         endKeepAlive()
+        if Self.currentService === self { Self.currentService = nil }
     }
 
     private func updateActivity(stage: PairingActivity.Stage, code: String? = nil) {
@@ -222,9 +282,7 @@ final class PairOnDeviceService: ObservableObject {
         audioKeepAlive.start()
         guard backgroundTask == .invalid else { return }
         backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "locus.pairable-host") { [weak self] in
-            self?.finishActivity()
-            self?.clearPINNotification()
-            self?.endKeepAlive()
+            self?.handleFailure("Pairing ran out of background time. Return to Elsepin and try again. Your saved pairing has not changed.")
         }
     }
 
@@ -343,7 +401,7 @@ final class PairOnDeviceService: ObservableObject {
         }
 
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: outputPath)
-        DispatchQueue.main.async { box.owner?.handleSuccess() }
+        DispatchQueue.main.async { box.owner?.handleSuccess(box) }
     }
 }
 
@@ -369,15 +427,70 @@ private final class PairingKeepAlive: NSObject, CLLocationManagerDelegate {
     }
 }
 
-final class PairCallbackBox: @unchecked Sendable {
+@MainActor
+final class PairCallbackBox {
     weak var owner: PairOnDeviceService?
+    weak var pairingStore: PairingStore?
+    let startingRevision: UUID
+    let stagedURL: URL
+    nonisolated let nativeWork = AppResetWorkGate()
+    var state = PairingAttemptState()
+    private var wakeup: NWConnection?
+
+    init(pairingStore: PairingStore) {
+        self.pairingStore = pairingStore
+        startingRevision = pairingStore.revision
+        stagedURL = pairingStore.pairingURL.deletingLastPathComponent()
+            .appendingPathComponent(".on-device-\(UUID().uuidString).plist")
+    }
+
+    func listening(on port: UInt16) {
+        if let port = state.listening(on: port) { wakeAccept(on: port) }
+    }
+
+    func cancel() {
+        if let port = state.cancel() { wakeAccept(on: port) }
+    }
+
+    func workerFinished() {
+        DeveloperLogStore.shared.record("pairing_worker_finished", ["cancelled": String(state.cancelled)])
+        state.finish()
+        wakeup?.cancel()
+        wakeup = nil
+        try? FileManager.default.removeItem(at: stagedURL)
+    }
+
+    private func wakeAccept(on port: UInt16) {
+        guard nativeWork.isBusy, let endpoint = NWEndpoint.Port(rawValue: port) else { return }
+        // This bundled ABI has no cancellation handle. A loopback connection
+        // followed by EOF releases its single blocking accept/read. If Settings
+        // already connected, advertiser.stop() closes that relay instead.
+        let connection = NWConnection(host: "127.0.0.1", port: endpoint, using: .tcp)
+        wakeup = connection
+        connection.stateUpdateHandler = { [weak connection] state in
+            switch state {
+            case .ready:
+                connection?.send(content: nil, contentContext: .finalMessage, isComplete: true,
+                    completion: .contentProcessed { [weak connection] _ in connection?.cancel() })
+            case .failed: connection?.cancel()
+            default: break
+            }
+        }
+        connection.start(queue: .global(qos: .utility))
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 2) { [weak connection] in
+            connection?.cancel()
+        }
+    }
 }
 
 private func pinDisplayTrampoline(pin: UnsafePointer<CChar>?, context: UnsafeMutableRawPointer?) {
     guard let pin, let context else { return }
     let value = String(cString: pin)
     let box = Unmanaged<PairCallbackBox>.fromOpaque(context).takeUnretainedValue()
-    DispatchQueue.main.async { box.owner?.handlePIN(value) }
+    DispatchQueue.main.async {
+        guard box.state.acceptsCallbacks else { return }
+        box.owner?.handlePIN(value)
+    }
 }
 
 private func listeningTrampoline(
@@ -403,6 +516,8 @@ private func listeningTrampoline(
     )
     // NetService must be touched on the main thread / runloop.
     DispatchQueue.main.async {
+        box.listening(on: port)
+        guard box.state.acceptsCallbacks else { return }
         box.owner?.handleListening(
             port: values.0,
             serviceIdentifier: values.1,
@@ -418,5 +533,8 @@ private func listeningTrampoline(
 private func connectedTrampoline(context: UnsafeMutableRawPointer?) {
     guard let context else { return }
     let box = Unmanaged<PairCallbackBox>.fromOpaque(context).takeUnretainedValue()
-    DispatchQueue.main.async { box.owner?.handleConnected() }
+    DispatchQueue.main.async {
+        guard box.state.acceptsCallbacks else { return }
+        box.owner?.handleConnected()
+    }
 }

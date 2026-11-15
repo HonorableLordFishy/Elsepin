@@ -138,6 +138,8 @@ struct PairOnDeviceView: View {
             case .idle:
                 Label("Ready when you are", systemImage: "antenna.radiowaves.left.and.right")
                     .foregroundStyle(.secondary)
+            case .stopping:
+                ProgressView("Finishing the previous pairing attempt…")
             case .advertising:
                 ProgressView()
                 Text("Waiting for Settings…")
@@ -224,9 +226,10 @@ struct PairOnDeviceView: View {
                     .frame(maxWidth: .infinity, minHeight: 52)
             }
             .buttonStyle(ShiftActionStyle())
-        case .advertising, .deviceConnected, .awaitingPIN:
+        case .stopping, .advertising, .deviceConnected, .awaitingPIN:
             Text({
                 switch host.phase {
+                case .stopping: return "Pairing will restart once the previous attempt stops."
                 case .awaitingPIN: return "Type the code above into the second Settings prompt."
                 case .deviceConnected: return "Connected — code coming next."
                 default: return "Waiting for iOS to connect… don’t force-quit Elsepin."
@@ -236,6 +239,8 @@ struct PairOnDeviceView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
+            Button("Stop pairing") { host.resetToIdle() }
+                .frame(maxWidth: .infinity, minHeight: 44)
         }
     }
 }

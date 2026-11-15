@@ -42,7 +42,7 @@ enum SetupIssue: String, Equatable {
     var detail: String {
         switch self {
         case .checkingWiFi: return "Wait for the Wi-Fi check, then continue."
-        case .wifiRequired: return "In iPhone Settings, open Wi-Fi and join a network. Initial connection needs Wi-Fi as well as LocalDevVPN."
+        case .wifiRequired: return "In iPhone Settings, open Wi-Fi and join a network. Initial connection needs Wi-Fi as well as LocalDevVPN. Connecting to another device’s Wi-Fi hotspot can also work."
         case .vpnRequired: return "Open LocalDevVPN, turn its tunnel on, then return to Elsepin. Wi-Fi must stay connected too."
         case .pairingRequired: return "Create a pairing on this iPhone or import its RPPairing file."
         case .activeSession: return "Return to the map and use Stop spoofing before testing setup. If Stop needs a connection, reconnect there first."

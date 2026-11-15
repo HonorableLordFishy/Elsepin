@@ -6,6 +6,7 @@ import Network
 /// Uses Network.framework `NWListener` + Bonjour (what iOS 27 Developer Mode
 /// browses). Inbound connections are relayed to the Rust pairable-host on
 /// 127.0.0.1 so accept() still completes while Settings is in the foreground.
+@MainActor
 final class PairableHostAdvertiser {
     private var listener: NWListener?
     private var activeRelay: RelayPipe?
@@ -19,7 +20,8 @@ final class PairableHostAdvertiser {
         model: String,
         authTag: String,
         ver: String,
-        minVer: String
+        minVer: String,
+        onFailure: @escaping @MainActor (String) -> Void
     ) {
         stop()
         rustLoopbackPort = port
@@ -46,34 +48,42 @@ final class PairableHostAdvertiser {
                 txtRecord: txt
             )
 
-            listener.stateUpdateHandler = { [weak self] state in
-                switch state {
-                case .ready:
-                    let p = listener.port?.rawValue ?? 0
-                    self?.publishedPort = p
-                    NSLog("[Elsepin] NWListener ready on port %u (relay → 127.0.0.1:%u)", p, port)
-                case .failed(let error):
-                    NSLog("[Elsepin] NWListener failed: %@", String(describing: error))
-                case .cancelled:
-                    NSLog("[Elsepin] NWListener cancelled")
-                default:
-                    break
+            listener.stateUpdateHandler = { [weak self, weak listener] state in
+                Task { @MainActor in
+                    guard let self, let listener, self.listener === listener else { return }
+                    switch state {
+                    case .ready:
+                        let p = listener.port?.rawValue ?? 0
+                        self.publishedPort = p
+                        NSLog("[Elsepin] NWListener ready on port %u (relay → 127.0.0.1:%u)", p, port)
+                    case .failed(let error):
+                        NSLog("[Elsepin] NWListener failed: %@", String(describing: error))
+                        onFailure("Pairing discovery could not start. Check Elsepin's Local Network permission and Wi-Fi, then try again.")
+                    case .cancelled:
+                        NSLog("[Elsepin] NWListener cancelled")
+                    default:
+                        break
+                    }
                 }
             }
 
-            listener.newConnectionHandler = { [weak self] connection in
-                NSLog(
-                    "[Elsepin] NWListener accepted %@",
-                    String(describing: connection.endpoint)
-                )
-                self?.relay(connection)
+            listener.newConnectionHandler = { [weak self, weak listener] connection in
+                Task { @MainActor in
+                    guard let self, let listener, self.listener === listener else { connection.cancel(); return }
+                    NSLog(
+                        "[Elsepin] NWListener accepted %@",
+                        String(describing: connection.endpoint)
+                    )
+                    self.relay(connection)
+                }
             }
 
-            listener.start(queue: .global(qos: .userInitiated))
             self.listener = listener
+            listener.start(queue: .main)
             NSLog("[Elsepin] NWListener starting; will relay → 127.0.0.1:%u", port)
         } catch {
             NSLog("[Elsepin] NWListener start failed: %@", error.localizedDescription)
+            onFailure("Pairing discovery could not start. Check Elsepin's Local Network permission and Wi-Fi, then try again.")
         }
     }
 
@@ -82,10 +92,14 @@ final class PairableHostAdvertiser {
         activeRelay = nil
         listener?.cancel()
         listener = nil
+        publishedPort = 0
+        rustLoopbackPort = 0
     }
 
     private func relay(_ inbound: NWConnection) {
-        activeRelay?.cancel()
+        // The native host accepts one peer. A second discovery connection must
+        // not evict the Settings connection already entering its pairing code.
+        guard activeRelay == nil else { inbound.cancel(); return }
         let rustPort = rustLoopbackPort
         guard rustPort > 0, let nwPort = NWEndpoint.Port(rawValue: rustPort) else {
             inbound.cancel()

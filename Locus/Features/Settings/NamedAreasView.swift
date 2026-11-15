@@ -103,7 +103,7 @@ struct NamedAreaEditor: View {
                     Spacer()
                     Text("\(draft.points.count) corners").font(.caption).foregroundStyle(.secondary)
                 }.buttonStyle(.borderless).padding(.horizontal)
-                Text("Preview only. Drawing here never moves your spoofed location.").font(.caption).foregroundStyle(.secondary)
+                Text("Drawing an area doesn’t change your spoofed location.").font(.caption).foregroundStyle(.secondary)
             }.padding(.vertical)
             }
             .sheet(isPresented: $editingCorners) {
