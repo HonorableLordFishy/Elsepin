@@ -245,4 +245,3 @@ final class SessionLifecycleDelegate: NSObject, UIApplicationDelegate {
         session?.prepareForTermination()
     }
 }
-

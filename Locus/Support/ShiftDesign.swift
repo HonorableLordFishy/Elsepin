@@ -24,7 +24,7 @@ struct ShiftScreenHeading: View {
     let detail: String
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            ShiftMark().fill(LocusTheme.accent.gradient)
+            ShiftAppMark().foregroundStyle(LocusTheme.accent.gradient)
                 .frame(width: 40, height: 40).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 7) {
                 Text(eyebrow.uppercased()).font(.footnote.weight(.semibold)).tracking(1).foregroundStyle(.secondary)

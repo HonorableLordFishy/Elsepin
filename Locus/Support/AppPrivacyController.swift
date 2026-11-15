@@ -216,7 +216,7 @@ private struct PrivacyCoverView: View {
         ZStack {
             Color(white: 0.07).ignoresSafeArea()
             VStack(spacing: 18) {
-                ShiftMark().fill(LocusTheme.accent).frame(width: 64, height: 64).accessibilityHidden(true)
+                ShiftAppMark().foregroundStyle(LocusTheme.accent).frame(width: 64, height: 64).accessibilityHidden(true)
                 Text("Elsepin").font(.system(.largeTitle, design: .rounded, weight: .bold)).foregroundStyle(.white)
                 ShiftSignature().foregroundStyle(.white.opacity(0.7))
                 if controller.access.isLocked, controller.access.activity == .active {

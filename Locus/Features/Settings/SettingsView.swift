@@ -271,7 +271,7 @@ private struct LocusAboutSettingsView: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 18) {
-                    ShiftMark().fill(LocusTheme.accent.gradient).frame(width: 72, height: 72).accessibilityHidden(true)
+                    ShiftAppMark().foregroundStyle(LocusTheme.accent.gradient).frame(width: 72, height: 72).accessibilityHidden(true)
                     Text("Elsepin").font(.system(size: titleSize, weight: .bold)).tracking(-2)
                     ShiftSignature()
                 }.padding(.vertical, 24).frame(maxWidth: .infinity, alignment: .leading)
@@ -344,7 +344,7 @@ struct PlacesView: View {
     private var content: some View {
         List {
             Section {
-                if typeSize.isAccessibilitySize { categoryPicker.pickerStyle(.menu) }
+                if typeSize.isAccessibilitySize { categoryPicker.pickerStyle(.menu).labelsHidden() }
                 else { categoryPicker.pickerStyle(.segmented) }
             }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
             if (category == .pins || category == .routes) && !folders.isEmpty {
@@ -388,7 +388,7 @@ struct PlacesView: View {
     private var categoryPicker: some View {
         Picker("Library category", selection: $category) {
             ForEach(Category.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-        }.frame(minHeight: 44)
+        }.frame(minHeight: 44).accessibilityIdentifier("library.category")
     }
     private var folders: [String] { Array(Set(session.savedPins.compactMap(\.folder) + library.trips.compactMap(\.folder))).sorted() }
     private var shownPins: [SavedPlace] {
@@ -397,24 +397,27 @@ struct PlacesView: View {
         }
     }
     private func pinRow(_ place: SavedPlace) -> some View {
-        HStack {
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout())
+        return layout {
             Button { onPlace(place); if !isRoot { dismiss() } } label: {
                 HStack(spacing: 12) {
-                    SavedPlaceBadge(symbol: place.symbol, tint: place.tint, emoji: place.emoji)
+                    if !typeSize.isAccessibilitySize { SavedPlaceBadge(symbol: place.symbol, tint: place.tint, emoji: place.emoji) }
                     Text(place.displayName).foregroundStyle(.primary)
                     Spacer()
                 }.frame(minHeight: 48).contentShape(Rectangle())
             }.buttonStyle(.borderless)
+            HStack {
             Button { session.togglePinFavorite(place) } label: {
-                Image(systemName: place.isFavorite ? "star.fill" : "star").frame(width: 44, height: 44)
+                Image(systemName: place.isFavorite ? "star.fill" : "star").font(.system(size: 20)).frame(width: 44, height: 44)
             }.buttonStyle(.borderless)
                 .accessibilityLabel(place.isFavorite ? "Unfavorite \(place.displayName)" : "Favorite \(place.displayName)")
             Menu {
                 Button("Edit pin", systemImage: "pencil") { pinEditor = PinDraft(place: place, center: place.coordinate) }
                 Button("Move to folder…", systemImage: "folder") { folderPlace = place }
                 Button("Delete pin", role: .destructive) { deletingPlace = place }
-            } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+            } label: { Image(systemName: "ellipsis").font(.system(size: 20)).frame(width: 44, height: 44) }
                 .buttonStyle(.borderless).accessibilityLabel("Options for \(place.displayName)")
+            }
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button("Delete", systemImage: "trash") { deletingPlace = place }.tint(.red)

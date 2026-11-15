@@ -9,6 +9,7 @@ struct MapHomeView: View {
     @Binding var incomingSearch: Bool
     var onToolsHeightChange: (CGFloat) -> Void = { _ in }
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.elsepinReducedResources) private var reducedResources
     @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var preferences: SessionPreferences
@@ -547,7 +548,7 @@ struct MapHomeView: View {
             if session.journey == nil && !planner.isDrawing {
                 Button { showSearch = true } label: {
                     HStack(spacing: 12) {
-                        ShiftMark().fill(LocusTheme.accent.gradient).frame(width: 26, height: 26).accessibilityHidden(true)
+                        ShiftAppMark().foregroundStyle(LocusTheme.accent.gradient).frame(width: 26, height: 26).accessibilityHidden(true)
                         Text("Where do you want to go?").font(.subheadline.weight(.medium)).foregroundStyle(.primary)
                         Spacer()
                         Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -562,14 +563,14 @@ struct MapHomeView: View {
                     HStack(spacing: 8) {
                         if session.journey != nil {
                             Button { showRouteSearch = true } label: {
-                                Image(systemName: "magnifyingglass").frame(width: 46, height: 46)
+                                Image(systemName: "magnifyingglass").font(.system(size: 20)).frame(width: 46, height: 46)
                             }.buttonStyle(.plain).locusGlass(.interactive, in: Circle())
                                 .accessibilityLabel("Search along route")
                                 .accessibilityIdentifier("map.routeSearch")
                         }
                         undoJumpButton
                         Button { followMovement = true; selection = nil; centerOnLocation() } label: {
-                            Image(systemName: followMovement ? "location.fill" : "location").frame(width: 46, height: 46).contentShape(Rectangle())
+                            Image(systemName: followMovement ? "location.fill" : "location").font(.system(size: 20)).frame(width: 46, height: 46).contentShape(Rectangle())
                         }
                         .buttonStyle(.plain).locusGlass(.interactive, in: Circle())
                         .accessibilityLabel("Follow latest location")
@@ -581,7 +582,7 @@ struct MapHomeView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 8)
                     .allowsHitTesting(false)
-                if session.activeRoute != nil, selection == nil {
+                if session.activeRoute != nil, selection == nil, !typeSize.isAccessibilitySize {
                     Text("Hold the route to place a jump marker")
                         .font(.footnote).padding(.horizontal, 12).padding(.vertical, 6)
                         .locusGlass(.regular, in: Capsule()).allowsHitTesting(false)
@@ -827,7 +828,7 @@ struct MapHomeView: View {
         withAnimation(drawingAnimation) { planner.isDrawing = true }
     }
     private func mapButton(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: icon).frame(width: 44, height: 44).contentShape(Rectangle()) }
+        Button(action: action) { Image(systemName: icon).font(.system(size: 20)).frame(width: 44, height: 44).contentShape(Rectangle()) }
             .buttonStyle(.plain).accessibilityLabel(label)
     }
     private func previewRoute() {

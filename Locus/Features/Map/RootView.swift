@@ -316,6 +316,7 @@ private struct ForegroundSchedule: TimelineSchedule {
 
 struct StatusBarView: View {
     var isVisible = true
+    @Environment(\.dynamicTypeSize) private var typeSize
     @EnvironmentObject private var session: SpoofSession
     @ObservedObject private var remote = RemoteFindMyController.shared
     @ObservedObject private var computer = CompanionClient.shared
@@ -330,7 +331,9 @@ struct StatusBarView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(session.showsClosedSessionNotice ? Color.secondary : phase.color)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(session.statusTitle).font(.subheadline.weight(.semibold))
+                    Text(typeSize.isAccessibilitySize ? compactStatusTitle : session.statusTitle)
+                        .font(typeSize.isAccessibilitySize ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
+                    if !typeSize.isAccessibilitySize {
                     if remote.enabled && remote.paired && session.remoteCheckSessionRequested {
                         Text(remote.state.title).font(.footnote)
                             .foregroundStyle(remote.state == .match ? Color.green : Color.secondary)
@@ -346,6 +349,7 @@ struct StatusBarView: View {
                     } else if phase == .unverified {
                         Text(session.showsClosedSessionNotice ? "Not running · Tap for details" : "Last location may still be set").font(.footnote).foregroundStyle(.secondary)
                     }
+                    }
                 }
                 Spacer(minLength: 0)
                 if session.lowPower {
@@ -359,6 +363,8 @@ struct StatusBarView: View {
             .contentShape(Capsule())
             }.buttonStyle(.plain)
             .accessibilityElement(children: .combine)
+            .accessibilityLabel(session.statusTitle)
+            .accessibilityValue(session.lastConfirmedAt.map { "Updated \($0.formatted(date: .omitted, time: .standard))" } ?? "No confirmed update")
             .accessibilityAddTraits(.isButton)
             .accessibilityHint("Open connection details")
             .accessibilityAction { showDetails = true }
@@ -367,6 +373,19 @@ struct StatusBarView: View {
             NavigationStack { ConnectionDetailsView().toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { showDetails = false } }
             } }.presentationDetents([.medium, .large])
+        }
+    }
+
+    private var compactStatusTitle: String {
+        if session.showsClosedSessionNotice { return "Session ended" }
+        switch session.effectivePhase {
+        case .active: return "Update sent"
+        case .connecting: return "Connecting"
+        case .reconnecting: return "Reconnecting"
+        case .stopping: return "Stopping"
+        case .unverified: return "Check status"
+        case .disconnected: return "Disconnected"
+        case .idle: return session.statusTitle
         }
     }
 }
@@ -576,6 +595,9 @@ struct BottomControlsView: View {
             }
             RouteExtrasControls()
             ArrivalControls()
+            if typeSize.isAccessibilitySize {
+                Text("Hold the route to place a jump marker").font(.caption).foregroundStyle(.secondary)
+            }
             if session.routeRerouting {
                 HStack { ProgressView("Finding route…"); Spacer(); Button("Cancel") { session.cancelReroute() }.frame(minHeight: 44) }.font(.caption)
             } else if session.routeJumping {
@@ -790,13 +812,14 @@ struct BottomControlsView: View {
             HStack(spacing: 6) {
                 if session.isStopping { ProgressView().controlSize(.small) }
                 else { Image(systemName: "stop.circle") }
-                Text(session.stopButtonTitle)
+                Text(typeSize.isAccessibilitySize ? (session.isStopping ? "Stopping" : session.effectivePhase == .active ? "Stop" : "Clear") : session.stopButtonTitle)
             }
                 .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, minHeight: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(ShiftActionStyle(kind: .destructive, immediatePress: true, compact: true))
         .disabled(session.isStopping)
+        .accessibilityLabel(session.stopButtonTitle)
         .accessibilityIdentifier("session.stop")
     }
 

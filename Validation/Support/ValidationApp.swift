@@ -60,14 +60,23 @@ private struct ValidationHost: View {
     @State private var details = false
     @State private var showSearch = false
     @State private var started = false
+    @State private var runSession = false
+    private var sessionScenario: Bool { ["moving", "paused", "connecting", "failed"].contains(ValidationFixture.scenario) }
     var body: some View {
         RootView(incomingShortcut: $shortcut, incomingSessionDetails: $details)
             .modifier(AppearancePresentation())
             .frame(maxWidth: ProcessInfo.processInfo.arguments.contains("--narrow") ? 320 : .infinity)
             .overlay(alignment: .top) {
-                Text("SIMULATOR TEST DATA").font(.system(size: 9, weight: .bold))
+                VStack(spacing: 0) {
+                Text("SIMULATOR TEST DATA")
+                    .accessibilityIdentifier("validation.banner")
+                if sessionScenario && !runSession {
+                    Button("Start validation session") { runSession = true }
+                        .accessibilityIdentifier("validation.start")
+                        .frame(minHeight: 44)
+                }
+                }.font(.system(size: 9, weight: .bold))
                     .padding(2).background(.yellow).foregroundStyle(.black)
-                    .accessibilityIdentifier("validation.banner").allowsHitTesting(false)
             }
             .sheet(isPresented: $showSearch) {
                 RoutePlaceSearchSheet(title: "Test search", onChoose: { _ in showSearch = false })
@@ -88,7 +97,11 @@ private struct ValidationHost: View {
                 // XCTest changes the simulator's real Accessibility settings.
                 // Keep glass requested so Reduce Transparency must supply the fallback.
                 preferences.glassPanel = true
-                if ["moving", "paused", "connecting", "failed"].contains(ValidationFixture.scenario) {
+                if !sessionScenario { session.selectPin(ValidationFixture.points[0], name: "Test garden entrance") }
+                if ValidationFixture.scenario == "search" { showSearch = true }
+            }
+            .task(id: runSession) {
+                guard runSession else { return }
                     _ = session.followRoute(ValidationFixture.route, pairing: pairing, smoothing: false)
                     if ValidationFixture.scenario == "paused" {
                         for _ in 0..<50 where session.effectivePhase != .active {
@@ -96,10 +109,6 @@ private struct ValidationHost: View {
                         }
                         session.toggleRoutePause()
                     }
-                } else {
-                    session.selectPin(ValidationFixture.points[0], name: "Test garden entrance")
-                }
-                if ValidationFixture.scenario == "search" { showSearch = true }
             }
     }
 }

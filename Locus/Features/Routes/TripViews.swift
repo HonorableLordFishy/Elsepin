@@ -54,6 +54,7 @@ struct ArrivalControls: View {
 }
 
 struct SavedTripsSection: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     @EnvironmentObject private var preferences: SessionPreferences
     @EnvironmentObject private var library: TripLibrary
     @EnvironmentObject private var session: SpoofSession
@@ -90,10 +91,11 @@ struct SavedTripsSection: View {
                     .frame(minHeight: 44)
             }
             ForEach(shownTrips) { trip in
-                HStack(spacing: 4) {
+                let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 4))
+                layout {
                 Button { onChoose(trip) } label: {
                     HStack {
-                        ShiftRowIcon(symbol: trip.mode.icon)
+                        if !typeSize.isAccessibilitySize { ShiftRowIcon(symbol: trip.mode.icon) }
                         VStack(alignment: .leading, spacing: 4) {
                             Text(trip.name).font(.body.weight(.semibold)).foregroundStyle(.primary)
                             Text("\(trip.originName) → \(trip.destinationName)").font(.caption).foregroundStyle(.secondary).lineLimit(2)
@@ -101,12 +103,12 @@ struct SavedTripsSection: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                        if !typeSize.isAccessibilitySize { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
                     }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless).disabled(session.journey != nil || session.isBusy)
                 Menu { tripActions(trip) } label: {
-                    Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Rectangle())
+                    Image(systemName: "ellipsis").font(.system(size: 20)).frame(width: 44, height: 44).contentShape(Rectangle())
                 }.buttonStyle(.borderless).accessibilityLabel("Options for \(trip.name)")
                 }
                 .contextMenu { tripActions(trip) }

@@ -28,11 +28,10 @@ extension EnvironmentValues {
 
 /// Monochrome counterparts of the independently selectable app icons.
 struct ShiftMark: Shape {
-    @Environment(\.shiftIconDesign) private var inheritedDesign
     var design: ShiftIconDesign?
     func path(in rect: CGRect) -> Path {
         var p = Path()
-        let selected = design ?? inheritedDesign
+        let selected = design ?? .glacier
         switch selected {
         case .glacier:
             p.move(to: CGPoint(x: 3, y: 11)); p.addLine(to: CGPoint(x: 22, y: 2))
@@ -66,6 +65,13 @@ struct ShiftMark: Shape {
         return p.applying(CGAffineTransform(scaleX: scale, y: scale)
             .concatenating(CGAffineTransform(translationX: rect.midX - scale * 12, y: rect.midY - scale * 12)))
     }
+}
+
+/// Resolve environment values in an installed View, never in Shape.path(in:).
+struct ShiftAppMark: View {
+    @Environment(\.shiftIconDesign) private var inheritedDesign
+    var design: ShiftIconDesign?
+    var body: some View { ShiftMark(design: design ?? inheritedDesign).fill(.foreground) }
 }
 
 /// Native dynamic colors follow the window trait without recreating the map.
@@ -103,7 +109,7 @@ struct ShiftWidgetBrand: View {
     var design: ShiftIconDesign?
     var body: some View {
         HStack(spacing: 7) {
-            ShiftMark(design: design).fill(.primary).frame(width: 18, height: 18).accessibilityHidden(true)
+            ShiftAppMark(design: design).foregroundStyle(.primary).frame(width: 18, height: 18).accessibilityHidden(true)
             Text("Elsepin").font(.subheadline.weight(.semibold))
         }.accessibilityElement(children: .combine)
     }

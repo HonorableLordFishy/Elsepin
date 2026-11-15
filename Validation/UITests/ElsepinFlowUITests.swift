@@ -3,6 +3,12 @@ import XCTest
 final class ElsepinFlowUITests: XCTestCase {
     private var app: XCUIApplication!
     override func setUpWithError() throws { continueAfterFailure = false }
+    override func tearDownWithError() throws {
+        if let app, app.state == .runningForeground {
+            capture("final-" + name)
+            app.terminate()
+        }
+    }
     private func launch(_ scenario: String, large: Bool = false, dark: Bool = false, fallback: Bool = false) {
         app = XCUIApplication()
         app.launchArguments = ["--elsepin-ui-test", "--narrow"]
@@ -13,9 +19,12 @@ final class ElsepinFlowUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts["validation.banner"].waitForExistence(timeout: 20))
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        for label in ["Allow While Using App", "Allow Once", "Allow"] {
+        for label in ["Allow While Using App", "Allow Once", "Allow", "Keep Only While Using", "Change to Always Allow"] {
             let button = springboard.buttons[label]
             if button.exists { button.tap() }
+        }
+        if ["moving", "paused", "connecting", "failed"].contains(scenario) {
+            app.buttons["validation.start"].tap()
         }
     }
     private func capture(_ name: String) {
@@ -59,8 +68,8 @@ final class ElsepinFlowUITests: XCTestCase {
         capture("05-largest-text-paused")
     }
     func testDarkAccessibilityFallbackPaused() {
-        configureAccessibility(true)
         defer { configureAccessibility(false) }
+        configureAccessibility(true)
         launch("paused", large: true, dark: true, fallback: true)
         reachable("session.stop"); reachable("session.pause")
         capture("06-dark-reduced-motion-transparency-contrast")
@@ -90,8 +99,13 @@ final class ElsepinFlowUITests: XCTestCase {
             }
             XCTAssertTrue(control.waitForExistence(timeout: 5), "Settings: \(label)")
             let expected = enabled ? "1" : "0"
-            if control.value as? String != expected { control.tap() }
-            XCTAssertEqual(control.value as? String, expected, label)
+            if control.value as? String != expected {
+                // Settings exposes the entire row as a switch on some runtimes.
+                // Hit the visible trailing toggle, then wait for its async update.
+                control.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+            }
+            let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", expected), object: control)
+            XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed, label)
         }
         open("Accessibility"); open("Display & Text Size")
         toggle("Reduce Transparency"); toggle("Increase Contrast")
@@ -105,8 +119,8 @@ final class ElsepinFlowUITests: XCTestCase {
     func testConnectingIsNotPresentedAsMoving() {
         launch("connecting")
         XCTAssertTrue(app.staticTexts["Starting route…"].waitForExistence(timeout: 10))
-        reachable("session.stop")
         capture("07-connecting-test-only")
+        reachable("session.stop")
     }
     func testFailedStateOffersRecovery() {
         launch("failed")
@@ -171,6 +185,12 @@ final class ElsepinFlowUITests: XCTestCase {
         launch("idle", large: true, dark: true, fallback: true)
         app.buttons["Library"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch.frame.width, 180)
         capture("14-library-long-names-largest-text")
+        app.buttons["library.category"].tap()
+        app.buttons["Routes"].tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch.frame.width, 180)
+        capture("14b-library-long-route-largest-text")
     }
 }

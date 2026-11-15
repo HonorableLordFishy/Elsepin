@@ -23,6 +23,7 @@ struct MapFavoriteButton: View {
         if route != nil || coordinate != nil {
             Button(action: toggle) {
                 Image(systemName: isFavorite ? "star.fill" : "star")
+                    .font(.system(size: 20))
                     .foregroundStyle(.primary).frame(width: 44, height: 44).contentShape(Rectangle())
             }.buttonStyle(.plain)
                 .accessibilityLabel((isFavorite ? "Unfavorite " : "Favorite ") + (route == nil ? "pin" : "route"))

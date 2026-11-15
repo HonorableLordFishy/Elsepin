@@ -84,6 +84,8 @@ jobs:
           set -o pipefail
           xcrun simctl boot "$VALIDATION_SIMULATOR"
           xcrun simctl bootstatus "$VALIDATION_SIMULATOR" -b
+          xcrun simctl install "$VALIDATION_SIMULATOR" .build/simulator-validation/Build/Products/Debug-iphonesimulator/ElsepinValidation.app
+          xcrun simctl privacy "$VALIDATION_SIMULATOR" grant location-always com.n3mostudio.elsepin.validation
           xcodebuild -project ElsepinValidation.xcodeproj -scheme Locus -configuration Debug \
             -destination "platform=iOS Simulator,id=$VALIDATION_SIMULATOR" \
             -derivedDataPath .build/simulator-validation -resultBundlePath .build/simulator-evidence/UI.xcresult \

@@ -19,6 +19,7 @@ struct MapOptionsMenu: View {
             }
         } label: {
             Image(systemName: "square.3.layers.3d")
+                .font(.system(size: 20))
                 .frame(width: 44, height: 44).contentShape(Rectangle())
         }
         .buttonStyle(.plain)

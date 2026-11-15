@@ -25,7 +25,9 @@ struct PlaceSearchResponse { let mapItems: [MKMapItem] }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) { continuation.resume() }
             }
         } else { try await Task.sleep(for: .milliseconds(150)) }
-        let item = MKMapItem(placemark: MKPlacemark(coordinate: ValidationFixture.points[1]))
+        // Keep search results away from named fixture pins: the real search flow
+        // deliberately substitutes a saved name at matching coordinates.
+        let item = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: 40.772, longitude: -73.973)))
         item.name = query == "slow" ? "OBSOLETE TEST RESULT" : "Test cafe result for \(query)"
         return PlaceSearchResponse(mapItems: [item])
     }
