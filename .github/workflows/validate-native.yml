@@ -98,6 +98,7 @@ jobs:
           if test -d .build/simulator-evidence/UI.xcresult; then
             xcrun xcresulttool export attachments --path .build/simulator-evidence/UI.xcresult --output-path .build/simulator-evidence/attachments
             xcrun xcresulttool get test-results summary --path .build/simulator-evidence/UI.xcresult > .build/simulator-evidence/summary.json
+            xcrun xcresulttool get object --legacy --format json --path .build/simulator-evidence/UI.xcresult > .build/simulator-evidence/result-detail.json
           fi
           if test -n "${VALIDATION_SIMULATOR:-}"; then
             xcrun simctl shutdown "$VALIDATION_SIMULATOR" || true

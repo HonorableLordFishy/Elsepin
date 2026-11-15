@@ -13,6 +13,7 @@ struct RootView: View {
     @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var preferences: SessionPreferences
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.shiftVisualStyle) private var visualStyle
     @StateObject private var planner = RoutePlanner()
@@ -179,12 +180,27 @@ struct RootView: View {
     }
     private func solidTab(_ tab: RootTab, title: String, symbol: String) -> some View {
         Button { selectedTab = tab } label: {
+            Group {
+            if typeSize.isAccessibilitySize {
+                // Match the native tab bar's bounded chrome. Large Content Viewer
+                // provides an enlarged title/icon without displacing route actions.
+                VStack(spacing: 3) {
+                    Image(systemName: symbol).font(.system(size: 20, weight: .semibold))
+                    Text(title).font(.system(size: 12, weight: selectedTab == tab ? .bold : .medium))
+                        .lineLimit(1)
+                }
+            } else {
             Label(title, systemImage: symbol)
                 .font(.footnote.weight(selectedTab == tab ? .bold : .medium))
                 .labelStyle(.titleAndIcon)
+            }
+            }
                 .foregroundStyle(ShiftPalette.color(selectedTab == tab ? .accent : .muted, style: visualStyle))
                 .frame(maxWidth: .infinity, minHeight: 48).contentShape(Rectangle())
         }.buttonStyle(.plain)
+            .accessibilityIdentifier("navigation.\(tab.rawValue)")
+            .accessibilityLabel(title)
+            .accessibilityShowsLargeContentViewer { Label(title, systemImage: symbol) }
             .accessibilityAddTraits(selectedTab == tab ? [.isSelected] : [])
             .accessibilityHint("Opens the \(title.lowercased()) tab")
     }

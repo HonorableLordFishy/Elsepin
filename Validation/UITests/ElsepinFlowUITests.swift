@@ -77,9 +77,13 @@ final class ElsepinFlowUITests: XCTestCase {
     private func configureAccessibility(_ enabled: Bool) {
         let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
         settings.launch()
+        func backButton() -> XCUIElement {
+            let explicit = settings.buttons["BackButton"]
+            return explicit.exists ? explicit : settings.navigationBars.buttons.firstMatch
+        }
         for _ in 0..<6 {
             if settings.navigationBars["Settings"].exists { break }
-            let back = settings.navigationBars.buttons.firstMatch
+            let back = backButton()
             if back.exists { back.tap() } else { break }
         }
         func open(_ label: String) {
@@ -109,7 +113,7 @@ final class ElsepinFlowUITests: XCTestCase {
         }
         open("Accessibility"); open("Display & Text Size")
         toggle("Reduce Transparency"); toggle("Increase Contrast")
-        settings.navigationBars.buttons.firstMatch.tap()
+        backButton().tap()
         open("Motion"); toggle("Reduce Motion")
         let shot = XCTAttachment(screenshot: settings.screenshot())
         shot.name = enabled ? "accessibility-settings-enabled" : "accessibility-settings-reset"
@@ -176,21 +180,26 @@ final class ElsepinFlowUITests: XCTestCase {
     }
     func testLibraryEmptyState() {
         launch("empty")
-        app.buttons["Library"].tap()
+        openLibrary()
         XCTAssertTrue(app.staticTexts["Star a pin to find it here."].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Star a saved route to find it here."].exists)
         capture("13-library-empty")
     }
     func testLibraryLongNamesLargeDark() {
         launch("idle", large: true, dark: true, fallback: true)
-        app.buttons["Library"].tap()
+        openLibrary()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch.waitForExistence(timeout: 10))
         XCTAssertGreaterThan(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch.frame.width, 180)
         capture("14-library-long-names-largest-text")
-        app.buttons["library.category"].tap()
+        app.descendants(matching: .any).matching(identifier: "library.category").firstMatch.tap()
         app.buttons["Routes"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch.waitForExistence(timeout: 10))
         XCTAssertGreaterThan(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Test botanical garden'")).firstMatch.frame.width, 180)
         capture("14b-library-long-route-largest-text")
+    }
+    private func openLibrary() {
+        let solid = app.buttons["navigation.library"]
+        if solid.exists && solid.isHittable { solid.tap() }
+        else { app.tabBars.buttons["Library"].tap() }
     }
 }
