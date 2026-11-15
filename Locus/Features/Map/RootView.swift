@@ -290,13 +290,14 @@ private struct MapTabContent: View {
                         Spacer(minLength: 0)
                         BottomControlsView(showPlaces: $showPlaces, showNotice: showNotice,
                             controlsEnabled: isVisible,
-                            availableHeight: max(0, geometry.size.height - geometry.safeAreaInsets.bottom - toolsHeight - 38))
+                            availableHeight: max(0, geometry.size.height - toolsHeight - 38))
                     }
                     .padding(.horizontal, 16)
                     // Preserve the map attribution/legal strip below the tray.
-                    // The map can draw beneath the solid tab bar. Its controls
-                    // must still respect that bar's inset (and the home indicator).
-                    .padding(.bottom, 30 + geometry.safeAreaInsets.bottom)
+                    // Each tab's inset already reduces this geometry's height.
+                    // Subtracting it again would float the tray too high and
+                    // squeeze the large-text details into an unusable sliver.
+                    .padding(.bottom, 30)
                 }
                 .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }

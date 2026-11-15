@@ -83,6 +83,7 @@ final class ElsepinFlowUITests: XCTestCase {
         capture("04-largest-text-long-route")
         let details = app.scrollViews["route.detailsScroll"]
         XCTAssertTrue(details.exists)
+        XCTAssertGreaterThanOrEqual(details.frame.height, 44, "Route details need a usable scrolling viewport")
         details.swipeUp()
         reachable("session.pause"); reachable("session.stop")
         capture("04b-largest-text-details-scrolled")
