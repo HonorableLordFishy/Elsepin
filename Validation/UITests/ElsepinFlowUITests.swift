@@ -46,6 +46,11 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertTrue(button.isHittable, id)
         XCTAssertGreaterThanOrEqual(button.frame.height, 43, id)
         XCTAssertTrue(app.windows.firstMatch.frame.contains(button.frame), id)
+        let solidNavigation = app.buttons["navigation.library"]
+        if solidNavigation.exists && solidNavigation.isHittable {
+            XCTAssertLessThanOrEqual(button.frame.maxY, solidNavigation.frame.minY - 8,
+                                    "\(id) must clear the solid navigation bar")
+        }
     }
     func testMovingPauseResumeAndStop() {
         launch("moving")
