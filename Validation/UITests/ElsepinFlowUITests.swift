@@ -52,6 +52,8 @@ final class ElsepinFlowUITests: XCTestCase {
     func testSavedPinsCrossCutoffDuringPinchAndStayVisibleWhenRotated() {
         launch("map-pins", narrow: false)
         reachable("session.pause"); reachable("session.stop")
+        app.buttons["Collapse route details"].tap()
+        XCTAssertTrue(app.buttons["validation.pin.near"].isHittable)
         app.buttons["validation.pin.near"].tap()
         let count = app.staticTexts["validation.pinCount"]
         func expectPins(_ shown: Bool) {
@@ -65,13 +67,15 @@ final class ElsepinFlowUITests: XCTestCase {
         expectPins(true)
         capture("18-pins-near-active-route")
         let hides = value("validation.pinLiveHides")
-        app.maps.firstMatch.pinch(withScale: 0.2, velocity: -0.5)
+        app.otherElements["validation.pinchSurface"].pinch(withScale: 0.2, velocity: -0.5)
         expectPins(false)
+        XCTAssertGreaterThan(Double(app.staticTexts["validation.pinWidth"].label) ?? 0, 1)
         XCTAssertGreaterThan(value("validation.pinLiveHides"), hides, "Pins must hide in a continuous callback, before camera settles")
         capture("19-pins-hidden-after-live-crossing")
         let shows = value("validation.pinLiveShows")
-        app.maps.firstMatch.pinch(withScale: 5, velocity: 0.5)
+        app.otherElements["validation.pinchSurface"].pinch(withScale: 5, velocity: 0.5)
         expectPins(true)
+        XCTAssertLessThan(Double(app.staticTexts["validation.pinWidth"].label) ?? 2, 1)
         XCTAssertGreaterThan(value("validation.pinLiveShows"), shows, "Pins must reappear in a continuous callback, before camera settles")
         app.buttons["validation.pin.edge"].tap()
         expectPins(true)

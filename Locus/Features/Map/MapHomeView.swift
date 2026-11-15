@@ -240,7 +240,7 @@ struct MapHomeView: View {
                 routeSelectionChanged(value, proxy: proxy)
             }
 #if ELSEPIN_UI_TESTING
-            .overlay(alignment: .bottomTrailing) {
+            .overlay(alignment: .topLeading) {
                 if ValidationFixture.scenario == "map-pins" {
                     ValidationPinVisibilityControls(probe: pinVisibilityProbe) { action in
                         followMovement = false
@@ -253,7 +253,14 @@ struct MapHomeView: View {
                         position = .camera(MapCamera(centerCoordinate: ValidationFixture.points[1],
                             distance: targetDistance, heading: action == "rotate" ? 45 : 0, pitch: 0))
                     }
-                    .padding(.bottom, 200)
+                    .padding(.leading, 16).padding(.top, 205)
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if ValidationFixture.scenario == "map-pins" {
+                    ValidationPinchSurface()
+                        .frame(width: 250, height: 150)
+                        .padding(.leading, 16).padding(.top, 280)
                 }
             }
 #endif

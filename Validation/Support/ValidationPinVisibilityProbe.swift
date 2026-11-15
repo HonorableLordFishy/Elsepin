@@ -2,6 +2,7 @@
 #error("Map validation probes must never compile into a device app")
 #endif
 import SwiftUI
+import UIKit
 
 /// Records the production map's actual filtered pins. Counters advance only in
 /// its continuous callback, never in its settled callback or synthetic engine.
@@ -28,16 +29,38 @@ struct ValidationPinVisibilityControls: View {
     let move: (String) -> Void
     var body: some View {
         VStack(spacing: 2) {
-            Text("PIN TEST ONLY")
-            Text(String(format: "%.3f", probe.width)).accessibilityIdentifier("validation.pinWidth")
-            Text(String(probe.pins)).accessibilityIdentifier("validation.pinCount")
-            Text(String(probe.liveShows)).accessibilityIdentifier("validation.pinLiveShows")
-            Text(String(probe.liveHides)).accessibilityIdentifier("validation.pinLiveHides")
-            Text(String(probe.settled)).accessibilityIdentifier("validation.pinSettled")
-            ForEach(["near", "edge", "rotate"], id: \.self) { action in
-                Button(action) { move(action) }.accessibilityIdentifier("validation.pin." + action)
-                    .frame(minWidth: 54, minHeight: 44)
+            HStack {
+                Text("PIN TEST")
+                Text(String(format: "%.3f", probe.width)).accessibilityIdentifier("validation.pinWidth")
+                Text(String(probe.pins)).accessibilityIdentifier("validation.pinCount")
+                Text(String(probe.liveShows)).accessibilityIdentifier("validation.pinLiveShows")
+                Text(String(probe.liveHides)).accessibilityIdentifier("validation.pinLiveHides")
+                Text(String(probe.settled)).accessibilityIdentifier("validation.pinSettled")
+            }
+            HStack {
+                ForEach(["near", "edge", "rotate"], id: \.self) { action in
+                    Button { move(action) } label: {
+                        Text(action).frame(width: 54, height: 44).contentShape(Rectangle())
+                    }.accessibilityIdentifier("validation.pin." + action)
+                }
             }
         }.font(.system(size: 10)).padding(4).background(.yellow).foregroundStyle(.black)
     }
+}
+
+/// Gives XCTest a small, unobstructed rectangle for its two-finger gesture.
+/// Touches pass through to the real MapKit map; no gesture is simulated in code.
+struct ValidationPinchSurface: UIViewRepresentable {
+    final class Surface: UIView {
+        override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? { nil }
+    }
+    func makeUIView(context: Context) -> Surface {
+        let view = Surface()
+        view.isAccessibilityElement = true
+        view.accessibilityIdentifier = "validation.pinchSurface"
+        view.accessibilityLabel = "Map pinch test area"
+        view.backgroundColor = .clear
+        return view
+    }
+    func updateUIView(_ uiView: Surface, context: Context) {}
 }
