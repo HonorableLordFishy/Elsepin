@@ -74,6 +74,32 @@ current project design guidance and simulator screenshots instead.
 
 ## Run receipt
 
+### Live pin visibility - 15 November 2026
+
+Production code at `2a1b281` passed 580 Swift tests (six new visibility/cadence
+cases), 22 resource checks and Release app/extension compilation in
+[run 43763782418](https://github.com/N3moStudio/Elsepin/actions/runs/43763782418).
+Its 13 existing UI cases passed. The new case initially failed because test
+controls were behind the route tray; screenshots exposed the misplaced input.
+A follow-up (`43766542813`) exposed a pinch finger hitting Expand. Neither was
+an app crash. The fixture now observes only its own overlay, asserts its gesture
+rectangle clears the tray, and passes the native two-finger input to MapKit.
+
+[Focused run 43767731864](https://github.com/N3moStudio/Elsepin/actions/runs/43767731864)
+at `c70d265` passed with zero runtime warnings on iPhone SE (3rd generation), iOS
+27.0. Inspected screenshots/AX snapshots show 0.282 mi across with one pin,
+1.310 mi with none, and 0.900 mi with one after a 45-degree rotation. Live-callback
+hide/show counters increased during the two pinches; rotation preserved ground
+width within the asserted tolerance, and Pause/Stop remained reachable. This
+brings distinct passing UI coverage to 14 across these runs; fixture-only changes
+after `2a1b281` are excluded from the production compilation condition.
+
+Production compilation had no compiler warnings/errors. The simulator build
+reported a non-blocking missing-AppIntents metadata-extraction warning for the
+test bundle. Full logs/screenshots remain under `.build/artifacts/pin-visibility/`.
+No IPA was packaged. Real-device spoofing, battery and the pin editor's gestures
+are not established by this check; its shared viewport code compiled successfully.
+
 Production validation at `c80dfdbf9d6814a6a0573c681453a1464d35affb`,
 [run 43666953418](https://github.com/N3moStudio/Elsepin/actions/runs/43666953418):
 567 Swift tests, including all nine `RouteFlowPresentationTests`, and 22 Python

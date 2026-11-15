@@ -1,6 +1,6 @@
 # Elsepin current handoff
 
-## Live saved-pin visibility - 15 November 2026 (validation pending)
+## Live saved-pin visibility - 15 November 2026 (validated, no IPA)
 
 Owner reported delayed/asymmetric visibility when pinching and asked whether the
 simulator can test it. Source confirmed camera-end-only saved-pin refresh plus
@@ -11,9 +11,28 @@ spatial filtering is capped at 10 Hz with a final settled refresh. Camera sample
 are non-observed and only changed pin arrays publish. Active route markers, real
 location engine, stored visibility preference and scale bar remain intact.
 
-Local 22 Python checks and identity/appearance checks passed. Added six Swift
-regressions (plus revised geometry test) and a simulator-only live-pinch/rotation
-probe/UI test. Mac validation is pending; do not claim these have passed yet.
+Local 22 Python checks and identity/appearance checks passed. At `2a1b281`, run
+`43763782418` passed all 580 Swift tests (six new cases plus revised geometry
+coverage), 22 resource tests, and Release app/extension compilation with no
+compiler warnings/errors. All 13 existing simulator UI cases passed with no
+runtime warnings. The new pin case failed because its fixture button was under
+the route menu; the screenshot showed the menu opening instead of setting zoom.
+The probe now observes only its small overlay. A second fixture failure in
+`43766542813` showed a pinch finger grazing Expand; its bounds were tightened and
+asserted above the tray. Focused run `43767731864` at `c70d265` passed the real
+two-finger pinch and rotation test on iPhone SE / iOS 27.0, with no runtime warnings.
+Inspected screenshots show 1 pin at 0.282 mi, 0 at 1.310 mi, and 1 at 0.900 mi after
+45-degree rotation. Continuous callback counters prove both hide/show changes
+occurred before the settled-camera refresh. Pause/Stop remained reachable.
+This is 14 distinct passing UI cases across the initial and focused runs.
+Intermediate focused runs `43765951612` and `43766014131` were cancelled for fixture
+corrections. Production code after `2a1b281` is unchanged outside the simulator
+compilation condition. Evidence: `.build/artifacts/pin-visibility/` (latest in `final/`).
+The simulator's test bundle has a non-blocking AppIntents metadata-extraction
+warning; production compilation was clean. Native spoofing/battery are not proven
+by these fixtures. On the next IPA, do a short phone pinch in both directions and
+rotate near the selected cutoff. The pin editor shares the helper and compiles;
+its gestures were not separately exercised in this simulator pass.
 No IPA packaging, build-number bump, website change or app release in this pass.
 
 ## Approved copy, website publication and build 85 - 15 November 2026
