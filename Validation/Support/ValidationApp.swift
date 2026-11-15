@@ -98,14 +98,16 @@ private struct ValidationHost: View {
                 preferences.liveActivities = false; preferences.connectionAlerts = false
                 // XCTest changes the simulator's real Accessibility settings.
                 // Keep glass requested so Reduce Transparency must supply the fallback.
-                preferences.glassPanel = true
+                preferences.glassPanel = ValidationFixture.scenario != "home-solid"
                 // Settle the real system permission before timing the synthetic
                 // connecting state. This never changes production permission flow.
                 if sessionScenario {
                     _ = await SessionNotifications.shared.requestPermission()
                     permissionsReady = true
                 }
-                if !sessionScenario { session.selectPin(ValidationFixture.points[0], name: "Test garden entrance") }
+                if !sessionScenario && !ValidationFixture.scenario.hasPrefix("home-") {
+                    session.selectPin(ValidationFixture.points[0], name: "Test garden entrance")
+                }
                 if ValidationFixture.scenario == "search" { showSearch = true }
             }
             .task(id: runSession) {

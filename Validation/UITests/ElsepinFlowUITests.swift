@@ -16,9 +16,10 @@ final class ElsepinFlowUITests: XCTestCase {
             restoreAccessibility = false
         }
     }
-    private func launch(_ scenario: String, large: Bool = false, dark: Bool = false, fallback: Bool = false) {
+    private func launch(_ scenario: String, large: Bool = false, dark: Bool = false, fallback: Bool = false, narrow: Bool = true) {
         app = XCUIApplication()
-        app.launchArguments = ["--elsepin-ui-test", "--narrow"]
+        app.launchArguments = ["--elsepin-ui-test"]
+        if narrow { app.launchArguments.append("--narrow") }
         if large { app.launchArguments.append("--large-text") }
         if dark { app.launchArguments.append("--dark") }
         if fallback { app.launchArguments.append("--accessibility-fallback") }
@@ -58,6 +59,24 @@ final class ElsepinFlowUITests: XCTestCase {
             XCTAssertLessThanOrEqual(button.frame.maxY, solidNavigation.frame.minY - 8,
                                     "\(id) must clear the solid navigation bar")
         }
+    }
+    func testIdleTraySitsAboveSolidNavigation() {
+        checkIdleTray(solid: true)
+    }
+    func testIdleTraySitsAboveGlassNavigation() {
+        checkIdleTray(solid: false)
+    }
+    private func checkIdleTray(solid: Bool) {
+        launch(solid ? "home-solid" : "home-glass", narrow: false)
+        XCTAssertTrue(app.staticTexts["Where to next?"].waitForExistence(timeout: 10))
+        let saved = app.buttons["Saved"]
+        XCTAssertTrue(saved.isHittable)
+        let navigation = solid ? app.buttons["navigation.library"] : app.tabBars.firstMatch
+        XCTAssertTrue(navigation.exists)
+        let gap = navigation.frame.minY - saved.frame.maxY
+        XCTAssertGreaterThanOrEqual(gap, 12, "Tray actions must clear navigation")
+        XCTAssertLessThanOrEqual(gap, 60, "The compact idle tray must not float above navigation")
+        capture(solid ? "16-idle-solid-tray-spacing" : "17-idle-glass-tray-spacing")
     }
     func testMovingPauseResumeAndStop() {
         launch("moving")
