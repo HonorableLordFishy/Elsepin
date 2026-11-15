@@ -16,8 +16,9 @@ import SwiftUI
             if self.pins == 0 && pins > 0 { liveShows += 1 }
             if self.pins > 0 && pins == 0 { liveHides += 1 }
         }
-        self.width = (width ?? 0) / SavedPinVisibility.metersPerMile
-        self.pins = pins
+        let miles = (width ?? 0) / SavedPinVisibility.metersPerMile
+        if self.width != miles { self.width = miles }
+        if self.pins != pins { self.pins = pins }
     }
     func didSettle() { settled += 1 }
 }

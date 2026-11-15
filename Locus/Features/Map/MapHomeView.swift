@@ -54,7 +54,8 @@ struct MapHomeView: View {
     @State private var adjustedPin: CLLocationCoordinate2D?
     @State private var pinAdjustmentCamera: MKMapCamera?
 #if ELSEPIN_UI_TESTING
-    @StateObject private var pinVisibilityProbe = ValidationPinVisibilityProbe()
+    // Only the small test overlay observes this object, never the map itself.
+    @State private var pinVisibilityProbe = ValidationPinVisibilityProbe()
 #endif
 
     private var visualUpdatesEnabled: Bool {
@@ -217,7 +218,7 @@ struct MapHomeView: View {
                 updateSavedPinViewport(context, proxy: proxy)
                 refreshSavedPins(session.savedPins)
 #if ELSEPIN_UI_TESTING
-                pinVisibilityProbe.didSettle()
+                if ValidationFixture.scenario == "map-pins" { pinVisibilityProbe.didSettle() }
 #endif
                 DeveloperLogStore.shared.record("map_viewport_settled", [
                     "style": String(session.mapStyleIndex), "distance": String(context.camera.distance),
@@ -284,7 +285,9 @@ struct MapHomeView: View {
             ? pins.filter { savedPinViewport.contains($0.coordinate) } : []
         if visibleSavedPins != visible { visibleSavedPins = visible }
 #if ELSEPIN_UI_TESTING
-        pinVisibilityProbe.record(width: savedPinViewport.widthMeters, pins: visible.count, continuous: !force)
+        if ValidationFixture.scenario == "map-pins" {
+            pinVisibilityProbe.record(width: savedPinViewport.widthMeters, pins: visible.count, continuous: !force)
+        }
 #endif
         if let selectedSavedPin, !visible.contains(where: { $0.id == selectedSavedPin }) {
             self.selectedSavedPin = nil
