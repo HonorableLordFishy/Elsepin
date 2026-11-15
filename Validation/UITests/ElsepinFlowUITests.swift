@@ -24,7 +24,13 @@ final class ElsepinFlowUITests: XCTestCase {
             if button.exists { button.tap() }
         }
         if ["moving", "paused", "connecting", "failed"].contains(scenario) {
-            app.buttons["validation.start"].tap()
+            let start = app.buttons["validation.start"]
+            if !start.isEnabled, springboard.buttons["Allow"].waitForExistence(timeout: 5) {
+                springboard.buttons["Allow"].tap()
+            }
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: start)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
+            start.tap()
         }
     }
     private func capture(_ name: String) {

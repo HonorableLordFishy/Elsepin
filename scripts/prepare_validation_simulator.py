@@ -16,10 +16,14 @@ def choose_destination(data, sdk_version):
                      if t.get('productFamily') == 'iPhone']
         if not supported:
             continue
-        device_type = next((t for t in supported if t['name'] == 'iPhone 17'), supported[0])
+        # Prefer a small portrait phone over a device-specific Duo runtime.
+        # SDK and runtime minor versions need not match for this iOS 18+ app.
+        preferred = ['iPhone SE (3rd generation)', 'iPhone 13 mini', 'iPhone 17']
+        device_type = next((t for name in preferred for t in supported if t['name'] == name), supported[0])
         version = tuple(int(v) for v in runtime['version'].split('.'))
-        matches_sdk = version[:2] == tuple(int(v) for v in sdk_version.split('.'))[:2]
-        candidates.append(((matches_sdk, version), runtime, device_type))
+        sdk = tuple(int(v) for v in sdk_version.split('.'))
+        portrait = device_type['name'] in preferred
+        candidates.append(((portrait, version[:2] <= sdk[:2], version), runtime, device_type))
     if not candidates:
         raise RuntimeError('No available iOS runtime with a supported iPhone device type')
     _, runtime, device_type = max(candidates, key=lambda candidate: candidate[0])

@@ -61,6 +61,7 @@ private struct ValidationHost: View {
     @State private var showSearch = false
     @State private var started = false
     @State private var runSession = false
+    @State private var permissionsReady = false
     private var sessionScenario: Bool { ["moving", "paused", "connecting", "failed"].contains(ValidationFixture.scenario) }
     var body: some View {
         RootView(incomingShortcut: $shortcut, incomingSessionDetails: $details)
@@ -73,6 +74,7 @@ private struct ValidationHost: View {
                 if sessionScenario && !runSession {
                     Button("Start validation session") { runSession = true }
                         .accessibilityIdentifier("validation.start")
+                        .disabled(!permissionsReady)
                         .frame(minHeight: 44)
                 }
                 }.font(.system(size: 9, weight: .bold))
@@ -97,6 +99,12 @@ private struct ValidationHost: View {
                 // XCTest changes the simulator's real Accessibility settings.
                 // Keep glass requested so Reduce Transparency must supply the fallback.
                 preferences.glassPanel = true
+                // Settle the real system permission before timing the synthetic
+                // connecting state. This never changes production permission flow.
+                if sessionScenario {
+                    _ = await SessionNotifications.shared.requestPermission()
+                    permissionsReady = true
+                }
                 if !sessionScenario { session.selectPin(ValidationFixture.points[0], name: "Test garden entrance") }
                 if ValidationFixture.scenario == "search" { showSearch = true }
             }

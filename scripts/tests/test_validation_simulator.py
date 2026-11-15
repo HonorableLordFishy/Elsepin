@@ -28,3 +28,15 @@ class ValidationSimulatorTests(unittest.TestCase):
     def test_unavailable_runtime_is_not_selected(self):
         with self.assertRaisesRegex(RuntimeError, 'No available iOS runtime'):
             choose_destination({'runtimes': [self.runtime('27.1', 'iPhone 17', False)]}, '27.1')
+
+    def test_portrait_phone_preferred_over_duo_sdk_match(self):
+        phone = self.runtime('27.0', 'iPhone SE (3rd generation)')
+        duo = self.runtime('27.1', 'iPhone Duo')
+        runtime, _ = choose_destination({'runtimes': [duo, phone]}, '27.1')
+        self.assertEqual(runtime, phone)
+
+    def test_portrait_runtime_at_or_below_sdk_preferred(self):
+        phone = self.runtime('27.0', 'iPhone SE (3rd generation)')
+        newer = self.runtime('27.2', 'iPhone SE (3rd generation)')
+        runtime, _ = choose_destination({'runtimes': [newer, phone]}, '27.1')
+        self.assertEqual(runtime, phone)

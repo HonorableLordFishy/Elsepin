@@ -33,7 +33,9 @@ struct RootView: View {
         .onChange(of: privacy.canOpenContent) { _, _ in openShortcutIfAllowed() }
         .loggedAlert("Session needs attention", isPresented: Binding(
             get: { session.lastError != nil },
-            set: { if !$0 { session.lastError = nil } }
+            // Alert actions already clear the error. Don't publish a second
+            // nil while SwiftUI reconciles the native alert's dismissal.
+            set: { if !$0, session.lastError != nil { session.lastError = nil } }
         )) {
             Button("Connection details") {
                 session.lastError = nil
@@ -526,6 +528,7 @@ struct BottomControlsView: View {
             }
             .padding(16)
             .frame(maxHeight: availableHeight)
+            .fixedSize(horizontal: false, vertical: true)
             .modifier(ControlPanelStyle(useGlass: preferences.glassPanel))
             .shadow(color: .black.opacity(0.10), radius: 16, y: 6)
         }
