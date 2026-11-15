@@ -1,5 +1,15 @@
 # Elsepin current handoff
 
+## Build 86 requested - 15 November 2026
+
+Owner requested a new IPA with the validated live pin-visibility changes, delivered
+to the normal Desktop folder replacing only Elsepin's older IPA. No app release
+is authorized. Both app and extension metadata are now 2.6.1 (86); there are no
+functional changes after the completed simulator validation below. Use the manual
+build workflow for regression checks, native packaging and verification. Build and
+delivery receipt pending; existing build 85 stays in place until its replacement
+is ready. No need to repeat the full simulator suite for this metadata-only bump.
+
 ## Live saved-pin visibility - 15 November 2026 (validated, no IPA)
 
 Owner reported delayed/asymmetric visibility when pinching and asked whether the
