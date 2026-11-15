@@ -1,5 +1,37 @@
 # Elsepin build history
 
+## Build 85 validated and delivered - 15 November 2026
+
+GitHub run `43752876339` built `72b9b95265e1964ed9e46ecf3185a5be843b69c3` on
+`codex/pins-search-69`. 718 tests passed: 574 Swift (including seven new pairing
+lifecycle cases), 104 cloud, 18 Companion and 22 resource/helper; one Windows-only
+Companion case skipped. Native app and activity extension compiled with no
+compiler warnings/errors. GitHub separately noted checkout's Node 20 deprecation.
+
+Cancellation now wakes the abandoned pairing worker, rejects stale callbacks and
+stages native output before validating/installing the current attempt. File/paste/
+Open In pairing cannot be overwritten by a cancelled native result. Retry has a
+bounded cleanup wait and actionable recovery text. The bundled FFI is unchanged.
+
+Only Humanizer proposals 2, 5 and 6 were approved. Pairing cleanup and area-editor
+copy were shortened; Stop/reconnection copy keeps its uncertainty and adds Wi-Fi
+plus the conditional wording that another device's Wi-Fi hotspot can also work.
+This guidance also appears in setup help, website and both READMEs. Other proposed
+copy changes were not applied. No copy-driven behavior changes.
+
+Package inspection verified both bundles as 2.6.1 (85), arm64, SDK 27.1, with
+expected IDs, icons, helper packages, notices and no simulator fixtures. Delivered
+only `Elsepin 2.6.1 build 85.ipa` (19,171,725 bytes) to the usual Desktop folder.
+Build 84 was moved to the ignored build archive; other projects are untouched.
+Logs and internal proof: `.build/artifacts/build85/`.
+
+The separate website update was published first as Elsepin-Releases `baa80f3`;
+Render deploy `dep-dbt0gvmi0phs73ebiovg` is live. Website checks passed 47 browser
+cases, 29 axe scans, 9 Python cases (one Windows symlink skip), and 6 live smoke
+checks. No new public app release/tag or paid billing. Native pairing cancel/retry,
+real movement, Stop/clear, imported pairing and hotspot reliability remain phone
+checks; pure lifecycle tests and native compilation do not establish those results.
+
 ## Build 84 validated and delivered - 14 November 2026
 
 GitHub run `43667658944` built `a31762327013fb99741686b387965dc4793b5966` on

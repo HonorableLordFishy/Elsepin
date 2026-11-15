@@ -15,8 +15,26 @@ Build metadata is 2.6.1 (85). GitHub manual build on codex/pins-search-69 will
 validate Swift, production app/extension and package; phone checks remain separate.
 Local identity/appearance checks and 22 Python repository tests passed. Website
 Python export tests passed 9 with 1 Windows symlink skip. Build/deploy receipts
-will be recorded after completion. Preserve the existing dirty public checkout's
-SETUP.md; publishing uses its isolated release-website-85 worktree.
+are complete below. The existing dirty public checkout's SETUP.md was preserved;
+publishing used its isolated release-website-85 worktree.
+
+- Website source `5802a90`; public website/README `baa80f3` pushed first.
+  Render deploy `dep-dbt0gvmi0phs73ebiovg` reached live. 47 browser checks,
+  29 axe scans and 6 live-site smoke checks passed; mobile guide inspected.
+- GitHub run `43752876339` built `72b9b95265e1964ed9e46ecf3185a5be843b69c3`.
+  718 tests passed (574 Swift, 104 cloud, 18 Companion, 22 resource), with one
+  Windows-only Companion case skipped. The seven new pairing tests passed.
+  App and extension compiled with no compiler warnings/errors. GitHub reported
+  an unrelated checkout action Node 20 deprecation notice; workflow completed.
+- Package inspection confirmed both bundles at 2.6.1 (85), arm64/SDK 27.1,
+  icons/helpers/notices and no simulator fixtures. Only the verified build 85
+  IPA is in the requested Desktop folder. Automated policy blocked deletion of
+  build 84; it was preserved outside delivery at
+  `.build/artifacts/build85/previous-build84.ipa` instead. Other apps untouched.
+- Physical pairing cancel/retry, imported-file connection and Stop/clear still
+  need iPhone acceptance. A successful hotspot attempt is not universal proof.
+  No new app release, tag, main merge, signing or billing changes. Internal
+  package proof and full log: `.build/artifacts/build85/`.
 
 ## Pairing cancellation recovery - local only, 15 November 2026
 

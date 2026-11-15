@@ -10,6 +10,17 @@ GitHub READMEs and the app. All other proposed Humanizer edits to website copy
 were declined and are unchanged. Public release v2.6.0 was rechecked on GitHub
 on 15 November; building test IPA 85 does not publish a new app release.
 
+Publication evidence: website source `5802a90`; public export/README commit
+`baa80f353a9e2e2e65307ad301fb0f09b9bf1850`. Render deploy
+`dep-dbt0gvmi0phs73ebiovg` reached live on 15 November at 19:31:24 UTC for
+the existing Elsepin static site. No hosting/billing configuration changed.
+The full browser suite passed 47 checks with 29 axe scans and no violations or
+browser errors. Website Python tests passed 9 with one Windows symlink skip.
+Six live-site smoke checks passed, including opening/closing the preview,
+choosing a pin, mobile layout and the approved Stop/clear wording. The mobile
+guide screenshot was inspected. Evidence: `.build/website-qa/copy-approved/`.
+Original font license text is preserved, including its upstream whitespace.
+
 ## Original local verification
 
 Local website work only. No native source changes, IPA packaging, commit, push,
