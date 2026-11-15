@@ -1,6 +1,12 @@
 name: Validate Elsepin (no IPA)
 on:
   workflow_dispatch:
+    inputs:
+      ui_focus:
+        description: Run all validation, or recheck search after test-only changes
+        type: choice
+        options: [all, search]
+        default: all
   push:
     branches: [codex/pins-search-69]
     paths:
@@ -16,6 +22,7 @@ permissions:
   contents: read
 jobs:
   regression-device:
+    if: github.event_name != 'workflow_dispatch' || inputs.ui_focus != 'search'
     runs-on: xcode-27
     timeout-minutes: 35
     steps:
@@ -80,8 +87,16 @@ jobs:
             2>&1 | tee .build/simulator-evidence/simulator-build.log | xcbeautify
       - name: Run focused native UI checks
         shell: bash
+        env:
+          UI_FOCUS: ${{ inputs.ui_focus }}
         run: |
           set -o pipefail
+          test_selection=()
+          if [[ "$UI_FOCUS" == search ]]; then
+            for test_name in testSearchSubmitFailureAndRetry testSearchCancellationRejectsLateResults testSearchDismissalAndForegroundInterruption testSearchInterruptedWhilePendingThenReplaced; do
+              test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$test_name")
+            done
+          fi
           xcrun simctl boot "$VALIDATION_SIMULATOR"
           xcrun simctl bootstatus "$VALIDATION_SIMULATOR" -b
           xcrun simctl install "$VALIDATION_SIMULATOR" .build/simulator-validation/Build/Products/Debug-iphonesimulator/ElsepinValidation.app
@@ -89,7 +104,7 @@ jobs:
           xcodebuild -project ElsepinValidation.xcodeproj -scheme Locus -configuration Debug \
             -destination "platform=iOS Simulator,id=$VALIDATION_SIMULATOR" \
             -derivedDataPath .build/simulator-validation -resultBundlePath .build/simulator-evidence/UI.xcresult \
-            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test-without-building \
+            -parallel-testing-enabled NO "${test_selection[@]}" CODE_SIGNING_ALLOWED=NO test-without-building \
             2>&1 | tee .build/simulator-evidence/ui-tests.log | xcbeautify
       - name: Export screenshots and test results
         if: always()

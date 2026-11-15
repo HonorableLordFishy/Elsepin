@@ -8,10 +8,18 @@ struct PlaceSearchResponse { let mapItems: [MKMapItem] }
 @MainActor final class PlaceSearchRequest {
     private let query: String
     private var cancelled = false
+    private var pendingSlowResponse: CheckedContinuation<Void, Never>?
     private static var retryAttempts = 0
     init(_ request: MKLocalSearch.Request) { query = request.naturalLanguageQuery ?? "" }
     init(pointsOfInterest request: MKLocalPointsOfInterestRequest) { query = "poi" }
-    func cancel() { cancelled = true }
+    func cancel() {
+        cancelled = true
+        // Release only after the real view cancels/replaces the request. A timer
+        // could finish while XCTest was locating Cancel, moving the target away.
+        let pending = pendingSlowResponse
+        pendingSlowResponse = nil
+        pending?.resume()
+    }
     func start(seconds: Double = 7) async throws -> PlaceSearchResponse {
         guard ValidationFixture.enabled else { throw URLError(.unsupportedURL) }
         // 'retry' fails both normal and broader lookup once, then succeeds.
@@ -19,10 +27,12 @@ struct PlaceSearchResponse { let mapItems: [MKMapItem] }
             Self.retryAttempts += 1
             if Self.retryAttempts <= 2 { throw URLError(.notConnectedToInternet) }
         }
-        // Deliberately allow a late response to exercise the view's generation guard.
+        // Deliberately return a stale response after cancellation. The production
+        // view must reject it using its task/generation guards, not fixture timing.
         if query == "slow" {
             await withCheckedContinuation { continuation in
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { continuation.resume() }
+                if cancelled { continuation.resume() }
+                else { pendingSlowResponse = continuation }
             }
         } else { try await Task.sleep(for: .milliseconds(150)) }
         // Keep search results away from named fixture pins: the real search flow
