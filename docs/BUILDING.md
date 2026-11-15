@@ -4,10 +4,17 @@ The source includes the app, WidgetKit/Live Activity extension, tests, artwork,
 helper source/downloads, Xcode project, and the bundled idevice engine library.
 No Apple signing credentials or deployed helper are included.
 
-## Current build access - 13 November 2026
+For checks **without an IPA**, use `Validate Elsepin (no IPA)` in
+`.github/workflows/validate-native.yml`. It compiles the production app/extension
+and runs an isolated simulator target, exporting test evidence rather than an
+installable app. See [native validation](NATIVE-VALIDATION.md) for its disposable
+data boundary, triggers, screenshot coverage and physical-device limits.
+
+## Current build access - 14 November 2026
 
 The owner authorized making `N3moStudio/Elsepin` public. GitHub Actions run
-`43525893260` succeeded on `xcode-27` for build 82 at `1a31952`.
+`43667658944` succeeded on `xcode-27` for test build 84 at `a317623`, including
+the corrected bottom-tray spacing. See BUILD-HISTORY.md for validation receipts.
 Use the manual workflow on `codex/pins-search-69` for the current development
 source; `main` is older. This does not publish a release. GitLab remains private.
 The earlier private-build billing failures below are historical. Codemagic's

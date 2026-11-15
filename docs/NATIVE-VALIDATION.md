@@ -5,7 +5,10 @@ regressions, resource checks, a Release build of the production app and extensio
 and focused XCUITests. It uploads logs, xcresult evidence and screenshots only.
 It does not archive, package, sign for distribution, publish a release or deploy.
 Changes on `codex/pins-search-69` to the scoped source/workflow paths trigger it;
-the workflow also declares manual dispatch for use once available on the default branch.
+manual dispatch is available on that branch. Its default `all` focus runs both jobs.
+The `search` focus reruns the four search cases; `home` runs the solid/glass idle
+tray cases. Both compile the isolated simulator app and skip the production job,
+so already validated production code need not be rebuilt for fixture-only checks.
 
 ## Production and simulator boundaries
 
@@ -28,7 +31,7 @@ library, pairing and shared widget data are not accessed or overwritten.
 Connection/session acceptance is synthetic. The real `SpoofSession` worker,
 Pause/Resume/Stop controls and views run against that adapter, which sends no
 coordinates and opens no developer tunnel. Pairing itself always reports
-unavailable. Search results are deterministic; delayed responses deliberately
+unavailable. Search results are deterministic; responses released after cancellation deliberately
 exercise the view's stale-response guard. Map tiles still come from MapKit.
 The production search request has a small value-response boundary and unchanged
 MapKit cancellation/deadline behavior. Its completer implementation was moved
@@ -36,12 +39,13 @@ unchanged into its own file so it can be excluded from this simulator target.
 
 ## UI coverage and evidence
 
-The fixture presents the real native views at 320pt width, with normal or maximum
-accessibility text and light/dark appearances. The fallback test uses the native
+The fixture constrains the root Map/Library content to 320pt width, with normal or
+maximum accessibility text and light/dark appearances. System-presented search
+sheets use the simulator's native presentation width. The fallback test uses the native
 Settings app to enable Reduce Motion, Reduce Transparency and Increase Contrast,
 then restores them. Tests exercise moving,
 paused, connecting and failed states, long route/Library names, empty Library,
-search submit/retry, cancellation and dismissal/foreground interruption.
+route-place search submit/retry, cancellation and dismissal/foreground interruption.
 Screenshots and accessibility trees are attached to the xcresult and exported
 with `xcresulttool`. Actual inspection/findings belong in the run receipt below;
 a test plan or fixture is not a passed check.
@@ -62,4 +66,87 @@ current project design guidance and simulator screenshots instead.
 
 ## Run receipt
 
-Pending: see GitHub run 43649680065 and subsequent fixes. No new IPA is requested.
+Production validation at `c80dfdbf9d6814a6a0573c681453a1464d35affb`,
+[run 43666953418](https://github.com/N3moStudio/Elsepin/actions/runs/43666953418):
+567 Swift tests, including all nine `RouteFlowPresentationTests`, and 22 Python
+resource/helper tests passed. The Release app and embedded activity extension
+compiled with zero compiler errors or warnings. All 11 simulator UI cases passed
+with zero runtime warnings. This validation-only run created no IPA.
+
+The two additional idle-screen spacing cases passed at `a317623` in
+[run 43667656079](https://github.com/N3moStudio/Elsepin/actions/runs/43667656079),
+also without runtime warnings. This is 13 distinct UI cases across the full suite
+and the idle follow-up; the only intervening changes were fixture/tests/workflow
+and the app/extension build number. Screenshots from both runs were inspected.
+
+An earlier simulator run (`43658708902`) failed before any test executed: the XCTest
+runner exited during bootstrapping (`XCTWaiter(StallHandling)`). This is not an
+app-test failure or a UI pass. Earlier runs did execute the UI suite and supplied
+the screenshots used for corrections below. The portrait iPhone SE (3rd generation)
+/ iOS 27.0 run `43661802428` then passed all 11 UI tests with zero runtime warnings.
+Screenshot inspection found an additional Stop/tab-bar overlap. A stronger
+assertion confirmed the inset outside TabView did not reach the map. Insets now
+live inside each tab, and test cleanup restores system accessibility settings
+even after an assertion fails. Run `43664601901` passed 10/11 tests and reported
+zero runtime warnings. The remaining fake slow-search timer expired while XCTest
+was locating Cancel; the adapter now releases stale responses only after the view
+cancels them. Production search behavior is unchanged.
+
+That run's screenshot inspection also found the bottom inset was counted twice,
+leaving a 10pt route-details viewport at maximum text. Source `c80dfdb` reserves
+it once and asserts at least 44pt for the scrollable details. Full validation
+`43666953418` passed; the fixture-only search rerun `43666772248` passed all four
+search cases without runtime warnings. The owner's build 83 phone screenshot
+also demonstrated the excessive idle-tray gap. Build 84 includes the correction.
+
+Screenshot review confirmed that the idle tray has a 30pt gap above navigation
+in both solid and glass modes, maximum-text route details have a usable scrolling
+viewport, and movement/clear controls remain outside that scroll view and above
+navigation. Long Library names wrap and scroll. Search submission, retry, cancelled
+late results, and background interruption retain the correct current query/result.
+Connecting and failed states retain their distinct status and recovery actions.
+
+Demonstrated issues corrected during validation:
+
+- Debug compilation exposed an oversized RootView expression; typed callbacks
+  and a stable Map subview preserve state while bounding type-checking work.
+- The isolated app entry point exposed a shared GPX notification declaration;
+  it now lives in a support file available to both builds.
+- Maximum text squeezed long Library names beside decorative icons and actions.
+  Accessibility layouts give names the full row width and move actions below.
+- A solid navigation bar expanded to cover route controls at maximum text size.
+  Its constrained controls now support Large Content Viewer; content text remains
+  scalable. This follows Apple's [large-content-viewer guidance](https://developer.apple.com/documentation/swiftui/view/accessibilityshowslargecontentviewer()).
+- The status/header area crowded the route controls at maximum text size. Concise
+  visible status retains the full accessibility label, and route help moves into
+  the scrollable details.
+- Environment reads inside the brand Shape caused runtime warnings. The enclosing
+  View now resolves the environment and passes an explicit design to the Shape.
+- Alert dismissal no longer redundantly publishes a cleared error during a view
+  update. The subsequent simulator run reported no runtime warnings.
+- Resume uses its full-width title at accessibility sizes; decorative action icons
+  no longer force the word onto two lines. Long names use leading alignment.
+- Solid tab-bar visibility is applied inside each tab, eliminating duplicate
+  navigation. Route controls respect the bottom safe-area inset while the map
+  continues drawing underneath it; only route details scroll when space is tight.
+
+Test harness corrections include real system permission setup, supported
+device/runtime selection, native Settings selectors, and search fixture results
+that do not accidentally collide with a saved pin. None changes production
+connection acceptance or makes simulated results proof of real-device spoofing.
+
+## Short physical-iPhone check for build 84
+
+1. Confirm pairing/code delivery, then connect with LocalDevVPN enabled.
+2. Start a short local route. Check movement in another map, then Pause/Resume.
+3. Interrupt the VPN, background/reopen Elsepin, reconnect and retry. Confirm the
+   route is retained and the UI does not falsely claim confirmed movement.
+4. With the tunnel available, Stop/clear and verify actual GPS returns in another
+   map and the session UI ends. A failed clear must not be presented as success.
+
+The owner subsequently requested IPA delivery. Build 83 was an interim artifact;
+build 84 from `a317623` supersedes it and includes the bottom-spacing correction.
+Manual packaging run `43667658944` passed 711 tests with one Windows-only skip,
+compiled the app/extension without compiler warnings/errors, and produced the
+inspected device IPA. Only the previous Elsepin IPA was replaced in the delivery
+folder. No release was published. Simulator success is not real-device spoofing proof.

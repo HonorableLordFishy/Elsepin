@@ -1,5 +1,47 @@
 # Elsepin build history
 
+## Build 84 validated and delivered - 14 November 2026
+
+GitHub run `43667658944` built `a31762327013fb99741686b387965dc4793b5966` on
+`codex/pins-search-69`. 711 tests passed: 567 Swift (including all nine new flow
+cases), 104 cloud, 18 Companion and 22 resource/helper; one Windows-only Companion
+case skipped. The Release app and embedded activity extension compiled with no
+compiler warnings/errors. Both bundles are 2.6.1 (84), arm64, linked to SDK 27.1.
+Package checks verified IDs, versions, icons, integrity and no simulator fixtures.
+
+The bottom tray now reserves navigation space once, correcting build 83's floating
+card and overly compressed route details. The full validation-only run
+`43666953418` passed 11 UI cases at `c80dfdb`; run `43667656079` passed two new
+idle-screen spacing cases at `a317623`. Both reported zero runtime warnings.
+Screenshots were inspected for solid/glass navigation, narrow and maximum-text
+route controls, long names, connecting/paused/failed states and search recovery.
+The simulator uses isolated, explicitly synthetic engine/search adapters.
+
+Delivered only `Elsepin 2.6.1 build 84.ipa` (19,157,855 bytes) to the usual Desktop
+IPA folder, replacing build 83 and preserving other apps. Build logs and package
+proof: `.build/artifacts/build-84*`; simulator evidence: `.build/artifacts/validation-*`.
+No release/tag/main merge or paid billing change. Pairing, actual movement,
+Stop/clear and VPN interruption recovery remain physical-iPhone checks.
+
+## Build 83 test IPA delivered - 14 November 2026
+
+The owner requested a test IPA while native validation continued. GitHub run
+`43666281557` built `7a21ec53a2e32e84ed38d811d4cbcdb9475c3bf8` from
+`codex/pins-search-69`: 711 tests passed (567 Swift, 104 cloud, 18 Companion,
+22 resource/helper); one Windows-only Companion case skipped. The native app
+and activity extension compiled with zero compiler warnings/errors. Both bundles
+are 2.6.1 (83), arm64, linked to iOS SDK 27.1. Package inspection verified identity,
+versions, icons, integrity and absence of simulator fixtures.
+
+Delivered only `Elsepin 2.6.1 build 83.ipa` (19,158,331 bytes) to the usual Desktop
+IPA folder, replacing build 82 and preserving other apps. Logs and package proof
+are under `.build/artifacts/build-83*`. No release, tag or main merge.
+
+This is an interim test build, not release acceptance. Subsequent source commit
+`c80dfdb` corrects double-reserved bottom spacing in the route tray, especially at
+maximum accessibility text; it is **not included in build 83**. The follow-up
+simulator receipts and remaining phone checks are in [native validation](NATIVE-VALIDATION.md).
+
 ## Build 82 validated and delivered - 13 November 2026
 
 GitHub run `43525893260` built `1a3195273ffc7e8f692e91844d169530379f320a` from

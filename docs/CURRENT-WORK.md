@@ -1,5 +1,49 @@
 # Elsepin current handoff
 
+## Native validation follow-up - 14 November 2026
+
+Owner authorized GitHub macOS validation and fixes, initially with no packaging.
+They subsequently requested an interim test IPA; **no release is authorized**.
+The local-only boundary in the earlier entry below is superseded by these requests.
+All existing flow work is preserved and pushed on `codex/pins-search-69`.
+
+- Added `Validate Elsepin (no IPA)`, separate from the unchanged packaging workflow.
+- 567 Swift tests (including all nine RouteFlowPresentation cases) and 22 resource
+  tests passed on Xcode 27.1. The production Release app and embedded extension
+  compiled with zero compiler warnings/errors at `c80dfdb`; the build 84 packaging
+  run repeated these checks successfully at `a317623`.
+- The simulator target has its own bundle/sandbox, excludes the device-only FFI
+  sources, and rejects device builds. Synthetic command acceptance is prominently
+  marked and never evidence of real location injection or pairing.
+- Native Debug compilation exposed RootView's oversized tab expression. Map
+  content is now a stable dedicated subview; existing Library callbacks became
+  typed methods. The isolated host exposed a GPX notification declaration in the
+  production entry point; it now lives in a shared support file. Source state,
+  route commands and device engine are preserved.
+- Simulator app and UI-test compilation passed. Full run `43666953418` passed
+  all 11 cases with zero runtime warnings. The fixture-only search rerun
+  `43666772248` also passed all four search cases. The adapter now releases stale
+  responses only after cancellation; production search is unchanged.
+- Screenshot review and the owner's build 83 phone screenshot confirmed the
+  bottom navigation spacing was counted twice. `c80dfdb` reserves it once and
+  asserts a usable route-details viewport. Two new idle-screen cases (solid/glass)
+  passed in `43667656079` at `a317623`, with zero runtime warnings. Screenshots
+  were inspected: the compact tray sits 30pt above navigation, and large-text
+  route details scroll while Pause/Resume and Stop remain reachable.
+- Screenshot-led fixes give large-text Library/route names their full row width,
+  keep decorative control icons bounded, retain one solid navigation bar, keep
+  Resume on one line, and let route details scroll above fixed movement actions.
+  Brand environment reads and redundant alert-dismissal publication were corrected.
+  See [native validation](NATIVE-VALIDATION.md) for receipts and physical limits.
+- Impeccable doctor found only a missing web design hook; no relevant native
+  configuration repair was warranted. Details are in the validation report.
+
+Build 84 is delivered from `a317623` (GitHub `43667658944`): 711 tests passed,
+one Windows-only case skipped, native app/extension and package checks passed.
+It includes the spacing correction. Only the old Elsepin build 83 IPA was replaced;
+other apps are untouched. No release/tag/main merge. Phone pairing, real movement,
+Stop/clear and interruption recovery still need acceptance. See BUILD-HISTORY.md.
+
 ## Post-build-82 flow refinement - local only, 14 November 2026
 
 Owner requested an evidence-led native refinement, explicitly **no IPA, release,
