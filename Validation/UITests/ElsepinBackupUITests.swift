@@ -60,7 +60,9 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertTrue(location.waitForExistence(timeout: 10))
         let row = app.cells.containing(.staticText, identifier: "On My iPhone").firstMatch
         if row.exists { row.tap() } else { location.tap() }
-        let localStorage = app.navigationBars.buttons.matching(NSPredicate(format: "label BEGINSWITH 'On My iPhone'")).firstMatch
+        // iOS 26 exposes this title as text; iOS 27 exposes an Actions button.
+        let localStorage = app.navigationBars.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'On My iPhone'")).firstMatch
         XCTAssertTrue(localStorage.waitForExistence(timeout: 10), "File import must use general Files storage, not the app-container provider")
         let file = app.cells.matching(NSPredicate(format: "label BEGINSWITH 'Elsepin-Settings'")).firstMatch
         capture("33b-general-files-storage")
