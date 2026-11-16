@@ -18,12 +18,14 @@ def choose_destination(data, sdk_version):
             continue
         # Prefer a small portrait phone over a device-specific Duo runtime.
         # SDK and runtime minor versions need not match for this iOS 18+ app.
-        preferred = ['iPhone SE (3rd generation)', 'iPhone 13 mini', 'iPhone 17']
+        preferred = ['iPhone 17', 'iPhone SE (3rd generation)', 'iPhone 13 mini']
         device_type = next((t for name in preferred for t in supported if t['name'] == name), supported[0])
         version = tuple(int(v) for v in runtime['version'].split('.'))
-        sdk = tuple(int(v) for v in sdk_version.split('.'))
         portrait = device_type['name'] in preferred
-        candidates.append(((portrait, version[:2] <= sdk[:2], version), runtime, device_type))
+        # Use the newest general-purpose runtime. The older 27.0 image stalled
+        # during boot on fresh runners; a newer runtime can run this SDK's app.
+        # Still avoid a device-specific runtime when a regular iPhone exists.
+        candidates.append(((portrait, version), runtime, device_type))
     if not candidates:
         raise RuntimeError('No available iOS runtime with a supported iPhone device type')
     _, runtime, device_type = max(candidates, key=lambda candidate: candidate[0])
@@ -39,7 +41,7 @@ def main():
     device = run('xcrun', 'simctl', 'create', 'Elsepin disposable validation', device_type['identifier'], runtime['identifier'])
     with open(os.environ['GITHUB_ENV'], 'a') as env:
         env.write('VALIDATION_SIMULATOR=' + device + '\n')
-    # Boot only after compilation, preserving memory/CPU for the compiler.
+    # The workflow verifies boot readiness before spending time on compilation.
     print(f"Validation simulator: {device_type['name']}, {runtime['name']}, SDK {sdk}; disposable data only")
 
 if __name__ == '__main__':

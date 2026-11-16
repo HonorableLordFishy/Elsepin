@@ -35,8 +35,8 @@ class ValidationSimulatorTests(unittest.TestCase):
         runtime, _ = choose_destination({'runtimes': [duo, phone]}, '27.1')
         self.assertEqual(runtime, phone)
 
-    def test_portrait_runtime_at_or_below_sdk_preferred(self):
+    def test_newest_portrait_runtime_preferred_even_above_sdk(self):
         phone = self.runtime('27.0', 'iPhone SE (3rd generation)')
         newer = self.runtime('27.2', 'iPhone SE (3rd generation)')
         runtime, _ = choose_destination({'runtimes': [newer, phone]}, '27.1')
-        self.assertEqual(runtime, phone)
+        self.assertEqual(runtime, newer)

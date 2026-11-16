@@ -91,6 +91,7 @@ private struct ValidationHost: View {
             .environmentObject(session.reliability).environmentObject(pairing)
             .environmentObject(preferences).environmentObject(privacy)
             .environmentObject(updates).environmentObject(reset)
+            .environmentObject(library)
             .environment(\.shiftVisualStyle, preferences.visualStyle)
             .environment(\.shiftIconDesign, preferences.iconSelection.design)
             .environment(\.dynamicTypeSize, ValidationFixture.largeText ? .accessibility5 : .large)

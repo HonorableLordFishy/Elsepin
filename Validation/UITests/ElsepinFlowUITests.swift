@@ -49,31 +49,167 @@ final class ElsepinFlowUITests: XCTestCase {
         tree.name = name + "-accessibility-tree"; tree.lifetime = .keepAlways; add(tree)
     }
 
-    func testUsualSpeedsAndSavedRouteRecalculation() {
+    private func launchRoutes() {
         launch("route-editing", narrow: false)
         let report = app.staticTexts["validation.routeRules"]
         let passed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == 'Passed'"), object: report)
         XCTAssertEqual(XCTWaiter.wait(for: [passed], timeout: 20), .completed, report.label)
-        let leg = app.buttons["Movement to Test cafe"]
-        if !leg.isHittable { app.swipeUp() }
-        XCTAssertTrue(leg.waitForExistence(timeout: 5))
-        leg.tap()
+    }
+
+    private func routeControl(_ element: XCUIElement) -> XCUIElement {
+        for _ in 0..<9 {
+            if element.exists && element.isHittable { return element }
+            // Start on the list below the map, not inside the pannable preview.
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.77))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.31)))
+        }
+        XCTAssertTrue(element.exists && element.isHittable, "Unreachable route control: \(element)")
+        return element
+    }
+
+    private func savedSnapshot() throws -> [String: Any] {
+        app.buttons["Read saved data"].tap()
+        let text = app.staticTexts["validation.savedSnapshot"].label
+        let value = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+        XCTAssertEqual(value["loadError"] as? String, "")
+        return value
+    }
+
+    private func savedTrip() throws -> [String: Any] {
+        try XCTUnwrap(savedSnapshot()["saved"] as? [String: Any])
+    }
+
+    private func closeRoute() {
+        app.navigationBars.buttons["Cancel"].tap()
+        XCTAssertTrue(app.buttons["Read saved data"].waitForExistence(timeout: 5))
+    }
+
+    private func saveRouteChanges() {
+        routeControl(app.buttons["Save changes"]).tap()
+        XCTAssertTrue(app.alerts["Save trip"].waitForExistence(timeout: 5))
+        app.alerts["Save trip"].buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["Trip saved with its place names and stops."].waitForExistence(timeout: 5))
+    }
+
+    @discardableResult private func setVisibleSpeed(_ mode: String, position: CGFloat) throws -> Double {
+        let slider = routeControl(app.sliders["\(mode) speed in miles per hour"])
+        slider.adjust(toNormalizedSliderPosition: position)
+        let text = try XCTUnwrap(slider.value as? String)
+        return try XCTUnwrap(Double(text.components(separatedBy: " ")[0]))
+    }
+
+    func testUsualSpeedsApplyToNewRoutesAndPersist() throws {
+        launchRoutes()
+        app.buttons["Usual speeds"].tap()
+        XCTAssertEqual(try setVisibleSpeed("Walk", position: 1), 6)
+        capture("24-settings-walk-six-mph")
+        app.buttons["Done"].tap()
+        XCTAssertEqual(try savedSnapshot()["usualWalk"] as? Double, 6)
+        for action in ["New drawn route", "New planned route"] {
+            app.buttons[action].tap()
+            let save = app.buttons["Save route & preview"]
+            XCTAssertTrue(save.waitForExistence(timeout: 5))
+            let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: save)
+            XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 5), .completed)
+            capture("25-" + action)
+            save.tap()
+            XCTAssertTrue(app.buttons["Read saved data"].waitForExistence(timeout: 5))
+            let saved = try savedTrip()
+            XCTAssertEqual(saved["speedMPH"] as? Double, 6)
+            XCTAssertEqual(saved["mode"] as? String, "walk")
+            app.buttons["Reopen last saved route"].tap()
+            closeRoute()
+            XCTAssertEqual(try savedSnapshot()["draftSpeed"] as? Double, 6)
+        }
+        // A previously saved route must keep its assigned speed, not take 6.
+        app.buttons["Open saved route"].tap()
+        routeControl(app.buttons["Movement to Test cafe"]).tap()
+        XCTAssertTrue(app.staticTexts["1.4 mph"].exists)
+        capture("26-existing-speed-preserved")
+    }
+
+    func testSavedLegModeAndCustomSpeedsSurviveReopening() throws {
+        launchRoutes()
+        let before = try savedTrip()
+        app.buttons["Open saved route"].tap()
+        routeControl(app.buttons["Movement to Test cafe"]).tap()
         app.buttons["Drive"].tap()
         XCTAssertTrue(app.staticTexts["85.0 mph"].exists)
-        capture("24-usual-drive-speed-on-saved-leg")
+        let drive = try setVisibleSpeed("Drive", position: 0.5)
+        XCTAssertGreaterThan(drive, 1); XCTAssertLessThan(drive, 85)
+        capture("27-custom-drive-leg")
         app.buttons["Done"].tap()
         XCTAssertTrue(app.buttons["Recalculate directions"].waitForExistence(timeout: 5))
         app.buttons["Keep current path"].tap()
-        let options = app.buttons["Stop and route options"]
-        if !options.isHittable { app.swipeUp() }
-        options.tap()
+        routeControl(app.buttons["Movement to Test pond"]).tap()
+        app.buttons["E-bike"].tap()
+        XCTAssertTrue(app.staticTexts["31.0 mph"].exists)
+        let bike = try setVisibleSpeed("E-bike", position: 0.35)
+        app.buttons["Done"].tap()
+        if app.buttons["Keep current path"].waitForExistence(timeout: 2) { app.buttons["Keep current path"].tap() }
+        saveRouteChanges()
+        closeRoute()
+        let saved = try savedTrip()
+        XCTAssertEqual(saved["id"] as? String, before["id"] as? String)
+        let sections = try XCTUnwrap(saved["travelSections"] as? [[String: Any]])
+        XCTAssertEqual(sections.count, 3)
+        XCTAssertEqual(sections[0]["mode"] as? String, "drive")
+        XCTAssertEqual(try XCTUnwrap(sections[0]["speedMPH"] as? Double), drive, accuracy: 0.11)
+        XCTAssertEqual(sections[1]["mode"] as? String, "eBike")
+        XCTAssertEqual(try XCTUnwrap(sections[1]["speedMPH"] as? Double), bike, accuracy: 0.11)
+        app.buttons["Reopen last saved route"].tap()
+        routeControl(app.buttons["Movement to Test cafe"]).tap()
+        XCTAssertEqual(try XCTUnwrap(Double((app.sliders.firstMatch.value as? String ?? "").components(separatedBy: " ")[0])), drive, accuracy: 0.11)
+        capture("28-reopened-custom-drive-speed")
+        app.buttons["Done"].tap()
+        routeControl(app.buttons["Movement to Test pond"]).tap()
+        XCTAssertEqual(try XCTUnwrap(Double((app.sliders.firstMatch.value as? String ?? "").components(separatedBy: " ")[0])), bike, accuracy: 0.11)
+        capture("29-reopened-custom-ebike-speed")
+    }
+
+    func testRecalculateSavedRouteRetainsStopsAndSavesNewSpeed() throws {
+        launchRoutes()
+        let before = try savedTrip()
+        app.buttons["Open saved route"].tap()
+        routeControl(app.buttons["Stop and route options"]).tap()
         app.buttons["Recalculate with another mode"].tap()
         app.buttons["E-bike"].tap()
         XCTAssertTrue(app.staticTexts["31.0 mph"].exists)
-        capture("25-recalculate-same-stops")
-        app.buttons["route.recalculate.confirm"].tap()
+        let speed = try setVisibleSpeed("E-bike", position: 0.65)
+        capture("30-recalculate-same-stops")
+        routeControl(app.buttons["route.recalculate.confirm"]).tap()
         XCTAssertTrue(app.buttons["Movement to Test cafe"].waitForExistence(timeout: 5))
-        capture("26-recalculated-itinerary")
+        saveRouteChanges()
+        closeRoute()
+        let saved = try savedTrip()
+        for key in ["id", "name", "originName", "destinationName"] {
+            XCTAssertEqual(saved[key] as? String, before[key] as? String, key)
+        }
+        XCTAssertEqual(saved["mode"] as? String, "eBike")
+        XCTAssertEqual(try XCTUnwrap(saved["speedMPH"] as? Double), speed, accuracy: 0.11)
+        XCTAssertEqual(saved["smoothMovement"] as? Bool, true)
+        XCTAssertEqual(saved["arrival"] as? String, before["arrival"] as? String)
+        let stops = try XCTUnwrap(saved["stops"] as? [[String: Any]])
+        let originalStops = try XCTUnwrap(before["stops"] as? [[String: Any]])
+        XCTAssertEqual(stops.count, 2)
+        for index in stops.indices {
+            for key in ["id", "name"] { XCTAssertEqual(stops[index][key] as? String, originalStops[index][key] as? String) }
+            XCTAssertEqual(stops[index]["waitSeconds"] as? Double, originalStops[index]["waitSeconds"] as? Double)
+        }
+        let points = try XCTUnwrap(saved["points"] as? [[String: Any]])
+        let oldPoints = try XCTUnwrap(before["points"] as? [[String: Any]])
+        XCTAssertTrue(NSDictionary(dictionary: points.first!).isEqual(to: oldPoints.first!))
+        XCTAssertTrue(NSDictionary(dictionary: points.last!).isEqual(to: oldPoints.last!))
+        let sections = try XCTUnwrap(saved["travelSections"] as? [[String: Any]])
+        XCTAssertEqual(sections.count, 3)
+        for section in sections {
+            XCTAssertEqual(section["mode"] as? String, "eBike")
+            XCTAssertEqual(try XCTUnwrap(section["speedMPH"] as? Double), speed, accuracy: 0.11)
+        }
+        app.buttons["Reopen last saved route"].tap()
+        routeControl(app.buttons["Movement to Test cafe"]).tap()
+        XCTAssertEqual(try XCTUnwrap(Double((app.sliders.firstMatch.value as? String ?? "").components(separatedBy: " ")[0])), speed, accuracy: 0.11)
+        capture("31-reopened-recalculated-route")
     }
 
     func testSavedPinsCrossCutoffDuringPinchAndStayVisibleWhenRotated() {

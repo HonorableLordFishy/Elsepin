@@ -75,6 +75,11 @@ jobs:
           .build/validation-venv/bin/python scripts/make_validation_project.py
           xcodegen generate --spec project.validation.json
           python3 scripts/prepare_validation_simulator.py
+      - name: Verify disposable simulator startup
+        run: |
+          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "boot", os.environ["VALIDATION_SIMULATOR"]], check=True, timeout=180)'
+          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "bootstatus", os.environ["VALIDATION_SIMULATOR"], "-b"], check=True, timeout=240)'
+          xcrun simctl io "$VALIDATION_SIMULATOR" screenshot .build/simulator-evidence/booted.png
       - name: Compile isolated simulator app and UI tests
         shell: bash
         run: |
@@ -103,29 +108,42 @@ jobs:
           elif [[ "$UI_FOCUS" == pins ]]; then
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testSavedPinsCrossCutoffDuringPinchAndStayVisibleWhenRotated")
           elif [[ "$UI_FOCUS" == routes ]]; then
-            test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testUsualSpeedsAndSavedRouteRecalculation")
+            for test_name in testUsualSpeedsApplyToNewRoutesAndPersist testSavedLegModeAndCustomSpeedsSurviveReopening testRecalculateSavedRouteRetainsStopsAndSavesNewSpeed; do
+              test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$test_name")
+            done
           fi
-          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "boot", os.environ["VALIDATION_SIMULATOR"]], check=True, timeout=300)'
-          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "bootstatus", os.environ["VALIDATION_SIMULATOR"], "-b"], check=True, timeout=180)'
           python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "install", os.environ["VALIDATION_SIMULATOR"], ".build/simulator-validation/Build/Products/Debug-iphonesimulator/ElsepinValidation.app"], check=True, timeout=180)'
           xcrun simctl privacy "$VALIDATION_SIMULATOR" grant location-always com.n3mostudio.elsepin.validation
           xcodebuild -project ElsepinValidation.xcodeproj -scheme Locus -configuration Debug \
             -destination "platform=iOS Simulator,id=$VALIDATION_SIMULATOR" \
             -derivedDataPath .build/simulator-validation -resultBundlePath .build/simulator-evidence/UI.xcresult \
             -parallel-testing-enabled NO -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 240 \
+            -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 420 \
             "${test_selection[@]}" CODE_SIGNING_ALLOWED=NO test-without-building \
             2>&1 | tee .build/simulator-evidence/ui-tests.log | xcbeautify
       - name: Export screenshots and test results
         if: always()
         shell: bash
         run: |
-          if test -d .build/simulator-evidence/UI.xcresult; then
+          if test -f .build/simulator-evidence/UI.xcresult/Info.plist; then
             xcrun xcresulttool export attachments --path .build/simulator-evidence/UI.xcresult --output-path .build/simulator-evidence/attachments
             xcrun xcresulttool get test-results summary --path .build/simulator-evidence/UI.xcresult > .build/simulator-evidence/summary.json
             xcrun xcresulttool get object --legacy --format json --path .build/simulator-evidence/UI.xcresult > .build/simulator-evidence/result-detail.json
           fi
           if test -n "${VALIDATION_SIMULATOR:-}"; then
+            python3 - <<'PY'
+          import os, pathlib, shutil, subprocess
+          evidence = pathlib.Path('.build/simulator-evidence')
+          with (evidence / 'simulator-errors.log').open('w') as log:
+              try:
+                  subprocess.run(['xcrun', 'simctl', 'spawn', os.environ['VALIDATION_SIMULATOR'], 'log', 'show', '--last', '20m', '--style', 'compact', '--predicate', '(process == "ElsepinValidation" OR process == "SpringBoard") AND messageType == error'], stdout=log, stderr=log, timeout=45)
+              except subprocess.TimeoutExpired:
+                  log.write('Simulator log collection timed out.\n')
+          reports = pathlib.Path.home() / 'Library/Logs/DiagnosticReports'
+          for report in reports.glob('*'):
+              if report.is_file() and any(name in report.name for name in ['Elsepin', 'LocusValidation', 'Simulator']):
+                  shutil.copy2(report, evidence / report.name)
+          PY
             xcrun simctl shutdown "$VALIDATION_SIMULATOR" || true
             xcrun simctl delete "$VALIDATION_SIMULATOR"
           fi

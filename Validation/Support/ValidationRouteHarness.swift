@@ -122,26 +122,94 @@ private final class ValidationRouteDriver: ObservableObject {
 struct ValidationRouteHarness: View {
     @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var preferences: SessionPreferences
+    @EnvironmentObject private var library: TripLibrary
     @StateObject private var driver = ValidationRouteDriver()
     @State private var started = false
-    var body: some View {
-        Group {
-            // Model checks rapidly replace routes. Mount the real map only
-            // after those finish, so XCTest starts from one settled itinerary.
-            if driver.report == "Passed" {
-                RoutePlannerSheet().environmentObject(driver.planner)
-            } else {
-                ProgressView("Checking route rules")
-            }
+    @State private var showPlanner = false
+    @State private var showSettings = false
+    @State private var snapshot = "{}"
+    @State private var lastID: UUID?
+
+    // Read a fresh instance from disk, not the in-memory object used by Save.
+    // This probe only observes the shipping persistence API; it never saves.
+    private func refreshSnapshot() {
+        let disk = TripLibrary()
+        let id = lastID ?? driver.trip.id
+        let trip = disk.trips.first { $0.id == id }
+        var value: [String: Any] = ["loadError": disk.error ?? "", "count": disk.trips.count,
+            "usualWalk": session.usualSpeedMPH(for: .walk), "usualDrive": session.usualSpeedMPH(for: .drive),
+            "draftSpeed": driver.planner.draftSpeedMPH, "draftMode": driver.planner.draftMode.rawValue]
+        if let trip, let data = try? JSONEncoder().encode(trip),
+           let object = try? JSONSerialization.jsonObject(with: data) { value["saved"] = object }
+        if let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+           let text = String(data: data, encoding: .utf8) { snapshot = text }
+    }
+
+    private func openSaved(_ id: UUID) {
+        guard let trip = TripLibrary().trips.first(where: { $0.id == id }) else {
+            driver.report = "Saved trip missing from disk"; return
         }
-            .overlay(alignment: .bottom) {
-                Text(driver.report).font(.system(size: 8)).background(.yellow)
-                    .accessibilityIdentifier("validation.routeRules")
+        lastID = id
+        driver.planner.useSaved(trip)
+        showPlanner = true
+    }
+
+    private func newRoute(drawn: Bool) {
+        driver.planner.discardDraft()
+        if drawn {
+            driver.planner.useCustom(ValidationFixture.points, source: .drawn)
+        } else {
+            // Same initial draft inputs as the map's new-route action, with
+            // deterministic places/directions instead of a remote service.
+            driver.planner.initializeDraftIfNeeded(mode: session.travelMode,
+                speedMPH: session.usualSpeedMPH(for: session.travelMode), smoothMovement: false)
+            driver.planner.plan(to: ValidationFixture.route.destination,
+                defaultOrigin: ValidationFixture.route.origin, mode: session.travelMode)
+        }
+        driver.planner.savesToLibraryOnCompletion = true
+        showPlanner = true
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Text(driver.report).accessibilityIdentifier("validation.routeRules")
+                if driver.report == "Passed" {
+                    Button("Usual speeds") { showSettings = true }
+                    Button("New drawn route") { newRoute(drawn: true) }
+                    Button("New planned route") { newRoute(drawn: false) }
+                    Button("Open saved route") { openSaved(driver.trip.id) }
+                    Button("Reopen last saved route") { openSaved(lastID ?? driver.trip.id) }
+                    Button("Read saved data") { refreshSnapshot() }
+                    Text(snapshot).font(.system(size: 7)).lineLimit(1)
+                        .accessibilityIdentifier("validation.savedSnapshot")
+                }
+            }
+            .navigationTitle("Route validation")
+        }
+            .sheet(isPresented: $showSettings, onDismiss: refreshSnapshot) {
+                NavigationStack {
+                    UsualSpeedsSettingsView()
+                        .toolbar { ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showSettings = false }
+                        } }
+                }
+            }
+            .sheet(isPresented: $showPlanner, onDismiss: {
+                lastID = library.lastSavedID ?? lastID
+                driver.planner.isPresented = false
+                refreshSnapshot()
+            }) {
+                RoutePlannerSheet().environmentObject(driver.planner)
             }
             .task {
                 guard !started else { return }; started = true
                 preferences.speedUnit = .mph
                 await driver.exercise(session: session)
+                do { _ = try library.merge([driver.trip]) }
+                catch { driver.report = "Could not seed disposable route: \(error)" }
+                lastID = driver.trip.id
+                refreshSnapshot()
             }
     }
 }
