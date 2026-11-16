@@ -11,6 +11,11 @@ on:
         description: Also run full regressions and compile the device app for a focused UI run
         type: boolean
         default: false
+      simulator_runner:
+        description: Simulator toolchain (production compilation always uses Xcode 27)
+        type: choice
+        options: [xcode-27, macos-26]
+        default: xcode-27
   push:
     branches: [codex/pins-search-69]
     paths:
@@ -67,7 +72,7 @@ jobs:
           path: .build/validation-evidence
           retention-days: 7
   simulator:
-    runs-on: xcode-27
+    runs-on: ${{ inputs.simulator_runner || 'xcode-27' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4

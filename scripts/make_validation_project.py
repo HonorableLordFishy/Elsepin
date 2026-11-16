@@ -1,18 +1,23 @@
 """Generate a disposable simulator-only project; never alter the device spec/engine."""
 import json
 from pathlib import Path
+import subprocess
 import yaml
+from validation_sdk_compatibility import compatibility_sources
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = yaml.safe_load((ROOT / "project.yml").read_text(encoding="utf-8"))
 spec["name"] = "ElsepinValidation"
 app = spec["targets"]["Locus"]
+sdk_major = int(subprocess.check_output(['xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version'], text=True).split('.')[0])
+compatibility_excludes, compatibility_files = compatibility_sources(ROOT, sdk_major)
 excluded = ["App/LocusApp.swift", "Engine/LocationEngine.swift", "Engine/PairingStore.swift",
             "Engine/PairOnDeviceService.swift", "Support/PlaceSearchRequest.swift",
             "Support/PlaceSearchCompleter.swift"]
-app["sources"][0]["excludes"] += excluded
+app["sources"][0]["excludes"] += excluded + compatibility_excludes
 app["sources"] = [s for s in app["sources"] if not s["path"].startswith("Vendor/")]
 app["sources"] += [{"path": "Validation/Support"}, {"path": ".build/validation/EngineTypes.swift"}]
+app["sources"] += compatibility_files
 base = app["settings"]["base"]
 for key in list(base):
     if key.startswith(("OTHER_LDFLAGS", "LIBRARY_SEARCH_PATHS", "SWIFT_INCLUDE_PATHS", "HEADER_SEARCH_PATHS")):
