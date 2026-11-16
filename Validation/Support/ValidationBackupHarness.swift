@@ -23,7 +23,8 @@ struct ValidationBackupHarness: View {
         do {
             var result: [String: Any] = [
                 "settings": try JSONSerialization.jsonObject(with: JSONEncoder().encode(session.backupPreferences)),
-                "tripCount": TripLibrary().trips.count, "pinCount": session.savedPins.count
+                "tripCount": TripLibrary().trips.count, "pinCount": session.savedPins.count,
+                "filesReady": FileManager.default.fileExists(atPath: documents.appendingPathComponent(".validation-files-ready").path)
             ]
             if let files = FileManager.default.enumerator(at: documents, includingPropertiesForKeys: nil) {
                 for case let file as URL in files where file.lastPathComponent.hasPrefix("Elsepin-Settings") && file.pathExtension == "json" {

@@ -125,6 +125,11 @@ jobs:
           fi
           python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "install", os.environ["VALIDATION_SIMULATOR"], ".build/simulator-validation/Build/Products/Debug-iphonesimulator/ElsepinValidation.app"], check=True, timeout=180)'
           xcrun simctl privacy "$VALIDATION_SIMULATOR" grant location-always com.n3mostudio.elsepin.validation
+          if [[ -z "$UI_FOCUS" || "$UI_FOCUS" == all || "$UI_FOCUS" == backups ]]; then
+            python3 scripts/stage_validation_backup.py > .build/simulator-evidence/files-staging.log 2>&1 &
+            staging_pid=$!
+            trap 'kill "$staging_pid" 2>/dev/null || true' EXIT
+          fi
           xcodebuild -project ElsepinValidation.xcodeproj -scheme Locus -configuration Debug \
             -destination "platform=iOS Simulator,id=$VALIDATION_SIMULATOR" \
             -derivedDataPath .build/simulator-validation -resultBundlePath .build/simulator-evidence/UI.xcresult \

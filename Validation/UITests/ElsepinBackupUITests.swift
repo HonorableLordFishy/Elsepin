@@ -49,17 +49,22 @@ final class ElsepinBackupUITests: XCTestCase {
     private func openImport() {
         app.buttons["Import and export"].tap()
         app.buttons["Choose backup file"].tap()
-        localExportFolder()
+        let browse = app.tabBars["DOC.browsingModeTabBar"].buttons["Browse"]
+        XCTAssertTrue(browse.waitForExistence(timeout: 25))
+        browse.tap()
         let file = app.cells.matching(NSPredicate(format: "label BEGINSWITH 'Elsepin-Settings'")).firstMatch
-        if !file.waitForExistence(timeout: 5) {
-            let back = app.buttons["DOC.navBarButton.backInHistory"]
-            XCTAssertTrue(back.exists)
-            back.tap()
-            let folder = app.cells["Elsepin, Container"]
-            XCTAssertTrue(folder.waitForExistence(timeout: 10))
-            folder.doubleTap()
+        if !file.waitForExistence(timeout: 3) {
+            // Back is browsing history on iOS 27 and may return to Recents.
+            // Browse again goes to Locations; choose actual Files storage.
+            let location = app.staticTexts["On My iPhone"].firstMatch
+            if !location.waitForExistence(timeout: 3) { browse.tap() }
+            XCTAssertTrue(location.waitForExistence(timeout: 10))
+            let row = app.cells.containing(.staticText, identifier: "On My iPhone").firstMatch
+            if row.exists { row.tap() } else { location.tap() }
         }
+        capture("33b-general-files-storage")
         XCTAssertTrue(file.waitForExistence(timeout: 20), "Exported settings file not listed")
+        XCTAssertTrue(file.isEnabled, "Valid settings backup is disabled in Files")
         file.tap()
         if app.navigationBars.buttons["Open"].exists { app.navigationBars.buttons["Open"].tap() }
         XCTAssertTrue(app.navigationBars["Review import"].waitForExistence(timeout: 10))
@@ -106,6 +111,12 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertEqual((backup["places"] as? [Any])?.count, 0)
         let exportedSettings = try XCTUnwrap(backup["preferences"] as? [String: Any])
         XCTAssertTrue(NSDictionary(dictionary: original).isEqual(to: exportedSettings))
+        var filesReady = false
+        for _ in 0..<30 {
+            if try snapshot()["filesReady"] as? Bool == true { filesReady = true; break }
+            Thread.sleep(forTimeInterval: 1)
+        }
+        XCTAssertTrue(filesReady, "Actual export was not staged in disposable Files storage; see files-staging.log")
 
         app.buttons["Change disposable settings"].tap()
         let changed = try settings(snapshot())
