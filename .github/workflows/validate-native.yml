@@ -98,8 +98,25 @@ jobs:
         timeout-minutes: 8
         run: |
           python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "boot", os.environ["VALIDATION_SIMULATOR"]], check=True, timeout=180)'
+          # Start the cloud runner's Simulator display before requesting images.
+          # This touches only the disposable CI device, not the owner's desktop.
+          python3 - <<'PY'
+          import os, pathlib, subprocess
+          developer = subprocess.check_output(['xcode-select', '-p'], text=True).strip()
+          simulator = pathlib.Path(developer) / 'Applications/Simulator.app'
+          subprocess.run(['open', '-a', str(simulator), '--args', '-CurrentDeviceUDID', os.environ['VALIDATION_SIMULATOR']], check=True, timeout=30)
+          PY
           python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "bootstatus", os.environ["VALIDATION_SIMULATOR"], "-b"], check=True, timeout=240)'
-          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "io", os.environ["VALIDATION_SIMULATOR"], "screenshot", ".build/simulator-evidence/booted.png"], check=True, timeout=45)'
+          # A SpringBoard diagnostic image is optional. The actual UI tests must
+          # still launch the app, exercise controls and capture their screenshots.
+          python3 - <<'PY'
+          import os, pathlib, subprocess
+          try:
+              subprocess.run(['xcrun', 'simctl', 'io', os.environ['VALIDATION_SIMULATOR'], 'screenshot', '.build/simulator-evidence/booted.png'], check=True, timeout=30)
+          except subprocess.SubprocessError as error:
+              pathlib.Path('.build/simulator-evidence/boot-screenshot-warning.txt').write_text(str(error))
+              print(f'Boot diagnostic screenshot unavailable; native UI checks remain required: {error}')
+          PY
       - name: Run focused native UI checks
         shell: bash
         env:
