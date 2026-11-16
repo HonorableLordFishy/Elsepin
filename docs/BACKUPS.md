@@ -1,5 +1,19 @@
 # Import and export — official 2.5.7
 
+## Unreleased native file-picker repair
+
+File import uses the system SwiftUI file importer with file-item selection, so a
+provider's type classification does not unnecessarily disable a JSON/text backup.
+The file must still pass the existing regular-file, size, JSON and backup-schema
+checks before review. Scoped access stays alive through coordinated background
+reading. Canceling does not apply settings or erase an existing valid preview.
+**Paste backup text** and the manual JSON help link remain available. See
+`NATIVE-VALIDATION.md` for the separate compilation, simulator and phone evidence.
+The production app/extension compile and backup rules pass. Native export and
+file selection/review/cancel have partial simulator evidence; the complete
+apply/reopen/paste UI check remains blocked by simulator Files failures. This
+repair is not in the delivered build 87 IPA, and phone acceptance is pending.
+
 ## Build 75 review (privately built; phone import check pending)
 
 Overview now groups only selected additions and current-to-applied setting values;
@@ -92,7 +106,7 @@ Shift/Locus v1/v2 backups. Settings are the existing portable allowlist of 25
 preferences; pairing, helper credentials, app lock, icon choice, recent-location
 entries and recovery points remain on the phone.
 
-Both file and text readers validate contents with a 32 MiB limit. The file-data
+Both file and text readers validate contents with a 32 MiB limit. The native file-item
 picker avoids dependence on JSON extension recognition. Provider files may need
 to be downloaded in Files first. Failed/canceled reads preserve a valid preview;
 late results cannot replace newer input. Unrelated JSON, GPX, pairing files,

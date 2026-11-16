@@ -8,19 +8,64 @@ Changes on `codex/pins-search-69` to the scoped source/workflow paths trigger it
 manual dispatch is available on that branch. Its default `all` focus runs both jobs.
 The `search` focus reruns the four search cases; `home` runs the solid/glass idle
 tray cases; `pins` runs the live zoom/rotation visibility case; `routes` runs the
-new Usual speeds/saved-itinerary case. These focused runs
+three Usual speeds/saved-itinerary cases. The `backups` focus exercises settings
+file export, selective import, cancellation, relaunch persistence and paste, plus the
+Swift backup/import-rule tests. These focused runs
 compile the isolated simulator app and skip the production job,
 so already validated production code need not be rebuilt for fixture-only checks.
+`validate_device=true` also runs the full production job for a focused dispatch.
+The optional `simulator_runner=macos-26` uses the stable SDK 26 image when the
+preview Xcode 27 simulator cannot start. Production compilation remains Xcode 27.
+`simulator_runtime` can request an exact installed iOS version for a focused
+comparison. An unavailable requested version fails rather than silently choosing
+another runtime. The default still selects the newest general-purpose runtime.
 
-## Build 87 route check - blocked by simulator startup
+## Build 87 route checks - simulator repair
+
+The standalone route fixture was missing the `TripLibrary` environment object.
+It now injects the same library and embedded-editor environment as the normal
+route sheet. The runner chooses the newest supported general-purpose iPhone
+runtime; the successful run used iPhone 17 / iOS 27.2 with SDK 27.1. Compile before
+boot to avoid competing for memory, then require bounded boot readiness before UI
+testing. Failed/incomplete result bundles no longer break evidence collection.
+
+Run `43799395957` at `c96fc4b` passed all three interactive cases, zero skips,
+zero runtime warnings, in 266 seconds of test execution. The initial expanded run
+`43797161250` passed the new-route case but exposed two automation issues: a
+combined accessibility label and a row underneath the sticky Show route action.
+Tests now read the slider's accessible value and scroll controls fully above that
+action before tapping. Screenshot review also identified an extra Cancel button
+in the standalone fixture. Final run `43800631629` at `7bd442d` matched the normal
+sheet environment and again passed all three cases, zero skips/runtime warnings.
+Its screenshots were inspected: native Back/Done, selected modes and reopened
+speeds render correctly, with the duplicate Cancel removed from the fixture.
+
+Coverage uses the actual settings, leg editor, planner and TripLibrary writes:
+
+- Set Usual walking speed to 6 mph through its slider; create both drawn and
+  planned routes; save and load them from disk; retain an existing trip's 1.4 mph.
+- Switch a saved leg to Drive and observe its 85 mph usual speed. Save custom
+  Drive/E-bike leg speeds (39/12 mph in the final run), read a fresh TripLibrary
+  from disk and reopen both leg editors to verify those values.
+- Recalculate with E-bike, observe its 31 mph preset, choose a custom speed
+  (21 mph in the passing run), save and reopen. Assert saved identity/name,
+  endpoint coordinates/names, stop IDs/order/names/90- and 30-second waits,
+  smoothing, arrival choice and all three leg modes/speeds.
+
+Evidence and inspected screenshots: `.build/artifacts/build87/simulator-repair/`.
+The local resource suite passed 22 tests. Production app code and build 87 IPA
+are unchanged. Directions remain deterministic test responses, not real Apple
+route calculations or evidence of device spoofing.
+
+### Earlier blocked attempts
 
 Production build `43790846355` passed 725 checks (one Windows-only case skipped),
-compiled the app/extension cleanly and produced a verified IPA. The new isolated
-route case compiled in both simulator attempts but has no passing runtime result.
+compiled the app/extension cleanly and produced a verified IPA. The initial route
+case compiled in both early simulator attempts, but neither produced a passing runtime result.
 Run `43790842470` was cancelled after prolonged boot/app-readiness waits; fresh
 run `43792787491` timed out in `simctl bootstatus` after 180 seconds, before launch.
-No new screenshots or interaction success are claimed. Logs and partial artifacts
-are in `.build/artifacts/build87/`; physical speed/recalculation confirmation remains.
+Those attempts supplied no screenshots or interaction proof. Their logs and partial
+artifacts remain in `.build/artifacts/build87/`; the successful follow-up is above.
 
 The test injects deterministic directions into the actual planner to check new
 defaults, saved settings, retained places/waits, Keep path, failure restore and
@@ -28,6 +73,86 @@ cancellation. Those rapid model checks finish before its map is mounted. UI step
 then exercise leg movement and whole-itinerary recalculation. It cannot prove
 real Apple routing, pairing or spoofing. Boot/install and XCTest timeouts now
 bound runner failures. Production location-engine code remains unchanged.
+
+## Settings file import repair (unreleased)
+
+The owner confirmed that Files opens on the phone but its files cannot be
+selected. Source `295a0b9` replaces the custom picker sheet/delegate with SwiftUI's
+native `fileImporter`, allows file items independently of provider JSON/data
+classification, and retains security-scoped access through the coordinated read.
+Completion and cancellation have explicit owners. The same bounded backup
+validator and selected-only review still protect both file and paste imports.
+Paste backup text and the manual JSON help link remain available.
+
+Production validation in run `43807961473` passed all 581 Swift tests and 22
+resource tests and compiled the app/extension with no compiler errors/warnings.
+No IPA was created. The focused backup-rule selection also passed 58 cases
+(a subset of the 581, not additional distinct coverage).
+
+The initial UI attempts did not complete import. Their screenshots exposed
+automation navigating before Files loaded and an extra fixture modal shell.
+After correcting those, simulator logs specifically reported
+`FILocalAppContainerNode<Elsepin>` enumeration failing with `nilError` despite
+a valid 830-byte exported JSON existing in Documents. The iOS 27 history Back
+button also returns to Recents, not necessarily the parent folder.
+
+The fixture now matches Settings' pushed navigation. For file import validation,
+`scripts/stage_validation_backup.py` copies the actual UI-exported JSON unchanged
+into the disposable simulator's general Files storage, verifies its bytes, and
+writes an internal receipt. It does not manufacture a backup, inject an import
+result, or bypass the native picker, review, confirmation or persistence. The
+test uses Browse / On My iPhone to select that file, like a downloaded backup.
+Only the validation app and owned simulator are accessed; the simulator is
+deleted afterward. Paste validation reads the same real export onto the
+disposable clipboard and taps the production Paste button.
+
+Run `43809800873` failed before import because its simulator setup could not
+resolve Files' shared storage. Run `43812196014` initialized Files first and
+resolved the exact LocalStorage group from owned simulator metadata. The real
+exported file was selectable, opened review, and cancellation preserved settings.
+Applying the selected settings then exposed a fixture-only missing RoutePlanner
+environment object (crash at BackupImportReviewView.swift:213). Production RootView
+already supplies that object above navigation; the fixture now does too at
+`b5f7640`. Subsequent startup attempts did not reach app interaction:
+`43813978799` timed out in bootstatus; `43815407351` booted but stalled taking a
+preliminary SpringBoard screenshot; `43816735672` exposed that this runner does
+not contain the usual Simulator.app GUI path. The separate GUI launch and boot
+screenshot were removed. XCTest still must launch the app, exercise controls and
+capture its interaction screenshots. Startup and cleanup have bounded durations.
+Run `43817929821` again timed out in bootstatus before app launch. Stable SDK 26
+run `43819584379` compiled the app/UI target, then found an existing contrast-test
+expression too complex for that compiler. Splitting its arithmetic into typed
+steps preserves the calculation and all assertions. Run `43820255219` at
+`976c09f` passed compilation and the expanded 66 backup/contrast rules and started
+the simulator. It selected the app-container copy (which now enumerated but did
+not deliver selection), so it did not reach review. The test now always navigates
+to Locations / On My iPhone and asserts that destination before selecting the
+staged export. Run `43822380158` reached that exact location with the real export
+visible, but its title assertion expected a button instead of iOS 26's static
+text. The query now accepts either native representation. Run `43824300829` at
+`5a5df35` passed compilation and 66 rules but stopped earlier, at a blank native
+export sheet. Its screenshot and system log show Files' LocalStorage indexing
+timing out. `25b5491` adds a readiness check through the actual Files app, requiring
+the disposable app folder to enumerate before opening the export sheet. Run
+`43825953906` passed that prerequisite and exported the actual settings file.
+Its native picker displayed the staged JSON as enabled, but selection failed in
+the system's bookmark resolution with FileProvider error -1005 (nonexistent item
+identifier). The staged file existed and its bytes matched the real UI export;
+the app did not receive it for review. This is not a completed import UI pass.
+Run `43827975555` at `fdde2ba` compiled and booted the available iOS 27.1 image
+(iPhone Duo, not the general iPhone 17 used in the successful route checks),
+but its Files app could not launch: FBSApplicationLibrary returned nil for
+`com.apple.DocumentsApp`; simctl also reported no such file/directory. It supplied
+no backup interaction evidence. The complete file/apply/relaunch/paste test
+remains enabled and **unverified** after the fixture correction. The relevant
+screenshots and provider/startup logs were inspected; do not treat these failed
+runs as production app failures or silently skip their assertions. Completing
+this check needs a working Files runtime or phone acceptance of a newly built IPA.
+Source visibility was restored to private and verified on 16 November. No IPA or
+release was created. The seven runtime-selector Python tests passed locally.
+Evidence is retained in
+`.build/artifacts/build87/backup-validation/`. The installed build 87 predates this
+file-import repair; its IPA has not been replaced.
 
 ## Production and simulator boundaries
 
@@ -39,6 +164,13 @@ app entry point, three FFI-dependent engine/pairing files and search providers.
 The original production location implementation is not edited or linked into
 this test executable. Public engine error/cancellation declarations are copied
 from the original source during generation, avoiding a second error contract.
+
+On SDK 26 only, `validation_sdk_compatibility.py` generates guarded copies using
+the app's existing pre-iOS-27 resource-usage and MetricKit fallback behavior. It
+does not alter production files, backup controls, import/export readers, data
+models or persistence. SDK 27 validation continues compiling the original two
+files. This fallback cannot validate iOS 27 resource-pressure or MetricManager
+diagnostics. Generated copies are ignored build products, not IPA inputs.
 
 Only `Validation/Support` supplies the replacement entry point and adapters.
 Compile guards reject device compilation or compilation without

@@ -1,5 +1,59 @@
 # Elsepin current handoff
 
+## Simulator speed/save and backup validation - 15-16 November 2026
+
+The owner's three requested route UI checks now pass. Validation-only run
+`43800631629` at `7bd442d` passed all three cases on iPhone 17 / iOS 27.2 with no
+skips or runtime warnings. Screenshots were inspected, including the actual leg
+editor after saving and reopening. This supersedes the blocked simulator attempts
+recorded below. The fixture now supplies the shared library, matches production
+editor navigation, and uses controls fully clear of the sticky route action.
+Compilation finishes before booting a disposable simulator on the newest usable
+general runtime, avoiding the previous startup contention.
+
+The tests exercise Usual speeds in new drawn/planned routes; saved-leg mode and
+custom-speed changes followed by Save and reopen; and recalculation with another
+mode while retaining start, destination, stops, waits and route options. Library
+assertions read fresh persisted data. Controlled directions remain test-only and
+do not prove real map directions, pairing or physical-device spoofing.
+
+The owner also requested settings import/export validation, then confirmed the
+phone picker opens but shows files that cannot be selected. Copy/paste must remain.
+The `backups` workflow focus does not yet have a complete passing UI result.
+All 58 backup/import-rule tests and real settings-only file export passed.
+The focused selection now also runs eight unchanged contrast assertions (66
+tests total), and the runtime selector passed seven local Python checks.
+
+At `295a0b9`, file import now uses SwiftUI's native fileImporter with file-item
+selection, explicit completion/cancellation, and retained security-scoped access
+through background coordinated reading. This replaces the custom sheet/delegate
+bridge and does not depend on a provider classifying JSON as public.data. Existing
+content validation, review, selected-only writes and Paste backup text remain.
+The backup fixture also now matches Settings' push navigation instead of adding
+an extra modal shell. Production validation in `43807961473` passed 581 Swift
+tests, 22 resource tests and app/extension compilation without compiler warnings.
+On iOS 27.2, run `43812196014` selected the actual exported file, opened review,
+and verified that Cancel preserved settings. Applying then exposed a missing
+RoutePlanner environment in the fixture, corrected to match production. No full
+apply/relaunch/paste pass has been obtained since that correction. Later iOS
+27.2 startup attempts stalled. iOS 26.5 run `43825953906` exported a valid file
+and displayed the byte-identical staged copy as enabled, but Files failed to
+resolve its bookmark (-1005). iOS 27.1 comparison `43827975555` could not launch
+the system Files app at all. These are simulator/provider blockers, not proof of
+successful restore or a new production app crash. Screenshots/logs were inspected.
+
+The complete file/paste UI test remains enabled and pending. Do not report it
+passed or repeatedly retry these unchanged runner failures. A working general
+iPhone runtime with Files, or a physical-device check after building the repair,
+is needed to finish native picker/apply/relaunch/paste acceptance. Compilation
+and portable rules do not replace that interaction evidence.
+
+The installed build 87 IPA is unchanged and does not include this new import fix.
+No new IPA or release was created. Source was restored to **private** and verified
+on 16 November after validation under the owner's temporary-public approval.
+Evidence: `.build/artifacts/build87/simulator-repair/` and
+`.build/artifacts/build87/backup-validation/`.
+
 ## Usual speeds and saved itinerary recalculation - 15 November 2026 (build 87 delivered)
 
 Owner confirmed Usual speeds was ignored in both new drafts and saved-route mode
