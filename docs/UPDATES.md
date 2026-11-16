@@ -1,6 +1,10 @@
 # Official release notices
 
-Shift 2.5.4 (53) checks the public repository's latest official release when the
+Current state, 15 November 2026: Elsepin 2.6.0 (59) is public. The 2.6.1 draft
+covers test builds through 86 and has no release asset. Source is private; the
+public Elsepin-Releases endpoint remains available to installed apps.
+
+Elsepin checks the public repository's latest official release when the
 app becomes active or Settings opens. It makes **at most one automatic attempt
 every rolling 24 hours**, not one per calendar date. A long uninterrupted session
 does not start a new timer; the next foreground/Settings entry performs a due check.
@@ -8,12 +12,12 @@ does not start a new timer; the next foreground/Settings entry performs a due ch
 An eligible release gets a small card at the top of Settings with **More info**
 and **X**. More info opens that exact GitHub release. Dismissal is remembered for
 its tag across launches; a different, newer official version can appear later.
-About Shift → Software updates keeps the release link available after dismissal.
-Searching Settings for updates or official releases leads to About Shift.
+Settings → Software updates keeps the release link available after dismissal.
+Searching Settings for updates or official releases opens Software updates.
 
 ## What counts as an update
 
-- Read `GET https://api.github.com/repos/N3moStudio/Shift/releases/latest`.
+- Read `GET https://api.github.com/repos/N3moStudio/Elsepin-Releases/releases/latest`.
 - Require a published, non-draft, non-prerelease response and a numeric version
   tag such as `v2.6.0`. Reject beta/RC suffixes even if mislabelled on GitHub.
 - Compare numeric components: 2.10 is newer than 2.9. Never suggest an older version.
@@ -36,11 +40,12 @@ permission, location request or automatic installation. A foreground task uses
 anonymous HTTPS with a 10-second request timeout and 15-second resource timeout.
 It is canceled when its foreground task ends. No GitHub sign-in, token, cookie,
 device identifier or location payload is sent. GitHub necessarily sees the
-request's network address and a generic Shift request header.
+request's network address and a generic Elsepin request header.
 
 The daily attempt is persisted before requesting, so offline, canceled or failed
-attempts also wait until another day. There is no retry loop or manual button that
-bypasses the daily limit. A server rate-limit delay can extend that wait. Simultaneous
+attempts also wait until another day. There is no automatic retry loop. The explicit Check now button can bypass the
+daily interval, but still respects server-requested cooldowns and prevents
+concurrent requests. A server rate-limit delay can extend the wait. Simultaneous
 app/Settings events cannot duplicate requests. Clock rollback rebases the wait.
 
 Successful metadata and ETags are stored locally; an unchanged response can be

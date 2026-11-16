@@ -1,5 +1,10 @@
 # Elsepin build history
 
+Current public release: **2.6.0 (59)**. Latest tested IPA: **2.6.1 (86)**.
+The 2.6.1 draft is awaiting final iPhone acceptance; it has no release asset.
+Source returned to private on 15 November 2026; Elsepin-Releases stays public.
+Past public/private labels below describe the hosting at the time of each build.
+
 ## Build 86 validated and delivered - 15 November 2026
 
 GitHub run `43773626417` built `7be3991623901b445fae1afed71991d8c66f9109` on
@@ -564,6 +569,16 @@ Artifact `13000346208`: 18,258,461 bytes; both bundles 2.6.1 (61), SDK 27.1; 13 
 `59031619b950c09b915b9b70ca7a29501dbef3cf2df321356f7098740fe91cbc`.
 
 Original logs and local receipt: `.build/artifacts/41103527856/`. Three pre-existing compiler warnings: deprecated certificate lookup in `CompanionClient.swift:168` and `RemoteFindMyController.swift:392`, and delegate actor isolation in `LocationVerificationController.swift:6`. No new pairing/browser compile warnings. Device UI, background pairing/Island delivery, permissions, sideload signing and energy behavior remain user acceptance checks. Release 2.6.1 remains a draft with no uploaded assets; build 60 on Google Drive is unchanged.
+
+## Earlier private test build: 2.6.1 (60) - 28 October 2026
+
+Build 60 introduced Bloom as the default, eight retained themes, compact rounded
+typography and simpler surface controls. Old backup appearance fields remained
+compatible. The changelog records 410 portable Swift checks, 14 Python checks,
+identity/appearance/helper checks and static website generation. Native app and
+extension compilation and IPA verification subsequently passed in GitHub run
+`40826806154`; the test IPA was delivered privately. No public release followed.
+This entry completes the previously missing build-60 register; no new run occurred.
 
 ## Current public release: 2.6.0 (59), official — 27 October 2026
 

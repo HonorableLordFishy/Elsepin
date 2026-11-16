@@ -19,6 +19,7 @@ def documents():
     for old, new in {
         "docs/CHANGE-LEDGER.md": "docs/BUILD-HISTORY.md",
         "docs/TESTING-2.5.md": "SETUP.md",
+        "docs/CURRENT-WORK.md": "docs/BUILD-HISTORY.md",
         "NOTICE.md": "LICENSES.txt",
     }.items():
         changelog = changelog.replace("](" + old + ")", "](" + new + ")")
@@ -36,7 +37,9 @@ def documents():
         "docs/images/elsepin-cover.svg": (ROOT / "docs/public/elsepin-cover.svg").read_text(encoding="utf-8"),
         "SETUP.md": setup,
         "CHANGELOG.md": changelog,
-        "docs/BUILD-HISTORY.md": (ROOT / "docs/BUILD-HISTORY.md").read_text(encoding="utf-8"),
+        "docs/BUILD-HISTORY.md": (ROOT / "docs/public/BUILD-HISTORY.md").read_text(encoding="utf-8"),
+        "docs/CHANGES-SINCE-2.6.0.md": (ROOT / "docs/CHANGES-SINCE-2.6.0.md").read_text(encoding="utf-8"),
+        "docs/releases/2.6.1-DRAFT.md": (ROOT / "docs/releases/2.6.1-DRAFT.md").read_text(encoding="utf-8"),
     }
 
 

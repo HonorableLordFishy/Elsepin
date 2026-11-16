@@ -12,12 +12,16 @@ data boundary, triggers, screenshot coverage and physical-device limits.
 
 ## Current build access - 15 November 2026
 
-The owner authorized making `N3moStudio/Elsepin` public. GitHub Actions run
-`43773626417` succeeded on `xcode-27` for test build 86 at `7be3991`, including
+The owner returned `N3moStudio/Elsepin` to **private** on 15 November.
+`N3moStudio/Elsepin-Releases` remains public for downloads and help. No new build
+was started during that change. Private Actions availability/allowance must be
+checked before the next build; do not enable paid billing. GitHub Actions run
+`43773626417` previously succeeded while the source was public on `xcode-27` for test build 86 at `7be3991`, including
 the validated live pin-visibility fixes. See BUILD-HISTORY.md for receipts.
 Use the manual workflow on `codex/pins-search-69` for the current development
 source; `main` is older. This does not publish a release. GitLab remains private.
-The earlier private-build billing failures below are historical. Codemagic's
+The earlier private-build billing failures below are historical, not evidence that
+private runner capacity is available now. Codemagic's
 personal free allowance is exhausted; do not enable paid billing or retry it
 until capacity changes. See BUILD-HISTORY.md for the final build result.
 ## GitHub Actions — works from Windows
@@ -60,7 +64,8 @@ source control. Since 5 November, the delivery folder is
 Elsepin test IPA, replacing older Elsepin IPAs after a complete replacement.
 Leave other apps untouched; no checksum sidecars, ZIP bundles or diagnostic files.
 
-The GitHub workflow is currently the verified build path. Removing `codemagic.yaml` removes this
+The GitHub workflow is the last verified build path; its successful public runs
+do not establish current private allowance. Removing `codemagic.yaml` removes this
 alternative without changing app behavior. Account allowance and runner availability
 still apply; see [Codemagic pricing](https://docs.codemagic.io/billing/pricing/).
 

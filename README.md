@@ -1,10 +1,10 @@
 # Elsepin
 
-Private development repository for the next chapter of the Shift app.
+Private development repository for Elsepin, the continuation of Shift.
 
-**2.6.0 (59) — development; not released.** Prism Jumpgate is the default icon. All nine themes and thirteen regular-edition icons remain available.
+**Public release: 2.6.0 (59). Current test build: 2.6.1 (86).** The 2.6.1 release is an unpublished draft awaiting final iPhone acceptance. Prism Jumpgate remains the primary icon; development has eight themes and thirteen icon choices.
 
-The new appearance system adds theme-specific color modes, solid/glass surfaces, fonts and relative text sizes. Ion defaults to dark olive and citron. Settings has a refreshed overview and a manual official-release update check. The responsive website is in `website/`.
+Bloom is the development default. Appearance offers Solid or Liquid Glass and compact rounded typography with accessibility support. The website is in `website/`; the public introduction is maintained in `docs/public/README.md`. See [changes since 2.6.0](docs/CHANGES-SINCE-2.6.0.md) for the complete pending update.
 
 ## Start here
 
@@ -38,6 +38,6 @@ this workflow does not publish a release.
 Public documentation is maintained here and exported with
 `python3 scripts/export_public_docs.py /path/to/Elsepin-Releases`. Add `--check`
 to verify the public copy matches. The export includes only the introduction,
-setup guide, complete changelog and public build register, never app source.
+setup guide, complete changelog, release summary/draft and public build register, never app source.
 
 Shared-rule tests can run with `swift test`; native SwiftUI and extension validation require Xcode on a Mac. `scripts/check_app_identity.py`, `scripts/check_appearance.py` and `scripts/package_helpers.py --check` protect install identity, icon resources and source-only helper packages. See the Change Ledger for the exact tested revision and remaining device checks.

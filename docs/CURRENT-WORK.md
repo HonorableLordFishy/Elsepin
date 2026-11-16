@@ -1,5 +1,34 @@
 # Elsepin current handoff
 
+## Release preparation - 15 November 2026
+
+Owner is doing final iPhone tests and requested private source, a concise visual
+public README, refreshed 2.6.1 release draft and complete update history. GitHub
+source privacy is verified; Elsepin-Releases remains public. No app code/build
+metadata/IPA changes are part of this work. The prior experimental-removal task
+had made no source edits and is deferred; investigate official Life360 access
+first and use a private helper only as a fallback when that work resumes.
+
+Public docs are maintained in `docs/public/README.md`,
+`docs/public/BUILD-HISTORY.md`, `docs/CHANGES-SINCE-2.6.0.md` and
+`docs/releases/2.6.1-DRAFT.md`, exported by `scripts/export_public_docs.py`.
+Changelog/ledger include builds 83–86, and the build register now includes 60.
+The official published version remains 2.6.0. Draft notes must stay unpublished
+and must not advertise the proposed Life360 replacement as included.
+
+Build 86 is still a prerelease-channel test IPA. Follow the private
+`docs/releases/2.6.1-PUBLISH-CHECKLIST.md` after phone acceptance. Private Mac
+allowance is unverified since the visibility change; do not assume the prior
+public runner access or exhausted Codemagic allowance is available now.
+
+Public documentation was pushed to Elsepin-Releases main as `4c03507`.
+Release draft `427472461` now targets `v2.6.1`, with current notes, `draft=true`,
+no publication timestamp and no assets. Public latest remains `v2.6.0`.
+Validation: 22 resource tests, export drift check, six public document/link checks
+(31 local links/images), all 27 build rows 60–86 and GitHub Markdown rendering
+passed. Existing dirty public checkout SETUP.md was preserved using the isolated
+`.build/release-docs-86` worktree. No app source, IPA or website assets changed.
+
 ## Build 86 delivered - 15 November 2026
 
 Owner requested a new IPA with the validated live pin-visibility changes, delivered

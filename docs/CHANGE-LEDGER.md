@@ -1,5 +1,49 @@
 # Elsepin Change Ledger
 
+## Release preparation and source privacy - 15 November 2026
+
+Owner requested private source, a rewritten public README, an updated unpublished
+release draft and complete update/build history while final iPhone testing continues.
+The source tree was clean at `74a05bb`; no Life360 removal/replacement code had
+been applied. That work is deferred. Future Life360 access should use official
+support first, with a private helper only as a fallback.
+
+GitHub confirmed `N3moStudio/Elsepin` private after the authorized visibility
+change; `N3moStudio/Elsepin-Releases` remains public. The new README uses approved
+artwork/icons and separates current public 2.6.0 from the upcoming 2.6.1 feature
+summary. No private phone photos, app source, pairing data or simulator test
+controls are included. New docs link the feature summary, full changelog and
+curated build register, with all recorded 2.6.1 builds 60–86 represented.
+
+The old 2.6.1 draft was replaced with current notes, kept unpublished and
+without assets.
+
+Public documentation was pushed to Elsepin-Releases main as `4c03507`.
+Release draft `427472461` now targets `v2.6.1`, with current notes, `draft=true`,
+no publication timestamp and no assets. Public latest remains `v2.6.0`.
+Validation: 22 resource tests, export drift check, six public document/link checks
+(31 local links/images), all 27 build rows 60–86 and GitHub Markdown rendering
+passed. Existing dirty public checkout SETUP.md was preserved using the isolated
+`.build/release-docs-86` worktree. No app source, IPA or website assets changed. Build 86 is prerelease-channel test metadata; the documented
+stable-channel/package check remains required before official publication.
+No native code, build metadata or delivery-folder files change in this task.
+
+### Completed native builds since the previous ledger update
+
+| Build | Native run | Passed checks | Result |
+| --- | --- | --- | --- |
+| 81 | 43493662140 | 692 | Pin editor/search clarity, verified test IPA. |
+| 82 | 43525893260 | 697 | Pin visibility preference and native scale, verified test IPA. |
+| 83 | 43666281557 | 711 | Adaptive map/search UI, interim test IPA; spacing followed up in 84. |
+| 84 | 43667658944 | 711 | Bottom spacing corrected; 13 distinct UI cases passed across focused runs. |
+| 85 | 43752876339 | 718 | Pairing cancellation/import recovery and approved wording, verified test IPA. |
+| 86 | 43773626417 | 724 | Continuous pin visibility and rotated scale, verified test IPA. |
+
+Full receipts, intermediate failures and physical-device limits are in
+[build history](BUILD-HISTORY.md). The new pinch/rotation case brings the distinct
+simulator UI total to 14 across validation runs. No simulated result verifies the
+physical device engine. No app release has been published.
+
 ## Build 80 validated and delivered - 12 November 2026
 
 GitHub run 43376928555 succeeded at 6a1a29c: 686 checks passed (547 Swift,
@@ -12,7 +56,7 @@ No release published. Physical-device acceptance remains pending. Earlier
 not-built/pending-native notes below are superseded by this result.
 
 
-Updated through **12 November 2026** (America/Los_Angeles). Elsepin 2.6.0 (59)
+Updated through **15 November 2026** (America/Los_Angeles). Elsepin 2.6.0 (59)
 is the last recorded public release. Earlier entries retain their original validation context.
 
 See [the public build register](BUILD-HISTORY.md) for dates, outcomes and all recorded 2.5.x/2.6.0 native runs.

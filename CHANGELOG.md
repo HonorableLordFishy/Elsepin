@@ -1,5 +1,68 @@
 # Elsepin changelog
 
+Updated through **15 November 2026**, including test build 86.
+**Public release: 2.6.0 (59). Next release: 2.6.1, in final testing and not published.**
+
+[What's coming in 2.6.1](docs/CHANGES-SINCE-2.6.0.md) · [Build history](docs/BUILD-HISTORY.md) · [Setup](SETUP.md)
+
+Earlier entries describe their original development checkpoints. A later build may
+supersede a pending check or an intermediate behavior. The build history records
+successful packages separately from failed attempts and simulator/device evidence.
+
+## Build 86 - live pin visibility during zoom (15 November 2026)
+
+- Refresh saved pins while the camera moves, rather than waiting for a gesture to end.
+- Measure horizontal ground scale at the screen center so rotating the map does not
+  change the visibility cutoff through an expanded bounding rectangle.
+- Apply cutoff crossings immediately in either direction. Limit repeated spatial
+  filtering to 10 Hz and flush the settled result; only changed pin lists publish.
+- Share the correction between the main map and Library pin editor. Preserve the
+  0.5–20 mile preference, map scale, active-route markers and location engine.
+- Build 86 passed 724 automated checks and native app/extension compilation with
+  no compiler warnings/errors. The verified IPA was delivered for private testing.
+- Fourteen distinct simulator UI cases passed across the preceding validation runs,
+  including actual two-finger pinch/rotation with test-only connection fixtures.
+  Physical movement, signing and battery behavior remain separate phone checks.
+
+## Build 85 - pairing cancellation and clearer recovery (15 November 2026)
+
+- Wake abandoned native pairing work, reject stale callbacks and validate staged
+  output before installing it. A cancelled result cannot replace an imported file.
+- Wait briefly for cleanup before retrying, then give an actionable reopen message
+  if the native worker has not finished. Keep existing pairing validation and FFI.
+- Shorten approved pairing, Stop and area-editor wording while retaining its meaning.
+  Explain the need for Wi-Fi and LocalDevVPN; another device's Wi-Fi hotspot can
+  also work. Force-closing still does not confirm that the location was cleared.
+- Publish the separate website rewrite with map-led scroll sections, a working
+  interactive preview, theme/icon examples, setup guidance and accessibility fallbacks.
+- Build 85 passed 718 automated checks and clean native app/extension compilation.
+  IPA delivered privately; no public app release. Website publication is separate.
+
+## Build 84 - bottom spacing and native validation (14 November 2026)
+
+- Reserve bottom navigation space once, fixing build 83's floating idle tray and
+  overly compressed active-route details, including maximum accessibility text.
+- Preserve reachable Pause/Stop and both Solid and Liquid Glass navigation.
+- Pass the initial 11 simulator UI cases and two focused idle-spacing cases with
+  inspected screenshots and no reported runtime warnings. Fixtures are disposable
+  and cannot perform or prove real-device spoofing.
+- Build 84 passed 711 automated checks and clean native compilation; test IPA delivered.
+
+## Build 83 - adaptable controls and search recovery (14 November 2026)
+
+- Wrap map controls when a narrow screen cannot fit them on one row. Allow long
+  route details to scroll while keeping movement commands outside the scroll area.
+- Show Starting/Checking before the first accepted route update; preserve distinct
+  paused, failed and unverified states.
+- Offer meaningful retry guidance when directions fail. Ignore duplicate search
+  submissions, cancel replaced queries and support interactive keyboard dismissal.
+- Improve Library empty states, long-name wrapping, named accessibility actions and
+  readable surfaces with transparency/contrast/motion fallbacks.
+- Add a validation-only Mac workflow and isolated simulator adapters. Production
+  device pairing and movement remain separate and no test fixture ships in the IPA.
+- Build 83 passed 711 automated checks and native compilation. Its bottom-spacing
+  regression was reported during testing and corrected in build 84.
+
 ## Build 82 - wider pin visibility and map scale (unpublished test build)
 
 - Show saved pins at wider zoom levels using visible ground-map span instead of
@@ -45,12 +108,7 @@ No release published. Physical-device acceptance remains pending. Earlier
 not-built/pending-native notes below are superseded by this result.
 
 
-Updated through **12 November 2026** (America/Los_Angeles). Elsepin 2.6.0 (59)
-is the official release. Earlier Shift entries retain their original names and release status.
-
-[App introduction](README.md) · [Build history](docs/BUILD-HISTORY.md) · [Detailed Change Ledger](docs/CHANGE-LEDGER.md)
-
-## Build 80 - planner and pin regression fixes (not built yet)
+## Build 80 - planner and pin regression fixes (unpublished test build)
 
 - Always show a larger route-planning map, including before endpoints are chosen
   and when directions fail. Fit explicitly frames the route or draft endpoints.
@@ -73,9 +131,9 @@ is the official release. Earlier Shift entries retain their original names and r
   the old address. Preserve favorite/style/folder and configured widget identity.
 - Avoid a redundant directions request when selecting a next-route destination.
 
-Local resource checks pass. New Swift regression cases and native compilation
-await the next authorized Mac run. No build 80 IPA or release exists yet; see
-[review and verification scope](docs/BUILD-80-REVIEW.md).
+The completed build passed 686 automated checks and native app/extension compilation.
+A verified test IPA was delivered; no release was published. The earlier pending
+validation note is superseded by the build 80 receipt above.
 
 ## Build 79 - library, pin and route refinements (unpublished test build)
 
