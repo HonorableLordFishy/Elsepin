@@ -143,13 +143,19 @@ jobs:
           evidence = pathlib.Path('.build/simulator-evidence')
           with (evidence / 'simulator-errors.log').open('w') as log:
               try:
-                  subprocess.run(['xcrun', 'simctl', 'spawn', os.environ['VALIDATION_SIMULATOR'], 'log', 'show', '--last', '20m', '--style', 'compact', '--predicate', '(process == "ElsepinValidation" OR process == "SpringBoard") AND messageType == error'], stdout=log, stderr=log, timeout=45)
+                  subprocess.run(['xcrun', 'simctl', 'spawn', os.environ['VALIDATION_SIMULATOR'], 'log', 'show', '--last', '20m', '--style', 'compact', '--predicate', '(process == "ElsepinValidation" OR process == "SpringBoard" OR process CONTAINS[c] "fileprovider" OR process CONTAINS[c] "documentmanager") AND messageType == error'], stdout=log, stderr=log, timeout=45)
               except subprocess.TimeoutExpired:
                   log.write('Simulator log collection timed out.\n')
           reports = pathlib.Path.home() / 'Library/Logs/DiagnosticReports'
           for report in reports.glob('*'):
               if report.is_file() and any(name in report.name for name in ['Elsepin', 'LocusValidation', 'Simulator']):
                   shutil.copy2(report, evidence / report.name)
+          try:
+              container = subprocess.check_output(['xcrun', 'simctl', 'get_app_container', os.environ['VALIDATION_SIMULATOR'], 'com.n3mostudio.elsepin.validation', 'data'], text=True, timeout=15).strip()
+              for index, file in enumerate((pathlib.Path(container) / 'Documents').rglob('Elsepin-Settings*.json')):
+                  shutil.copy2(file, evidence / f'disposable-settings-export-{index}.json')
+          except (subprocess.SubprocessError, OSError) as error:
+              print(f'Disposable export collection unavailable: {error}')
           PY
             xcrun simctl shutdown "$VALIDATION_SIMULATOR" || true
             xcrun simctl delete "$VALIDATION_SIMULATOR"

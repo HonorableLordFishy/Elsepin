@@ -45,6 +45,17 @@ final class ElsepinBackupUITests: XCTestCase {
         app.buttons["Choose backup file"].tap()
         localExportFolder()
         let file = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Elsepin-Settings'")).firstMatch
+        if !file.waitForExistence(timeout: 3) {
+            // Files can retain an empty pre-export listing on a fresh simulator.
+            // Re-enter the location through its native history to refresh it.
+            capture("33b-import-files-before-refresh")
+            let back = app.buttons["DOC.navBarButton.backInHistory"]
+            if back.exists { back.tap() }
+            let folder = app.staticTexts["Elsepin"].firstMatch
+            if folder.waitForExistence(timeout: 5) { folder.tap() }
+            tapFileLocationIfPresent("Validation exports")
+            capture("33c-import-files-after-refresh")
+        }
         XCTAssertTrue(file.waitForExistence(timeout: 10))
         file.tap()
         if app.navigationBars.buttons["Open"].exists { app.navigationBars.buttons["Open"].tap() }
