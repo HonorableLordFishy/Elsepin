@@ -21,16 +21,26 @@ final class ElsepinBackupUITests: XCTestCase {
         }
         XCTFail("Unreachable backup control: \(element)"); return element
     }
-    private func tapFileLocationIfPresent(_ label: String) {
-        for element in [app.staticTexts[label].firstMatch, app.buttons[label].firstMatch] {
-            if element.exists && element.isHittable { element.tap(); return }
-        }
-    }
     private func localExportFolder() {
-        tapFileLocationIfPresent("Browse")
-        tapFileLocationIfPresent("On My iPhone")
-        tapFileLocationIfPresent("Elsepin")
-        tapFileLocationIfPresent("Validation exports")
+        // DocumentManager loads out of process. Wait for its navigation before
+        // querying locations; an optional query during loading can hit Back and
+        // silently save to On My iPhone instead of this app's Documents folder.
+        let picker = app.navigationBars["FullDocumentManagerViewControllerNavigationBar"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 25), "Native Files did not finish presenting")
+        let marker = app.cells.matching(NSPredicate(format: "label BEGINSWITH 'Validation exports'")).firstMatch
+        let ownFolder = app.cells["Elsepin, Container"]
+        if !marker.waitForExistence(timeout: 5) {
+            if !ownFolder.exists {
+                let back = app.buttons["DOC.navBarButton.backInHistory"]
+                if back.exists { back.tap() }
+                else if app.buttons["BackButton"].exists { app.buttons["BackButton"].tap() }
+            }
+            XCTAssertTrue(ownFolder.waitForExistence(timeout: 15), "App folder missing from On My iPhone")
+            ownFolder.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
+        }
+        XCTAssertTrue(marker.waitForExistence(timeout: 20), "App Documents folder did not finish loading")
+        // Remain in Documents. The marker proves which folder is selected;
+        // the exporter and importer both operate on the actual saved JSON here.
     }
     private func snapshot() throws -> [String: Any] {
         app.buttons["Read settings and export"].tap()
@@ -44,19 +54,8 @@ final class ElsepinBackupUITests: XCTestCase {
         app.buttons["Import and export"].tap()
         app.buttons["Choose backup file"].tap()
         localExportFolder()
-        let file = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Elsepin-Settings'")).firstMatch
-        if !file.waitForExistence(timeout: 3) {
-            // Files can retain an empty pre-export listing on a fresh simulator.
-            // Re-enter the location through its native history to refresh it.
-            capture("33b-import-files-before-refresh")
-            let back = app.buttons["DOC.navBarButton.backInHistory"]
-            if back.exists { back.tap() }
-            let folder = app.staticTexts["Elsepin"].firstMatch
-            if folder.waitForExistence(timeout: 5) { folder.tap() }
-            tapFileLocationIfPresent("Validation exports")
-            capture("33c-import-files-after-refresh")
-        }
-        XCTAssertTrue(file.waitForExistence(timeout: 10))
+        let file = app.cells.matching(NSPredicate(format: "label BEGINSWITH 'Elsepin-Settings'")).firstMatch
+        XCTAssertTrue(file.waitForExistence(timeout: 20), "Exported settings file not listed")
         file.tap()
         if app.navigationBars.buttons["Open"].exists { app.navigationBars.buttons["Open"].tap() }
         XCTAssertTrue(app.navigationBars["Review import"].waitForExistence(timeout: 10))
