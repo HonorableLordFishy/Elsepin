@@ -105,14 +105,16 @@ jobs:
           elif [[ "$UI_FOCUS" == routes ]]; then
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testUsualSpeedsAndSavedRouteRecalculation")
           fi
-          xcrun simctl boot "$VALIDATION_SIMULATOR"
-          xcrun simctl bootstatus "$VALIDATION_SIMULATOR" -b
-          xcrun simctl install "$VALIDATION_SIMULATOR" .build/simulator-validation/Build/Products/Debug-iphonesimulator/ElsepinValidation.app
+          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "boot", os.environ["VALIDATION_SIMULATOR"]], check=True, timeout=300)'
+          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "bootstatus", os.environ["VALIDATION_SIMULATOR"], "-b"], check=True, timeout=180)'
+          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "install", os.environ["VALIDATION_SIMULATOR"], ".build/simulator-validation/Build/Products/Debug-iphonesimulator/ElsepinValidation.app"], check=True, timeout=180)'
           xcrun simctl privacy "$VALIDATION_SIMULATOR" grant location-always com.n3mostudio.elsepin.validation
           xcodebuild -project ElsepinValidation.xcodeproj -scheme Locus -configuration Debug \
             -destination "platform=iOS Simulator,id=$VALIDATION_SIMULATOR" \
             -derivedDataPath .build/simulator-validation -resultBundlePath .build/simulator-evidence/UI.xcresult \
-            -parallel-testing-enabled NO "${test_selection[@]}" CODE_SIGNING_ALLOWED=NO test-without-building \
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 240 \
+            "${test_selection[@]}" CODE_SIGNING_ALLOWED=NO test-without-building \
             2>&1 | tee .build/simulator-evidence/ui-tests.log | xcbeautify
       - name: Export screenshots and test results
         if: always()

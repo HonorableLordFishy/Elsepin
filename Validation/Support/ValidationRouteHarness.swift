@@ -123,14 +123,23 @@ struct ValidationRouteHarness: View {
     @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var preferences: SessionPreferences
     @StateObject private var driver = ValidationRouteDriver()
+    @State private var started = false
     var body: some View {
-        RoutePlannerSheet()
-            .environmentObject(driver.planner)
+        Group {
+            // Model checks rapidly replace routes. Mount the real map only
+            // after those finish, so XCTest starts from one settled itinerary.
+            if driver.report == "Passed" {
+                RoutePlannerSheet().environmentObject(driver.planner)
+            } else {
+                ProgressView("Checking route rules")
+            }
+        }
             .overlay(alignment: .bottom) {
                 Text(driver.report).font(.system(size: 8)).background(.yellow)
                     .accessibilityIdentifier("validation.routeRules")
             }
             .task {
+                guard !started else { return }; started = true
                 preferences.speedUnit = .mph
                 await driver.exercise(session: session)
             }
