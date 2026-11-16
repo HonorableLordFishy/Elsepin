@@ -98,7 +98,7 @@ jobs:
         if: inputs.ui_focus == 'backups'
         run: |
           set -o pipefail
-          swift test --filter 'Backup|LibraryMerge' 2>&1 | tee .build/simulator-evidence/backup-rules.log
+          swift test --filter 'Backup|LibraryMerge|ShiftAppearanceTests' 2>&1 | tee .build/simulator-evidence/backup-rules.log
       - name: Verify disposable simulator startup
         timeout-minutes: 8
         run: |
