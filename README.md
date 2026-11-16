@@ -2,9 +2,9 @@
 
 Private development repository for Elsepin, the continuation of Shift.
 
-**Public release: 2.6.0 (59). Current test build: 2.6.1 (87).** The 2.6.1 release is an unpublished draft awaiting final iPhone acceptance. Prism Jumpgate remains the primary icon; development has eight themes and thirteen icon choices.
+**Public release: [2.6.1 (89)](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/v2.6.1).** Build 89 uses the official update channel with build 88's features and fixes. Prism Jumpgate remains the primary icon; the app has eight themes and thirteen icon choices.
 
-Bloom is the development default. Appearance offers Solid or Liquid Glass and compact rounded typography with accessibility support. The website is in `website/`; the public introduction is maintained in `docs/public/README.md`. See [changes since 2.6.0](docs/CHANGES-SINCE-2.6.0.md) for the complete pending update.
+Bloom is the default. Appearance offers Solid or Liquid Glass and compact rounded typography with accessibility support. The website is in `website/`; the public introduction is maintained in `docs/public/README.md`. See [changes since 2.6.0](docs/CHANGES-SINCE-2.6.0.md) for the complete update.
 
 ## Start here
 

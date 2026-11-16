@@ -12,6 +12,18 @@ data boundary, triggers, screenshot coverage and physical-device limits.
 
 ## Current build access - 16 November 2026
 
+Official build 89 used the manual `Prepare release IPA` workflow in the public
+Elsepin-Releases repository, checking out pinned private source through a
+temporary read-only deploy key. App source stayed private throughout. Raw build
+logs and source are not uploaded; the only artifact is the IPA. Successful run:
+`43954072204`, private source `d1a55042782d9b40b9aeefa8d88c3b6c03ce04ef`.
+The temporary key and public-repo secret are removed after use; the workflow is
+disabled afterward. A future authorized build must create fresh read-only access
+and explicitly enable/dispatch it with a reviewed full source SHA. No release
+publishes automatically, and no paid billing was enabled.
+
+### Earlier build access
+
 `N3moStudio/Elsepin` is **private**. Private run `43790679432` was rejected before
 execution for account billing/spending limits. The owner explicitly allowed
 temporary public source for building/testing, then restoring private. This route

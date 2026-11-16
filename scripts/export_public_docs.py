@@ -40,6 +40,7 @@ def documents():
         "docs/BUILD-HISTORY.md": (ROOT / "docs/public/BUILD-HISTORY.md").read_text(encoding="utf-8"),
         "docs/CHANGES-SINCE-2.6.0.md": (ROOT / "docs/CHANGES-SINCE-2.6.0.md").read_text(encoding="utf-8"),
         "docs/releases/2.6.1-DRAFT.md": (ROOT / "docs/releases/2.6.1-DRAFT.md").read_text(encoding="utf-8"),
+        "docs/releases/2.6.1.md": (ROOT / "docs/releases/2.6.1.md").read_text(encoding="utf-8"),
     }
 
 

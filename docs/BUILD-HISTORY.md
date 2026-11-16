@@ -1,5 +1,42 @@
 # Elsepin build history
 
+## Official 2.6.1 (89) published - 16 November 2026
+
+The owner explicitly requested publication and private source. Published release
+`427472461`, tag `v2.6.1`, in Elsepin-Releases with only `Elsepin-2.6.1.ipa`.
+Anonymous latest-release metadata and the downloaded public asset were verified
+against the inspected package. Public documentation/tag commit: `eb31df4cb196b3f873b5526a333605ee3a552cca`.
+
+Native run `43954072204` built private source `d1a55042782d9b40b9aeefa8d88c3b6c03ce04ef`.
+The private source tag `v2.6.1` records that tested revision. The public workflow
+revision was `b0ed1a79b01eed437cc4bd7a831b7212efb72e74`. Both app and extension are
+2.6.1 (89), arm64, SDK 27.1; the app update channel is stable. This is a metadata-only
+native rebuild of build 88, not a renamed/repacked test binary. No app behavior changed.
+
+727 checks passed (581 Swift, 24 resource, 18 Companion, 104 cloud); one additional
+Windows-only case skipped. Native compilation had zero compiler warnings/errors.
+Package/resource checks verified expected entitlements, 13 icons, bundled notices
+and helpers, and absence of simulator fixtures. The workflow emitted a checkout
+Node runtime deprecation notice, separate from app/compiler results.
+
+Source remained private throughout. A public manual workflow used a temporary
+read-only private-source deploy key, uploaded only the IPA, and kept full build logs
+on the ephemeral runner. First run `43953866653` failed at key authentication;
+correcting the key allowed the successful run. The deploy key and repo secret were
+removed and the manual workflow disabled after packaging. No paid billing enabled.
+
+Delivered `Elsepin 2.6.1 build 89.ipa` (19,206,238 bytes) to the usual Desktop
+IPA folder, replacing only build 88. Other projects' files were preserved.
+Local and public release notes, README, feature summary and chronological history
+now include builds 88/89. Website release links were updated in the public checkout;
+no separate Render deployment was triggered manually.
+
+The three route/speed simulator cases previously passed against unchanged route
+code. Final physical-iPhone file-import acceptance has not been reported, and the
+simulator Files-provider blocker remains documented. Neither release authorization
+nor automated results are recorded as proof of device spoofing, Stop or battery life.
+Evidence: `.build/artifacts/build89/`.
+
 ## Build 88 delivered - 16 November 2026
 
 GitHub run `43903180690` built `259db640f774cb4a05b8bc9cb11e89317f2e6fa7`:
@@ -50,9 +87,8 @@ The two changed flows still need a brief physical check; real location writes,
 Stop/clear and signing are not established by portable tests.
 
 
-Current public release: **2.6.0 (59)**. Latest test IPA: **2.6.1 (88)**.
-The 2.6.1 draft is awaiting final iPhone acceptance; it has no release asset.
-Source returned to private on 16 November 2026; Elsepin-Releases stays public.
+Current public release: **2.6.1 (89)**.
+Source is private; Elsepin-Releases stays public for downloads and documentation.
 Past public/private labels below describe the hosting at the time of each build.
 
 ## Build 86 validated and delivered - 15 November 2026
