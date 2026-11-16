@@ -7,6 +7,7 @@ selection, the exporter, its bytes, the importer, or any review/apply action.
 import json
 import os
 from pathlib import Path
+import plistlib
 import subprocess
 import time
 
@@ -15,6 +16,24 @@ def container(device, bundle, kind):
     return Path(subprocess.check_output(
         ['xcrun', 'simctl', 'get_app_container', device, bundle, kind],
         text=True, stderr=subprocess.PIPE, timeout=15).strip())
+
+
+def files_storage_group(device, app):
+    # On some runtimes this group belongs to the LocalStorage provider rather
+    # than DocumentsApp, so get_app_container's specific-group lookup rejects
+    # it. Resolve only that exact group's metadata inside our owned simulator.
+    data = next(parent for parent in app.parents
+                if parent.name == 'data' and parent.parent.name == device)
+    groups = data / 'Containers/Shared/AppGroup'
+    identifiers = []
+    for metadata in groups.glob('*/.com.apple.mobile_container_manager.metadata.plist'):
+        with metadata.open('rb') as stream:
+            identifier = plistlib.load(stream).get('MCMMetadataIdentifier', '')
+        if 'FileProvider' in identifier or 'Documents' in identifier:
+            identifiers.append(identifier)
+        if identifier == 'group.com.apple.FileProvider.LocalStorage':
+            return metadata.parent
+    raise FileNotFoundError(f'LocalStorage group not initialized; document groups: {identifiers}')
 
 
 def main():
@@ -34,7 +53,7 @@ def main():
             backup = json.loads(payload)
             if backup.get('categories') != ['settings'] or backup.get('places') or backup.get('trips'):
                 raise ValueError('Expected only the disposable settings export')
-            group = container(device, 'com.apple.DocumentsApp', 'group.com.apple.FileProvider.LocalStorage')
+            group = files_storage_group(device, app)
             # Refuse any path outside this owned, disposable simulator.
             if device not in group.parts or 'AppGroup' not in group.parts:
                 raise ValueError('Files group is outside the disposable simulator')
