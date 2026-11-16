@@ -7,10 +7,12 @@ import subprocess
 def run(*args):
     return subprocess.check_output(args, text=True).strip()
 
-def choose_destination(data, sdk_version):
+def choose_destination(data, sdk_version, requested_version=None):
     candidates = []
     for runtime in data['runtimes']:
         if not runtime.get('isAvailable') or '.iOS-' not in runtime['identifier']:
+            continue
+        if requested_version and runtime['version'] != requested_version:
             continue
         supported = [t for t in runtime.get('supportedDeviceTypes', [])
                      if t.get('productFamily') == 'iPhone']
@@ -27,7 +29,8 @@ def choose_destination(data, sdk_version):
         # Still avoid a device-specific runtime when a regular iPhone exists.
         candidates.append(((portrait, version), runtime, device_type))
     if not candidates:
-        raise RuntimeError('No available iOS runtime with a supported iPhone device type')
+        raise RuntimeError('No available iOS runtime with a supported iPhone device type'
+                           + (f' for requested version {requested_version}' if requested_version else ''))
     _, runtime, device_type = max(candidates, key=lambda candidate: candidate[0])
     return runtime, device_type
 
@@ -37,7 +40,8 @@ def main():
     inventory = run('xcrun', 'simctl', 'list', '--json')
     (evidence / 'simulator-inventory.json').write_text(inventory)
     sdk = run('xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version')
-    runtime, device_type = choose_destination(json.loads(inventory), sdk)
+    runtime, device_type = choose_destination(json.loads(inventory), sdk,
+                                             os.environ.get('VALIDATION_RUNTIME_VERSION'))
     device = run('xcrun', 'simctl', 'create', 'Elsepin disposable validation', device_type['identifier'], runtime['identifier'])
     with open(os.environ['GITHUB_ENV'], 'a') as env:
         env.write('VALIDATION_SIMULATOR=' + device + '\n')

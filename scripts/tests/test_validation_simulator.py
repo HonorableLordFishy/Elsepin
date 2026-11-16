@@ -40,3 +40,13 @@ class ValidationSimulatorTests(unittest.TestCase):
         newer = self.runtime('27.2', 'iPhone SE (3rd generation)')
         runtime, _ = choose_destination({'runtimes': [newer, phone]}, '27.1')
         self.assertEqual(runtime, newer)
+
+    def test_explicit_runtime_comparison_uses_requested_version(self):
+        requested = self.runtime('27.1', 'iPhone 17')
+        newer = self.runtime('27.2', 'iPhone 17')
+        runtime, _ = choose_destination({'runtimes': [requested, newer]}, '27.1', '27.1')
+        self.assertEqual(runtime, requested)
+
+    def test_missing_requested_runtime_does_not_silently_test_another_version(self):
+        with self.assertRaisesRegex(RuntimeError, 'requested version 27.1'):
+            choose_destination({'runtimes': [self.runtime('27.2', 'iPhone 17')]}, '27.1', '27.1')
