@@ -201,6 +201,7 @@ struct ValidationRouteHarness: View {
                 refreshSnapshot()
             }) {
                 RoutePlannerSheet().environmentObject(driver.planner)
+                    .environment(\.shiftEditorEmbedded, true)
             }
             .task {
                 guard !started else { return }; started = true
