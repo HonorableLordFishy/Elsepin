@@ -46,6 +46,25 @@ final class ElsepinBackupUITests: XCTestCase {
     private func settings(_ snapshot: [String: Any]) throws -> [String: Any] {
         try XCTUnwrap(snapshot["settings"] as? [String: Any])
     }
+    private func prepareFilesProvider() {
+        // A successful simctl launch does not mean Files' provider has finished
+        // its first-run indexing. Verify actual enumeration before opening an
+        // export sheet; a blank system sheet is not a backup interaction result.
+        let files = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
+        files.launch()
+        let browse = files.tabBars["DOC.browsingModeTabBar"].buttons["Browse"]
+        XCTAssertTrue(browse.waitForExistence(timeout: 60), "Simulator Files did not become ready")
+        browse.tap()
+        browse.tap()
+        let location = files.staticTexts["On My iPhone"].firstMatch
+        XCTAssertTrue(location.waitForExistence(timeout: 30))
+        let row = files.cells.containing(.staticText, identifier: "On My iPhone").firstMatch
+        if row.exists { row.tap() } else { location.tap() }
+        XCTAssertTrue(files.cells["Elsepin, Container"].waitForExistence(timeout: 60),
+            "Simulator Files could not enumerate the disposable app container")
+        app.activate()
+        XCTAssertTrue(app.buttons["Read settings and export"].waitForExistence(timeout: 20))
+    }
     private func openImport() {
         app.buttons["Import and export"].tap()
         app.buttons["Choose backup file"].tap()
@@ -91,6 +110,7 @@ final class ElsepinBackupUITests: XCTestCase {
         app.launchEnvironment["ELSEPIN_TEST_SCENARIO"] = "backup-settings"
         app.launch()
         XCTAssertTrue(app.buttons["Read settings and export"].waitForExistence(timeout: 20))
+        prepareFilesProvider()
         let baseline = try snapshot()
         let original = try settings(baseline)
         app.buttons["Import and export"].tap()
