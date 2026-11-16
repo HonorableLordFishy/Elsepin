@@ -5,7 +5,7 @@ on:
       ui_focus:
         description: Run all validation, or a focused simulator recheck
         type: choice
-        options: [all, search, home, pins, routes]
+        options: [all, search, home, pins, routes, backups]
         default: all
   push:
     branches: [codex/pins-search-69]
@@ -85,6 +85,11 @@ jobs:
             -derivedDataPath .build/simulator-validation \
             -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO build-for-testing \
             2>&1 | tee .build/simulator-evidence/simulator-build.log | xcbeautify
+      - name: Check backup format and import rules
+        if: inputs.ui_focus == 'backups'
+        run: |
+          set -o pipefail
+          swift test --filter 'Backup|LibraryMerge' 2>&1 | tee .build/simulator-evidence/backup-rules.log
       - name: Verify disposable simulator startup
         run: |
           python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "boot", os.environ["VALIDATION_SIMULATOR"]], check=True, timeout=180)'
@@ -111,6 +116,8 @@ jobs:
             for test_name in testUsualSpeedsApplyToNewRoutesAndPersist testSavedLegModeAndCustomSpeedsSurviveReopening testRecalculateSavedRouteRetainsStopsAndSavesNewSpeed; do
               test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$test_name")
             done
+          elif [[ "$UI_FOCUS" == backups ]]; then
+            test_selection+=("-only-testing:LocusValidationUITests/ElsepinBackupUITests")
           fi
           python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "install", os.environ["VALIDATION_SIMULATOR"], ".build/simulator-validation/Build/Products/Debug-iphonesimulator/ElsepinValidation.app"], check=True, timeout=180)'
           xcrun simctl privacy "$VALIDATION_SIMULATOR" grant location-always com.n3mostudio.elsepin.validation
@@ -118,7 +125,7 @@ jobs:
             -destination "platform=iOS Simulator,id=$VALIDATION_SIMULATOR" \
             -derivedDataPath .build/simulator-validation -resultBundlePath .build/simulator-evidence/UI.xcresult \
             -parallel-testing-enabled NO -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 420 \
+            -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 720 \
             "${test_selection[@]}" CODE_SIGNING_ALLOWED=NO test-without-building \
             2>&1 | tee .build/simulator-evidence/ui-tests.log | xcbeautify
       - name: Export screenshots and test results

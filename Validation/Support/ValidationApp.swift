@@ -27,6 +27,7 @@ enum ValidationFixture {
         guard enabled, Bundle.main.bundleIdentifier == "com.n3mostudio.elsepin.validation" else {
             preconditionFailure("Disposable validation app must be launched explicitly by UI tests")
         }
+        if scenario == "backup-settings", ProcessInfo.processInfo.arguments.contains("--preserve-backup-test-data") { return }
         // The validation bundle has its own sandbox and no App Group entitlement.
         // Every launch clears only that disposable sandbox, never the shipping app.
         UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
@@ -66,6 +67,7 @@ private struct ValidationHost: View {
     var body: some View {
         Group {
             if ValidationFixture.scenario == "route-editing" { ValidationRouteHarness() }
+            else if ValidationFixture.scenario == "backup-settings" { ValidationBackupHarness() }
             else { RootView(incomingShortcut: $shortcut, incomingSessionDetails: $details) }
         }
             .modifier(AppearancePresentation())
