@@ -74,9 +74,12 @@ struct ValidationBackupHarness: View {
                     .toolbar { ToolbarItem(placement: .confirmationAction) {
                         Button("Close backup test") { showing = false }
                     } }
-                    .environmentObject(planner)
             }
         }
+        // Navigation destinations share the stack's environment. Installing
+        // this only on its first screen leaves the pushed review without it.
+        // Production RootView supplies its planner above navigation as well.
+        .environmentObject(planner)
         .task {
             guard !started else { return }; started = true
             do {
