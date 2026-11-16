@@ -1,6 +1,6 @@
 # Elsepin current handoff
 
-## Usual speeds and saved itinerary recalculation - 15 November 2026 (validation pending)
+## Usual speeds and saved itinerary recalculation - 15 November 2026 (build 87 delivered)
 
 Owner confirmed Usual speeds was ignored in both new drafts and saved-route mode
 changes, and requested a new IPA after fixes. New drawn/planned/next-route drafts
@@ -15,11 +15,30 @@ and destination. It edits the draft only, uses the existing failed-directions
 restore path, and retains the eight-stop directions limit. Library writes and
 movement still require their existing explicit actions.
 
-Build metadata is 2.6.1 (87), prerelease. Resource/identity/appearance checks pass;
-Swift, native compilation and the new controlled simulator route test are pending.
-The simulator test injects deterministic directions into the production planner;
-it cannot validate real Apple routes or device spoofing. Source stays private,
-release stays a draft; do not enable paid billing or change visibility for CI.
+Build 87 at `29bec26e79dd4e3b34d91267bd1467d22a2263a8` passed GitHub run
+`43790846355`: 581 Swift + 104 cloud + 18 Companion + 22 resource tests passed,
+with one additional Windows-only Companion case skipped. Native app/extension
+compiled cleanly; package inspection passed. Delivered `Elsepin 2.6.1 build 87.ipa`
+(19,208,987 bytes) to the standard Desktop folder, replacing only build 86.
+
+Private Actions run `43790679432` was rejected before execution by billing.
+Owner explicitly approved temporary public source for testing/building, then
+restoring private. Source privacy was restored and verified after the last run.
+No billing change or app release. The GitLab mirror push failed authentication;
+local work and GitHub are saved. Do not retry that credential unchanged.
+
+The new UI case compiled but has no passing interaction result. Run `43790842470`
+was cancelled after prolonged boot/app-readiness waits; `43792787491` at `0bde2b3`
+failed `simctl bootstatus` after 180 seconds, before launch. No screenshots were
+available. The latter commit changes only validation fixtures/time limits; the
+production app in build 87 is unchanged. Evidence: `.build/artifacts/build87/`.
+Controlled test directions do not validate real Apple routes or spoofing.
+
+Owner rejected the branding-heavy README. The public README now leads with six
+feature groups and brief fixes, without cover/logo/icon-gallery/studio branding.
+References reviewed: PowerToys, LocalSend and Immich READMEs. GitHub-rendered HTML
+verified the six cells/titles, disclosures and links. Existing credits remain
+linked. Release notes/history now include build 87; the draft stays unpublished.
 
 ## Release preparation - 15 November 2026
 

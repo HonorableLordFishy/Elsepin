@@ -1,7 +1,7 @@
 # Official release notices
 
 Current state, 15 November 2026: Elsepin 2.6.0 (59) is public. The 2.6.1 draft
-covers test builds through 86 and has no release asset. Source is private; the
+covers test builds through 87 and has no release asset. Source is private; the
 public Elsepin-Releases endpoint remains available to installed apps.
 
 Elsepin checks the public repository's latest official release when the

@@ -1,5 +1,19 @@
 # Elsepin Change Ledger
 
+## Build 87 and feature-focused README - 15 November 2026
+
+Usual speeds and same-itinerary mode recalculation implemented and packaged at
+`29bec26`; 725 checks passed with one platform skip, native app/extension and IPA
+inspection passed. Delivered only build 87, replacing build 86. See BUILD-HISTORY
+for private-run rejection, explicit temporary-public approval, restored privacy,
+GitLab authentication failure and simulator-startup blockers. The new UI case is
+compiled but unverified; no screenshot or physical-spoofing success is claimed.
+
+Public README was rewritten at `a5b4d7f` after the owner rejected promotional
+branding. It uses six compact feature cells, short fixes and linked setup/history.
+No cover, icon gallery or studio footer remains. No app release was published.
+
+
 ## Release preparation and source privacy - 15 November 2026
 
 Owner requested private source, a rewritten public README, an updated unpublished

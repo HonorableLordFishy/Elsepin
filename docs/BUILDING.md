@@ -12,16 +12,19 @@ data boundary, triggers, screenshot coverage and physical-device limits.
 
 ## Current build access - 15 November 2026
 
-The owner returned `N3moStudio/Elsepin` to **private** on 15 November.
-`N3moStudio/Elsepin-Releases` remains public for downloads and help. No new build
-was started during that change. Private Actions availability/allowance must be
-checked before the next build; do not enable paid billing. GitHub Actions run
-`43773626417` previously succeeded while the source was public on `xcode-27` for test build 86 at `7be3991`, including
-the validated live pin-visibility fixes. See BUILD-HISTORY.md for receipts.
+`N3moStudio/Elsepin` is **private**. Private run `43790679432` was rejected before
+execution for account billing/spending limits. The owner explicitly allowed
+temporary public source for build 87 and its validation attempts, then restoring
+private; that restoration is verified. Build `43790846355` passed on `xcode-27`
+at `29bec26`. Do not assume this one-time permission applies to future builds.
+Do not retry the unchanged private quota block or enable paid billing.
+`N3moStudio/Elsepin-Releases` remains public for downloads/help. See BUILD-HISTORY.
 Use the manual workflow on `codex/pins-search-69` for the current development
 source; `main` is older. This does not publish a release. GitLab remains private.
 The earlier private-build billing failures below are historical, not evidence that
-private runner capacity is available now. Codemagic's
+private runner capacity is available now. The GitLab mirror push also failed
+authentication on 15 November; preserve the remote but refresh credentials before
+retrying. Codemagic's
 personal free allowance is exhausted; do not enable paid billing or retry it
 until capacity changes. See BUILD-HISTORY.md for the final build result.
 ## GitHub Actions — works from Windows

@@ -1,6 +1,34 @@
 # Elsepin build history
 
-Current public release: **2.6.0 (59)**. Latest tested IPA: **2.6.1 (86)**.
+## Build 87 delivered - 15 November 2026
+
+GitHub build `43790846355` at `29bec26e79dd4e3b34d91267bd1467d22a2263a8`
+passed 725 tests/checks: 581 Swift, 104 cloud, 18 Companion and 22 resource tests;
+one additional Windows-only case skipped. Native production app and activity
+extension compiled without compiler warnings/errors. Verified both bundles at
+2.6.1 (87), arm64, SDK 27.1, expected resources/icons and no simulator fixtures.
+Delivered only `Elsepin 2.6.1 build 87.ipa` (19,208,987 bytes) to the standard
+Desktop folder after internal package verification; replaced only build 86.
+
+Changes: Usual speeds initialize new drafts and newly chosen modes; saved route
+speeds remain explicit. Saved/drawn/GPX legs offer Keep path/Recalculate when
+networks differ. Route options can recalculate all legs with the same places,
+stop names/order/waits, without writing to the Library. Failure restore remains.
+
+Private run `43790679432` hit the account billing restriction before execution.
+Owner approved temporary public source for these runs; private visibility was
+restored afterward. No paid billing or release publication. GitLab mirror push
+was rejected by authentication; source is saved locally and on GitHub.
+
+UI compilation passed twice. `43790842470` stalled around simulator/app startup
+and was cancelled; `43792787491` timed out booting the simulator before launch.
+No new interaction pass or screenshots are claimed. `0bde2b3` only changes test
+fixtures/runtime bounds after the IPA build. Evidence: `.build/artifacts/build87/`.
+The two changed flows still need a brief physical check; real location writes,
+Stop/clear and signing are not established by portable tests.
+
+
+Current public release: **2.6.0 (59)**. Latest test IPA: **2.6.1 (87)**.
 The 2.6.1 draft is awaiting final iPhone acceptance; it has no release asset.
 Source returned to private on 15 November 2026; Elsepin-Releases stays public.
 Past public/private labels below describe the hosting at the time of each build.

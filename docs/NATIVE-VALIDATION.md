@@ -7,9 +7,27 @@ It does not archive, package, sign for distribution, publish a release or deploy
 Changes on `codex/pins-search-69` to the scoped source/workflow paths trigger it;
 manual dispatch is available on that branch. Its default `all` focus runs both jobs.
 The `search` focus reruns the four search cases; `home` runs the solid/glass idle
-tray cases; `pins` runs the live zoom/rotation visibility case. These focused runs
+tray cases; `pins` runs the live zoom/rotation visibility case; `routes` runs the
+new Usual speeds/saved-itinerary case. These focused runs
 compile the isolated simulator app and skip the production job,
 so already validated production code need not be rebuilt for fixture-only checks.
+
+## Build 87 route check - blocked by simulator startup
+
+Production build `43790846355` passed 725 checks (one Windows-only case skipped),
+compiled the app/extension cleanly and produced a verified IPA. The new isolated
+route case compiled in both simulator attempts but has no passing runtime result.
+Run `43790842470` was cancelled after prolonged boot/app-readiness waits; fresh
+run `43792787491` timed out in `simctl bootstatus` after 180 seconds, before launch.
+No new screenshots or interaction success are claimed. Logs and partial artifacts
+are in `.build/artifacts/build87/`; physical speed/recalculation confirmation remains.
+
+The test injects deterministic directions into the actual planner to check new
+defaults, saved settings, retained places/waits, Keep path, failure restore and
+cancellation. Those rapid model checks finish before its map is mounted. UI steps
+then exercise leg movement and whole-itinerary recalculation. It cannot prove
+real Apple routing, pairing or spoofing. Boot/install and XCTest timeouts now
+bound runner failures. Production location-engine code remains unchanged.
 
 ## Production and simulator boundaries
 
