@@ -92,8 +92,14 @@ final class ShiftAppearanceTests: XCTestCase {
     }
     private func contrast(_ a: Int, _ b: Int) -> Double {
         func luminance(_ hex: Int) -> Double {
-            let rgb = [16,8,0].map { Double((hex >> $0) & 255) / 255 }
-                .map { $0 <= 0.04045 ? $0 / 12.92 : pow(($0 + 0.055) / 1.055, 2.4) }
+            let channels: [Double] = [16, 8, 0].map { shift in
+                let component: Int = (hex >> shift) & 255
+                return Double(component) / 255.0
+            }
+            let rgb: [Double] = channels.map { component in
+                if component <= 0.04045 { return component / 12.92 }
+                return pow((component + 0.055) / 1.055, 2.4)
+            }
             return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
         }
         let x = luminance(a), y = luminance(b)
