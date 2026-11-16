@@ -41,7 +41,7 @@ def main():
     device = run('xcrun', 'simctl', 'create', 'Elsepin disposable validation', device_type['identifier'], runtime['identifier'])
     with open(os.environ['GITHUB_ENV'], 'a') as env:
         env.write('VALIDATION_SIMULATOR=' + device + '\n')
-    # The workflow verifies boot readiness before spending time on compilation.
+    # Compile before boot so the simulator does not compete for compiler memory.
     print(f"Validation simulator: {device_type['name']}, {runtime['name']}, SDK {sdk}; disposable data only")
 
 if __name__ == '__main__':

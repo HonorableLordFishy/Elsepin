@@ -75,11 +75,6 @@ jobs:
           .build/validation-venv/bin/python scripts/make_validation_project.py
           xcodegen generate --spec project.validation.json
           python3 scripts/prepare_validation_simulator.py
-      - name: Verify disposable simulator startup
-        run: |
-          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "boot", os.environ["VALIDATION_SIMULATOR"]], check=True, timeout=180)'
-          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "bootstatus", os.environ["VALIDATION_SIMULATOR"], "-b"], check=True, timeout=240)'
-          xcrun simctl io "$VALIDATION_SIMULATOR" screenshot .build/simulator-evidence/booted.png
       - name: Compile isolated simulator app and UI tests
         shell: bash
         run: |
@@ -90,6 +85,11 @@ jobs:
             -derivedDataPath .build/simulator-validation \
             -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO build-for-testing \
             2>&1 | tee .build/simulator-evidence/simulator-build.log | xcbeautify
+      - name: Verify disposable simulator startup
+        run: |
+          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "boot", os.environ["VALIDATION_SIMULATOR"]], check=True, timeout=180)'
+          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "bootstatus", os.environ["VALIDATION_SIMULATOR"], "-b"], check=True, timeout=240)'
+          xcrun simctl io "$VALIDATION_SIMULATOR" screenshot .build/simulator-evidence/booted.png
       - name: Run focused native UI checks
         shell: bash
         env:

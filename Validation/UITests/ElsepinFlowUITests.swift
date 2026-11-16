@@ -58,10 +58,19 @@ final class ElsepinFlowUITests: XCTestCase {
 
     private func routeControl(_ element: XCUIElement) -> XCUIElement {
         for _ in 0..<9 {
-            if element.exists && element.isHittable { return element }
+            var bottom = app.frame.maxY - 60
+            for label in ["Show route", "Save route & preview"] {
+                let action = app.buttons[label]
+                if action.exists && action.isHittable { bottom = min(bottom, action.frame.minY - 24) }
+            }
+            let top = app.frame.minY + 150
+            // XCTest can call a partially covered row hittable even though
+            // its center lies beneath the sticky Show route button.
+            if element.exists && element.isHittable && element.frame.minY >= top && element.frame.maxY <= bottom { return element }
+            let isAbove = element.exists && element.frame.minY < top
             // Start on the list below the map, not inside the pannable preview.
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.77))
-                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.31)))
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: isAbove ? 0.35 : 0.77))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: isAbove ? 0.77 : 0.35)))
         }
         XCTAssertTrue(element.exists && element.isHittable, "Unreachable route control: \(element)")
         return element
@@ -141,6 +150,7 @@ final class ElsepinFlowUITests: XCTestCase {
         app.buttons["Done"].tap()
         XCTAssertTrue(app.buttons["Recalculate directions"].waitForExistence(timeout: 5))
         app.buttons["Keep current path"].tap()
+        capture("27b-kept-path-before-second-leg")
         routeControl(app.buttons["Movement to Test pond"]).tap()
         app.buttons["E-bike"].tap()
         XCTAssertTrue(app.staticTexts["31.0 mph"].exists)
@@ -174,7 +184,7 @@ final class ElsepinFlowUITests: XCTestCase {
         routeControl(app.buttons["Stop and route options"]).tap()
         app.buttons["Recalculate with another mode"].tap()
         app.buttons["E-bike"].tap()
-        XCTAssertTrue(app.staticTexts["31.0 mph"].exists)
+        XCTAssertEqual(app.sliders["E-bike speed in miles per hour"].value as? String, "31.0 mph")
         let speed = try setVisibleSpeed("E-bike", position: 0.65)
         capture("30-recalculate-same-stops")
         routeControl(app.buttons["route.recalculate.confirm"]).tap()
