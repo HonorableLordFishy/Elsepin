@@ -5,7 +5,7 @@ on:
       ui_focus:
         description: Run all validation, or a focused simulator recheck
         type: choice
-        options: [all, search, home, pins]
+        options: [all, search, home, pins, routes]
         default: all
   push:
     branches: [codex/pins-search-69]
@@ -102,6 +102,8 @@ jobs:
             done
           elif [[ "$UI_FOCUS" == pins ]]; then
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testSavedPinsCrossCutoffDuringPinchAndStayVisibleWhenRotated")
+          elif [[ "$UI_FOCUS" == routes ]]; then
+            test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testUsualSpeedsAndSavedRouteRecalculation")
           fi
           xcrun simctl boot "$VALIDATION_SIMULATOR"
           xcrun simctl bootstatus "$VALIDATION_SIMULATOR" -b

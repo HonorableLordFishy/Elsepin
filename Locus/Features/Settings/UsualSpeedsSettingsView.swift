@@ -15,7 +15,7 @@ struct UsualSpeedsSettingsView: View {
                 Text("Applies throughout Elsepin. Switching units keeps your actual speed and saved trips unchanged.")
             }.shiftSettingsRows()
             Section {
-                Text("Your presets for Reset speed. Active trips keep their current speed.").font(.footnote).foregroundStyle(.secondary)
+                Text("Used for new routes, switching travel modes and Reset speed. Saved and active trips keep their assigned speeds.").font(.footnote).foregroundStyle(.secondary)
             }.shiftSettingsRows()
             ForEach(TravelMode.allCases) { mode in
                 Section {
@@ -43,7 +43,7 @@ struct UsualSpeedsSettingsView: View {
             Button("Restore presets") { session.restoreStartingUsualSpeeds() }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Your last used speeds and any moving route stay as they are until you tap Reset speed.")
+            Text("Saved and active trips keep their assigned speeds. New routes and mode changes will use the starting presets.")
         }
     }
 }

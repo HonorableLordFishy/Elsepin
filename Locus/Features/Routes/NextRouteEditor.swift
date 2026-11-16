@@ -56,7 +56,7 @@ struct NextRouteEditor: View {
                     waitSeconds = existing.waitSeconds; automatically = existing.automatically
                 } else {
                     nextPlanner.initializeDraftIfNeeded(mode: session.travelMode,
-                        speedMPH: session.speedMPH(for: session.travelMode), smoothMovement: session.currentSmoothMovement)
+                        speedMPH: session.usualSpeedMPH(for: session.travelMode), smoothMovement: session.currentSmoothMovement)
                 }
             }
             .sheet(isPresented: $showSearch, onDismiss: {

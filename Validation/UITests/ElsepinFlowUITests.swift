@@ -49,6 +49,33 @@ final class ElsepinFlowUITests: XCTestCase {
         tree.name = name + "-accessibility-tree"; tree.lifetime = .keepAlways; add(tree)
     }
 
+    func testUsualSpeedsAndSavedRouteRecalculation() {
+        launch("route-editing", narrow: false)
+        let report = app.staticTexts["validation.routeRules"]
+        let passed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == 'Passed'"), object: report)
+        XCTAssertEqual(XCTWaiter.wait(for: [passed], timeout: 20), .completed, report.label)
+        let leg = app.buttons["Movement to Test cafe"]
+        if !leg.isHittable { app.swipeUp() }
+        XCTAssertTrue(leg.waitForExistence(timeout: 5))
+        leg.tap()
+        app.buttons["Drive"].tap()
+        XCTAssertTrue(app.staticTexts["85.0 mph"].exists)
+        capture("24-usual-drive-speed-on-saved-leg")
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.buttons["Recalculate directions"].waitForExistence(timeout: 5))
+        app.buttons["Keep current path"].tap()
+        let options = app.buttons["Stop and route options"]
+        if !options.isHittable { app.swipeUp() }
+        options.tap()
+        app.buttons["Recalculate with another mode"].tap()
+        app.buttons["E-bike"].tap()
+        XCTAssertTrue(app.staticTexts["31.0 mph"].exists)
+        capture("25-recalculate-same-stops")
+        app.buttons["route.recalculate.confirm"].tap()
+        XCTAssertTrue(app.buttons["Movement to Test cafe"].waitForExistence(timeout: 5))
+        capture("26-recalculated-itinerary")
+    }
+
     func testSavedPinsCrossCutoffDuringPinchAndStayVisibleWhenRotated() {
         launch("map-pins", narrow: false)
         reachable("session.pause"); reachable("session.stop")

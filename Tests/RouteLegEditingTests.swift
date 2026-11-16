@@ -10,11 +10,21 @@ final class RouteLegEditingTests: XCTestCase {
             XCTAssertFalse(RouteLegPathPolicy.keepsGeometry(from: pair.0, to: pair.1, exactPath: false, choice: .recalculate))
         }
     }
-    func testExactAndSameNetworkPathsDoNotNeedRecalculation() {
-        XCTAssertFalse(RouteLegPathPolicy.needsChoice(from: .drive, to: .walk, exactPath: true))
-        XCTAssertTrue(RouteLegPathPolicy.keepsGeometry(from: .drive, to: .walk, exactPath: true, choice: .recalculate))
+    func testSavedDrawnAndGPXPathsOfferRecalculationWithoutSilentlyReplacingGeometry() {
+        for old in TravelMode.allCases {
+            for new in TravelMode.allCases where old.routeNetwork != new.routeNetwork {
+                XCTAssertTrue(RouteLegPathPolicy.needsChoice(from: old, to: new, exactPath: true))
+                XCTAssertTrue(RouteLegPathPolicy.keepsGeometry(from: old, to: new, exactPath: true, choice: .keepCurrent))
+                XCTAssertFalse(RouteLegPathPolicy.keepsGeometry(from: old, to: new, exactPath: true, choice: .recalculate))
+            }
+        }
+    }
+    func testSameNetworkModeAndSpeedEditsKeepExactPaths() {
         XCTAssertFalse(RouteLegPathPolicy.needsChoice(from: .eBike, to: .cycle, exactPath: false))
         XCTAssertTrue(RouteLegPathPolicy.keepsGeometry(from: .walk, to: .run, exactPath: false, choice: .recalculate))
+        XCTAssertFalse(RouteLegPathPolicy.needsChoice(from: .walk, to: .run, exactPath: true))
+        XCTAssertTrue(RouteLegPathPolicy.keepsGeometry(from: .walk, to: .run, exactPath: true, choice: .recalculate))
+        XCTAssertTrue(RouteLegPathPolicy.keepsGeometry(from: .drive, to: .drive, exactPath: true, choice: .keepCurrent))
     }
     func testKeepingCarPathChangesLegMotionWithoutChangingBoundaries() throws {
         let id = UUID()

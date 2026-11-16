@@ -64,7 +64,10 @@ private struct ValidationHost: View {
     @State private var permissionsReady = false
     private var sessionScenario: Bool { ["moving", "paused", "connecting", "failed", "map-pins"].contains(ValidationFixture.scenario) }
     var body: some View {
-        RootView(incomingShortcut: $shortcut, incomingSessionDetails: $details)
+        Group {
+            if ValidationFixture.scenario == "route-editing" { ValidationRouteHarness() }
+            else { RootView(incomingShortcut: $shortcut, incomingSessionDetails: $details) }
+        }
             .modifier(AppearancePresentation())
             .frame(maxWidth: ProcessInfo.processInfo.arguments.contains("--narrow") ? 320 : .infinity)
             .overlay(alignment: .top) {

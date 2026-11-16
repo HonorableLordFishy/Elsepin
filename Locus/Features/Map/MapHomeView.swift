@@ -586,6 +586,8 @@ struct MapHomeView: View {
             if library.trips.contains(where: { $0.id == trip.id }) { planner.useSaved(trip) }
             else { planner.useRecent(trip) }
         } else if let destination = pendingDestination {
+            planner.initializeDraftIfNeeded(mode: session.travelMode,
+                speedMPH: session.usualSpeedMPH(for: session.travelMode), smoothMovement: session.smoothMovement)
             planner.plan(to: destination, defaultOrigin: session.defaultRouteOrigin, mode: session.travelMode)
             pendingDestination = nil
         }

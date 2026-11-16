@@ -1057,12 +1057,14 @@ final class SpoofSession: ObservableObject {
         guard canEditRouteMovement else { return }
         guard journey == nil || !travelMode.needsRouteChoice(changingTo: mode) || keepCurrentPath else { return }
         let preserveSpeed = routeSectionSettingsEnabled && mode == travelMode ? speedMPH(for: mode) : nil
+        let changedMode = mode != travelMode
         routeSectionSettingsEnabled = false
         activeRoute?.travelSections = []
         sectionSpeedOverrides = [:]
         appliedSectionID = nil
         travelMode = mode
         if let preserveSpeed { setSpeedMPH(preserveSpeed, for: mode) }
+        else if changedMode { setSpeedMPH(usualSpeedMPH(for: mode), for: mode) }
         speedRevision += 1
         publishActivity(force: true)
     }
@@ -1106,6 +1108,7 @@ final class SpoofSession: ObservableObject {
         let token = UUID()
         rerouteGeneration = token
         let ticket = epoch
+        let requestedSpeed = usualSpeedMPH(for: mode)
         publishActivity(force: true)
         rerouteTask = Task { [weak self] in
             guard let self else { return }
@@ -1136,6 +1139,7 @@ final class SpoofSession: ObservableObject {
                 let smoothing = currentSmoothMovement
                 cancelRoute()
                 travelMode = mode
+                setSpeedMPH(requestedSpeed, for: mode)
                 if followRoute(replacement, pairing: pairing, smoothing: smoothing) {
                     routePaused = wasPaused
                     journey?.state = wasPaused ? .paused : .moving

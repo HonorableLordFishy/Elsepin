@@ -242,6 +242,7 @@ struct RouteWaypointEditor: View {
 }
 
 struct RouteSectionChoiceSheet: View {
+    @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var preferences: SessionPreferences
     @Environment(\.shiftEditorEmbedded) private var embedded
     let title: String
@@ -294,12 +295,18 @@ struct RouteSectionChoiceSheet: View {
                     }
                 }
             }
-            .onChange(of: mode) { _, new in speed = new.defaultSpeedMPH }
+            .onChange(of: mode) { _, new in
+                speed = new == original.mode ? original.speedMPH : session.usualSpeedMPH(for: new)
+            }
             .loggedConfirmationDialog("Which path?", isPresented: $confirmRoadChange, titleVisibility: .visible) {
                 Button("Keep current path") { save(.keepCurrent) }
                 Button("Recalculate directions") { save(.recalculate) }
                 Button("Cancel", role: .cancel) { }
-            } message: { Text("Keep the path and change movement only, or find directions for the new mode.") }
+            } message: {
+                Text(keepsExactPath
+                    ? "Keep this exact path, or find new directions through the same places. A drawn or imported path may change. Your Library copy stays unchanged until you save."
+                    : "Keep the path and change movement only, or find directions for the new mode.")
+            }
         }
     }
     private func save(_ path: RouteLegPathChoice) {

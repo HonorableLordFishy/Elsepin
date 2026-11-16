@@ -8,6 +8,8 @@ struct RoutePlannerSheet: View {
     var nextRouteMode = false
     var onPrepared: ((PreparedRoute) -> Void)? = nil
     @State private var showNextRoute = false
+    @State private var showRecalculateRoute = false
+    @State private var pendingRecalculation: RouteLegChoice?
     @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var preferences: SessionPreferences
     @EnvironmentObject private var planner: RoutePlanner
@@ -128,7 +130,7 @@ struct RoutePlannerSheet: View {
                 applyPendingSearchChoice()
                 applyPendingSectionChoice()
                 if !hasJourney {
-                    planner.initializeDraftIfNeeded(mode: session.travelMode, speedMPH: session.speedMPH(for: session.travelMode), smoothMovement: session.smoothMovement)
+                    planner.initializeDraftIfNeeded(mode: session.travelMode, speedMPH: session.usualSpeedMPH(for: session.travelMode), smoothMovement: session.smoothMovement)
                 }
                 if !hasJourney, planner.origin == nil, let current = session.defaultRouteOrigin {
                     planner.setOrigin(current, mode: displayMode)
@@ -218,6 +220,18 @@ struct RoutePlannerSheet: View {
             }
             .onChange(of: editingSection) { _, item in
                 if item == nil { applyPendingSectionChoice() }
+            }
+            .navigationDestination(isPresented: $showRecalculateRoute) {
+                RouteRecalculationSheet(mode: displayMode) { pendingRecalculation = $0 }
+            }
+            .onChange(of: showRecalculateRoute) { _, showing in
+                guard !showing, let choice = pendingRecalculation else { return }
+                pendingRecalculation = nil
+                Task { @MainActor in
+                    await Task.yield()
+                    guard planner.isPresented, !hasJourney else { return }
+                    planner.recalculateAllLegs(using: choice)
+                }
             }
             .navigationDestination(isPresented: $showPathStop) {
                 if let route {
@@ -355,6 +369,8 @@ struct RoutePlannerSheet: View {
                     Button("Pause on this path", systemImage: "pause.circle") { showPathStop = true }
                         .disabled(route == nil || timelineStops.count >= 20 || (hasJourney && !session.canAddRouteStop))
                     if !hasJourney {
+                        Button("Recalculate with another mode", systemImage: "arrow.triangle.branch") { showRecalculateRoute = true }
+                            .disabled(planner.origin == nil || planner.destination == nil)
                         Button("Swap start and destination", systemImage: "arrow.up.arrow.down") { requestRecalculation(swap: true) }
                             .disabled(planner.origin == nil || planner.destination == nil)
                         Button("Refresh directions", systemImage: "arrow.clockwise") { requestRecalculation(swap: false) }

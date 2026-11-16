@@ -5,7 +5,7 @@
   "primaryIcon": "AppIconPrismJumpgate",
   "defaultTheme": "bloom",
   "version": "2.6.1",
-  "build": 86,
+  "build": 87,
   "releaseState": "development",
   "compatibility": {
     "bundleIdentifier": "com.n3mostudio.shift",

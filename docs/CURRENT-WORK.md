@@ -1,5 +1,26 @@
 # Elsepin current handoff
 
+## Usual speeds and saved itinerary recalculation - 15 November 2026 (validation pending)
+
+Owner confirmed Usual speeds was ignored in both new drafts and saved-route mode
+changes, and requested a new IPA after fixes. New drawn/planned/next-route drafts
+now initialize with Usual speeds; a newly chosen leg/session mode uses that preset.
+An existing saved/prepared route keeps its explicit speed. Returning to the
+original leg mode before Done restores its original speed.
+
+Saved/drawn/GPX legs now offer Keep current path or Recalculate directions when
+the mode uses a different route network. Stop and route options also includes
+Recalculate with another mode, using the same start, stop IDs/order/names/waits
+and destination. It edits the draft only, uses the existing failed-directions
+restore path, and retains the eight-stop directions limit. Library writes and
+movement still require their existing explicit actions.
+
+Build metadata is 2.6.1 (87), prerelease. Resource/identity/appearance checks pass;
+Swift, native compilation and the new controlled simulator route test are pending.
+The simulator test injects deterministic directions into the production planner;
+it cannot validate real Apple routes or device spoofing. Source stays private,
+release stays a draft; do not enable paid billing or change visibility for CI.
+
 ## Release preparation - 15 November 2026
 
 Owner is doing final iPhone tests and requested private source, a concise visual

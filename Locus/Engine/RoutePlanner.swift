@@ -19,6 +19,16 @@ struct PreparedRoute: Identifiable {
 
 @MainActor
 final class RoutePlanner: ObservableObject {
+    typealias ItineraryBuilder = @MainActor (RoutePlace, RoutePlace, [TripWaypoint], TravelMode, Bool, [UUID: RouteLegChoice], Double) async throws -> [PlannedRoute]
+    private let buildItinerary: ItineraryBuilder
+
+    init(buildItinerary: @escaping ItineraryBuilder = { start, end, stops, mode, walking, choices, speed in
+        try await RouteBuilder.itinerary(from: start, to: end, via: stops, mode: mode,
+            preferWalkingPaths: walking, legChoices: choices, defaultSpeedMPH: speed)
+    }) {
+        self.buildItinerary = buildItinerary
+    }
+
     @Published private(set) var preparedRoute: PreparedRoute?
     @Published var editingTripID: UUID?
     @Published var savesToLibraryOnCompletion = false
@@ -277,6 +287,24 @@ final class RoutePlanner: ObservableObject {
         rebuild(mode: mode, preserving: draftSnapshot())
     }
 
+    /// Reuse the itinerary, not the old road geometry. This is an explicit
+    /// draft edit; it must not change the Library copy or an active session.
+    func recalculateAllLegs(using choice: RouteLegChoice) {
+        guard !isLoading, origin != nil, destination != nil, choice.isValid else { return }
+        let previous = draftSnapshot()
+        syncPathStops()
+        guard waypoints.count <= 8 else {
+            error = "New directions support up to eight stops. Remove stops first, or keep this path."
+            return
+        }
+        draftMode = choice.mode
+        draftSpeedMPH = choice.speedMPH
+        draftSettingsInitialized = true
+        sectionChoices = Dictionary(uniqueKeysWithValues:
+            (waypoints.map(\.id) + [RouteLegChoice.destinationID]).map { ($0, choice) })
+        rebuild(mode: choice.mode, preserving: previous)
+    }
+
     private func rebuild(mode: TravelMode, preserving previous: DraftSnapshot?) {
         cancel()
         previousDraft = previous
@@ -293,6 +321,7 @@ final class RoutePlanner: ObservableObject {
         let preferWalking = preferWalkingPaths
         let choices = sectionChoices
         let defaultSpeed = mode.clampedSpeedMPH(draftSpeedMPH)
+        let buildItinerary = self.buildItinerary
         isLoading = true
         let started = ProcessInfo.processInfo.systemUptime
         DeveloperLogStore.shared.record("route_plan_started", ["attempt": token.uuidString,
@@ -301,8 +330,7 @@ final class RoutePlanner: ObservableObject {
             "destination_latitude": String(destination.coordinate.latitude), "destination_longitude": String(destination.coordinate.longitude)])
         task = Task { [weak self] in
             do {
-                let routes = try await RouteBuilder.itinerary(from: origin, to: destination, via: stops,
-                                                              mode: mode, preferWalkingPaths: preferWalking, legChoices: choices, defaultSpeedMPH: defaultSpeed)
+                let routes = try await buildItinerary(origin, destination, stops, mode, preferWalking, choices, defaultSpeed)
                 DeveloperLogStore.shared.record("route_plan_finished", ["attempt": token.uuidString,
                     "routes": String(routes.count), "duration_ms": String(Int((ProcessInfo.processInfo.systemUptime - started) * 1000))])
                 guard let self, !Task.isCancelled, self.generation == token else { return }
