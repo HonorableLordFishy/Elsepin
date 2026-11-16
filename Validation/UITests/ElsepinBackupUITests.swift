@@ -52,16 +52,17 @@ final class ElsepinBackupUITests: XCTestCase {
         let browse = app.tabBars["DOC.browsingModeTabBar"].buttons["Browse"]
         XCTAssertTrue(browse.waitForExistence(timeout: 25))
         browse.tap()
+        // The first tap selects Browse; tapping its selected tab returns to
+        // Locations. Always leave the app container, even if it lists its copy:
+        // that provider can enumerate files yet fail to deliver a selection.
+        browse.tap()
+        let location = app.staticTexts["On My iPhone"].firstMatch
+        XCTAssertTrue(location.waitForExistence(timeout: 10))
+        let row = app.cells.containing(.staticText, identifier: "On My iPhone").firstMatch
+        if row.exists { row.tap() } else { location.tap() }
+        let localStorage = app.navigationBars.buttons.matching(NSPredicate(format: "label BEGINSWITH 'On My iPhone'")).firstMatch
+        XCTAssertTrue(localStorage.waitForExistence(timeout: 10), "File import must use general Files storage, not the app-container provider")
         let file = app.cells.matching(NSPredicate(format: "label BEGINSWITH 'Elsepin-Settings'")).firstMatch
-        if !file.waitForExistence(timeout: 3) {
-            // Back is browsing history on iOS 27 and may return to Recents.
-            // Browse again goes to Locations; choose actual Files storage.
-            let location = app.staticTexts["On My iPhone"].firstMatch
-            if !location.waitForExistence(timeout: 3) { browse.tap() }
-            XCTAssertTrue(location.waitForExistence(timeout: 10))
-            let row = app.cells.containing(.staticText, identifier: "On My iPhone").firstMatch
-            if row.exists { row.tap() } else { location.tap() }
-        }
         capture("33b-general-files-storage")
         XCTAssertTrue(file.waitForExistence(timeout: 20), "Exported settings file not listed")
         XCTAssertTrue(file.isEnabled, "Valid settings backup is disabled in Files")
