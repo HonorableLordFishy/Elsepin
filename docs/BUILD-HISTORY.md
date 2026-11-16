@@ -1,5 +1,27 @@
 # Elsepin build history
 
+## Build 88 delivered - 16 November 2026
+
+GitHub run `43903180690` built `259db640f774cb4a05b8bc9cb11e89317f2e6fa7`:
+727 checks passed (581 Swift, 24 resource, 18 Companion and 104 cloud), with one
+additional Windows-only Companion case skipped. App and extension compiled with
+zero compiler warnings/errors. Native/ad-hoc signature checks and downloaded
+package inspection passed: both bundles 2.6.1 (88), arm64, SDK 27.1, preserved
+app-group entitlements, 13 icons, required resources and no simulator test code.
+
+Includes native backup file selection with explicit selection/cancellation and
+scoped background reading; the existing Paste backup text option remains.
+The owner will check file import on the signed phone. Simulator provider failures
+remain documented in NATIVE-VALIDATION.md, not counted as passes. The three
+route/speed UI cases passed earlier against unchanged production route code.
+
+Delivered `Elsepin 2.6.1 build 88.ipa` (19,206,101 bytes) to the standard Desktop
+folder. Replaced only build 87 after verifying the new file; other apps preserved.
+Source was temporarily public under the owner's build/test approval and restored
+to private after the build. Billing allowance lookup lacked the needed credential
+scope; no paid billing was enabled. No release/tag/website deployment or release
+asset was created. Evidence and delivery receipt: `.build/artifacts/build88/`.
+
 ## Build 87 delivered - 15 November 2026
 
 GitHub build `43790846355` at `29bec26e79dd4e3b34d91267bd1467d22a2263a8`
@@ -28,9 +50,9 @@ The two changed flows still need a brief physical check; real location writes,
 Stop/clear and signing are not established by portable tests.
 
 
-Current public release: **2.6.0 (59)**. Latest test IPA: **2.6.1 (87)**.
+Current public release: **2.6.0 (59)**. Latest test IPA: **2.6.1 (88)**.
 The 2.6.1 draft is awaiting final iPhone acceptance; it has no release asset.
-Source returned to private on 15 November 2026; Elsepin-Releases stays public.
+Source returned to private on 16 November 2026; Elsepin-Releases stays public.
 Past public/private labels below describe the hosting at the time of each build.
 
 ## Build 86 validated and delivered - 15 November 2026

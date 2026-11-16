@@ -1,6 +1,6 @@
 # Import and export — official 2.5.7
 
-## Unreleased native file-picker repair
+## Build 88 native file-picker repair (phone acceptance pending)
 
 File import uses the system SwiftUI file importer with file-item selection, so a
 provider's type classification does not unnecessarily disable a JSON/text backup.
@@ -12,7 +12,7 @@ reading. Canceling does not apply settings or erase an existing valid preview.
 The production app/extension compile and backup rules pass. Native export and
 file selection/review/cancel have partial simulator evidence; the complete
 apply/reopen/paste UI check remains blocked by simulator Files failures. This
-repair is not in the delivered build 87 IPA, and phone acceptance is pending.
+repair is included in the delivered build 88 IPA, and phone acceptance is pending.
 
 ## Build 75 review (privately built; phone import check pending)
 

@@ -10,13 +10,15 @@ and runs an isolated simulator target, exporting test evidence rather than an
 installable app. See [native validation](NATIVE-VALIDATION.md) for its disposable
 data boundary, triggers, screenshot coverage and physical-device limits.
 
-## Current build access - 15 November 2026
+## Current build access - 16 November 2026
 
 `N3moStudio/Elsepin` is **private**. Private run `43790679432` was rejected before
 execution for account billing/spending limits. The owner explicitly allowed
-temporary public source for build 87 and its validation attempts, then restoring
-private; that restoration is verified. Build `43790846355` passed on `xcode-27`
-at `29bec26`. Do not assume this one-time permission applies to future builds.
+temporary public source for building/testing, then restoring private. This route
+was used for the subsequently requested build 88; private visibility is verified.
+Build `43903180690` passed on `xcode-27` at `259db64`. The latest read-only billing
+lookup could not read allowance with the current credential scope. Follow the
+owner's current build and privacy instructions when choosing a future build path.
 Do not retry the unchanged private quota block or enable paid billing.
 `N3moStudio/Elsepin-Releases` remains public for downloads/help. See BUILD-HISTORY.
 Use the manual workflow on `codex/pins-search-69` for the current development
@@ -91,7 +93,7 @@ The workflow is `elsepin-ipa`, `mac_mini_m2`, Xcode 27.1, maximum 30 minutes. Ch
 free allowance before dispatch; leave paid billing disabled and allow queuing behind
 other apps. No push trigger, release publishing or Apple signing account is configured.
 
-Latest validated source: `fc3887a00b85eeed97d911461ffc07a46e3d8481`, build 75,
+Last Codemagic-validated source: `fc3887a00b85eeed97d911461ffc07a46e3d8481`, build 75,
 Codemagic run `6aeffd199b54af17623a586e`. Subsequent documentation-only commits
 record that result; see [build history](BUILD-HISTORY.md) for test and delivery evidence.
 
@@ -169,8 +171,8 @@ IPA validator checks the compiled bundle IDs and URL scheme.
 
 ## Official versus prerelease builds
 
-The latest validated development source is Elsepin 2.6.1 (74) at `b66aad4` on
-`codex/pins-search-69`, privately built from GitLab in Codemagic for owner testing. `main`
+The latest packaged development source is Elsepin 2.6.1 (88) at `259db64` on
+`codex/pins-search-69`, built on GitHub for owner testing with source private again. `main`
 still contains build 68; select the branch intentionally.
 See [build history](BUILD-HISTORY.md) for native results and retained local evidence.
 Creating an IPA artifact does not publish a release or declare it stable. Verify both target

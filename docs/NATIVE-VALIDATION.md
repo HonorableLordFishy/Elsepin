@@ -74,7 +74,7 @@ then exercise leg movement and whole-itinerary recalculation. It cannot prove
 real Apple routing, pairing or spoofing. Boot/install and XCTest timeouts now
 bound runner failures. Production location-engine code remains unchanged.
 
-## Settings file import repair (unreleased)
+## Settings file import repair (included in test build 88)
 
 The owner confirmed that Files opens on the phone but its files cannot be
 selected. Source `295a0b9` replaces the custom picker sheet/delegate with SwiftUI's
@@ -148,11 +148,16 @@ remains enabled and **unverified** after the fixture correction. The relevant
 screenshots and provider/startup logs were inspected; do not treat these failed
 runs as production app failures or silently skip their assertions. Completing
 this check needs a working Files runtime or phone acceptance of a newly built IPA.
-Source visibility was restored to private and verified on 16 November. No IPA or
-release was created. The seven runtime-selector Python tests passed locally.
+Source visibility was restored to private and verified on 16 November. These
+validation runs created no IPA or release. The seven runtime-selector Python
+tests passed locally.
 Evidence is retained in
-`.build/artifacts/build87/backup-validation/`. The installed build 87 predates this
-file-import repair; its IPA has not been replaced.
+`.build/artifacts/build87/backup-validation/`. Build 87 predates this file-import
+repair. On 16 November the owner requested build 88 for phone testing; run
+`43903180690` packaged the repair with Paste retained. Its native build, 727
+automated checks (plus one platform skip) and package inspection passed, and its
+IPA replaced build 87. This does not change the incomplete simulator interaction
+result above. See BUILD-HISTORY.md and `.build/artifacts/build88/`.
 
 ## Production and simulator boundaries
 

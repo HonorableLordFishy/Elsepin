@@ -1,5 +1,27 @@
 # Elsepin current handoff
 
+## Build 88 delivered - 16 November 2026
+
+The owner requested the IPA and will check file import on the phone. GitHub run
+`43903180690` built `259db640f774cb4a05b8bc9cb11e89317f2e6fa7` successfully:
+581 Swift, 24 resource, 18 Companion and 104 cloud tests passed (727 total;
+one additional Windows-only case skipped). The production app and activity
+extension compiled without compiler warnings/errors. Package inspection verified
+2.6.1 (88) in both bundles, arm64 device binaries, SDK 27.1, expected entitlements,
+icons/resources and no simulator fixtures.
+
+Delivered only `Elsepin 2.6.1 build 88.ipa` (19,206,101 bytes) to the usual Desktop
+IPA folder, replacing only build 87 after checking the replacement. The native
+file-picker repair below is now included; **Paste backup text** is retained.
+File-import/apply/reopen acceptance remains a phone check; the earlier simulator
+blockers below have not been represented as passing tests. The three route/speed
+UI checks remain passed on the same production implementation.
+
+Source is saved locally and on GitHub and is private again. The read-only billing
+lookup could not read allowance with the current credential scope. The existing
+owner-approved temporary-public build route was used, without enabling paid
+billing or publishing a release. Evidence: `.build/artifacts/build88/`.
+
 ## Simulator speed/save and backup validation - 15-16 November 2026
 
 The owner's three requested route UI checks now pass. Validation-only run
@@ -48,8 +70,9 @@ iPhone runtime with Files, or a physical-device check after building the repair,
 is needed to finish native picker/apply/relaunch/paste acceptance. Compilation
 and portable rules do not replace that interaction evidence.
 
-The installed build 87 IPA is unchanged and does not include this new import fix.
-No new IPA or release was created. Source was restored to **private** and verified
+At the end of this validation, build 87 was unchanged and did not include the
+import fix; the later build 88 delivery above supersedes that artifact state.
+These validation runs created no IPA or release. Source was restored to **private** and verified
 on 16 November after validation under the owner's temporary-public approval.
 Evidence: `.build/artifacts/build87/simulator-repair/` and
 `.build/artifacts/build87/backup-validation/`.
