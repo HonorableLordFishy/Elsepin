@@ -31,7 +31,7 @@ struct LibraryBackupView: View {
                     PasteButton(payloadType: String.self) { strings in message = nil; input.paste(strings) }
                         .labelStyle(.titleOnly).accessibilityLabel("Paste backup text")
                         .accessibilityHint("Analyze copied JSON and review individual changes before importing.")
-                        .disabled(input.state.isLoading || input.request != nil)
+                        .disabled(input.state.isLoading || input.isChoosingFile)
                 }.frame(minHeight: 44)
                 if input.state.isLoading { ProgressView("Analyzing backup…") }
                 if input.state.preview != nil {
@@ -45,7 +45,7 @@ struct LibraryBackupView: View {
                     // contents from the app; choosing a file and copying are manual.
                     .environment(\.openURL, OpenURLAction { url in
                         guard url == BackupJSONBrowser.siteURL else { return .systemAction }
-                        guard !input.state.isLoading, input.request == nil, !exporting, !confirmExport else { return .handled }
+                        guard !input.state.isLoading, !input.isChoosingFile, !exporting, !confirmExport else { return .handled }
                         showingJSONSite = true
                         return .handled
                     })
@@ -106,9 +106,13 @@ struct LibraryBackupView: View {
             case .failure(let error): message = error.localizedDescription
             }
         }
-        .sheet(item: $input.request, onDismiss: input.dismissed) { request in
-            LibraryBackupPicker { url in input.picked(url, for: request) }.id(request.id)
-        }
+        // Native presentation owns the Files lifecycle. Accept file items even
+        // when a provider does not classify JSON as public.data; the bounded
+        // content validator still rejects folders and unrelated/invalid files.
+        .fileImporter(isPresented: $input.isFilePickerPresented, allowedContentTypes: [.item],
+            allowsMultipleSelection: false, onCompletion: input.picked,
+            onCancellation: input.cancelledFileSelection)
+        .fileDialogBrowserOptions(.displayFileExtensions)
         .sheet(isPresented: $showingJSONSite) {
             BackupJSONBrowser()
         }
@@ -119,7 +123,7 @@ struct LibraryBackupView: View {
             selection = BackupImportReview(backup: backup, current: current).defaultSelection
             reviewing = true
         }
-        .onDisappear { if input.request == nil { input.cancelPreparation() } }
+        .onDisappear { if !input.isChoosingFile { input.cancelPreparation() } }
     }
 }
 

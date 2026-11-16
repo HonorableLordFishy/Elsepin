@@ -2,6 +2,7 @@
 #error("Backup fixtures are simulator tests only")
 #endif
 import SwiftUI
+import UIKit
 
 /// The real exporter and importer own all backup writes/restores. This fixture
 /// supplies disposable settings, changes them on request, and observes disk data.
@@ -52,17 +53,28 @@ struct ValidationBackupHarness: View {
                     refresh()
                 }
                 Button("Read settings and export") { refresh() }
+                Button("Copy exported backup text") {
+                    do {
+                        let files = FileManager.default.enumerator(at: documents, includingPropertiesForKeys: nil)
+                        let file = (files?.allObjects as? [URL])?.first {
+                            $0.lastPathComponent.hasPrefix("Elsepin-Settings") && $0.pathExtension == "json"
+                        }
+                        guard let file else { snapshot = "ERROR: No actual export to copy"; return }
+                        UIPasteboard.general.string = try String(contentsOf: file, encoding: .utf8)
+                    } catch { snapshot = "ERROR: \(error.localizedDescription)" }
+                }
                 Text(snapshot).font(.system(size: 7)).lineLimit(1)
                     .accessibilityIdentifier("validation.backupSnapshot")
             }.navigationTitle("Backup validation")
-        }
-        .sheet(isPresented: $showing, onDismiss: refresh) {
-            NavigationStack {
+            .navigationDestination(isPresented: $showing) {
+                // Match Settings' real navigation. A second modal shell around
+                // the system document UI is not part of the production flow.
                 LibraryBackupView()
                     .toolbar { ToolbarItem(placement: .confirmationAction) {
                         Button("Close backup test") { showing = false }
                     } }
-            }.environmentObject(planner)
+                    .environmentObject(planner)
+            }
         }
         .task {
             guard !started else { return }; started = true

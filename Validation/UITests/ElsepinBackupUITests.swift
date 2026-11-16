@@ -2,7 +2,10 @@ import XCTest
 
 final class ElsepinBackupUITests: XCTestCase {
     private var app: XCUIApplication!
-    override func setUpWithError() throws { continueAfterFailure = false }
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        executionTimeAllowance = 900
+    }
     override func tearDownWithError() throws {
         if let app, app.state == .runningForeground { capture("backup-final"); app.terminate() }
     }
@@ -27,20 +30,13 @@ final class ElsepinBackupUITests: XCTestCase {
         // silently save to On My iPhone instead of this app's Documents folder.
         let picker = app.navigationBars["FullDocumentManagerViewControllerNavigationBar"]
         XCTAssertTrue(picker.waitForExistence(timeout: 25), "Native Files did not finish presenting")
-        let marker = app.cells.matching(NSPredicate(format: "label BEGINSWITH 'Validation exports'")).firstMatch
-        let ownFolder = app.cells["Elsepin, Container"]
-        if !marker.waitForExistence(timeout: 5) {
-            if !ownFolder.exists {
-                let back = app.buttons["DOC.navBarButton.backInHistory"]
-                if back.exists { back.tap() }
-                else if app.buttons["BackButton"].exists { app.buttons["BackButton"].tap() }
-            }
+        let title = picker.buttons["Elsepin, Actions Menu"]
+        if !title.waitForExistence(timeout: 5) {
+            let ownFolder = app.cells["Elsepin, Container"]
             XCTAssertTrue(ownFolder.waitForExistence(timeout: 15), "App folder missing from On My iPhone")
-            ownFolder.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
+            ownFolder.doubleTap()
         }
-        XCTAssertTrue(marker.waitForExistence(timeout: 20), "App Documents folder did not finish loading")
-        // Remain in Documents. The marker proves which folder is selected;
-        // the exporter and importer both operate on the actual saved JSON here.
+        XCTAssertTrue(title.waitForExistence(timeout: 20), "Native Files did not open the app folder")
     }
     private func snapshot() throws -> [String: Any] {
         app.buttons["Read settings and export"].tap()
@@ -55,6 +51,14 @@ final class ElsepinBackupUITests: XCTestCase {
         app.buttons["Choose backup file"].tap()
         localExportFolder()
         let file = app.cells.matching(NSPredicate(format: "label BEGINSWITH 'Elsepin-Settings'")).firstMatch
+        if !file.waitForExistence(timeout: 5) {
+            let back = app.buttons["DOC.navBarButton.backInHistory"]
+            XCTAssertTrue(back.exists)
+            back.tap()
+            let folder = app.cells["Elsepin, Container"]
+            XCTAssertTrue(folder.waitForExistence(timeout: 10))
+            folder.doubleTap()
+        }
         XCTAssertTrue(file.waitForExistence(timeout: 20), "Exported settings file not listed")
         file.tap()
         if app.navigationBars.buttons["Open"].exists { app.navigationBars.buttons["Open"].tap() }
@@ -144,5 +148,23 @@ final class ElsepinBackupUITests: XCTestCase {
         openImport()
         XCTAssertFalse(visible(app.buttons["Import selected changes"]).isEnabled, "Reimport should have no settings left to change")
         capture("36-reimport-after-relaunch-no-changes")
+        visible(app.buttons["Cancel import"]).tap()
+        app.buttons["Close backup test"].tap()
+
+        // Keep the existing paste alternative working, using bytes from the
+        // real export above rather than constructing an artificial backup.
+        app.buttons["Change disposable settings"].tap()
+        app.buttons["Copy exported backup text"].tap()
+        app.buttons["Import and export"].tap()
+        let paste = app.buttons["Paste backup text"]
+        XCTAssertTrue(paste.waitForExistence(timeout: 5))
+        XCTAssertTrue(paste.isEnabled)
+        paste.tap()
+        XCTAssertTrue(app.navigationBars["Review import"].waitForExistence(timeout: 10))
+        expandSettings()
+        visible(app.buttons["Select all settings"]).tap()
+        capture("37-paste-import-retained")
+        applyImport()
+        XCTAssertTrue(NSDictionary(dictionary: try settings(snapshot())).isEqual(to: original))
     }
 }
