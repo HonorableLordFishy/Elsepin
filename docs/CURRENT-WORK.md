@@ -1,5 +1,21 @@
 # Elsepin current handoff
 
+## Private ownership transfer requested — 17 November 2026
+
+The owner requested moving the source repository to `HonorableLordFishy`.
+GitHub accepted the transfer API request; acceptance by the receiving account is
+still pending at this checkpoint. `N3moStudio/Elsepin` remains private. Do not
+change origin until the new owner is verified; then update the remote in this same
+local checkout. Keep the GitLab remote and the separate Elsepin-Releases repository.
+Keep source private; moving ownership cannot revoke previously downloaded clones.
+
+Prepared `Downloads/Elsepin-reviewed-source-2026-11-17.zip` for another Google AI
+review: 319 files, source revision `5c64c64`, including full changelog and a review
+context document. It deliberately omits native binaries, images/fonts, generated
+helper archives, Git history, local diagnostics and credentials. It is a review
+snapshot, not a standalone build distribution. No code changes, IPA or publication
+were made for this export/transfer request.
+
 ## Reviewed ZIP integration — 17 November 2026 (no IPA)
 
 Integrated the reviewed portions of `Elsepin-fixed.zip` in the existing checkout
