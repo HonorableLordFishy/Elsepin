@@ -1,5 +1,6 @@
 # Elsepin project guide
 
+- Source origin is now `HonorableLordFishy/Elsepin`. The old `N3moStudio/Elsepin` is an empty private placeholder that prevents redirects; never push source there. Read CURRENT-WORK.md for current visibility authorization and the pending owner-only visibility change.
 - Read [current work](docs/CURRENT-WORK.md) when starting a workstream and [chat workflow](docs/CHAT-WORKFLOW.md) for handoffs or optional external supporting analysis.
 - App sources remain under `Locus/`, extension under `LocusActivity/`, portable rules/tests under `Shared/` and `Tests/`. The visible product is Elsepin; do not blindly rename compatibility identifiers. Helpers are in `Companion/` and `CloudFindMy/`; website is in `website/`.
 - Before building, read [building](docs/BUILDING.md). GitHub `origin` is private again by owner request (15 November); public downloads/docs stay in Elsepin-Releases. Recheck private Actions allowance before future builds; use the manual `build-ipa.yml` workflow on the current development branch. GitLab remains private. Codemagic free minutes are exhausted; do not enable paid billing or retry unchanged quota blocks. Keep both remotes. Local native builds require macOS/Xcode and XcodeGen; discover tools before assuming availability. `project.yml` is authoritative; regenerate `Locus.xcodeproj` before native builds.

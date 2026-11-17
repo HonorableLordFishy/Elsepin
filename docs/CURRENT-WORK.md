@@ -1,5 +1,21 @@
 # Elsepin current handoff
 
+## Old-address redirect removed; public source requested — 17 November 2026
+
+The owner clarified that source should be public under HonorableLordFishy for
+builds, without the former N3moStudio address forwarding to it. Created an empty
+private `N3moStudio/Elsepin` (repository ID 1462021383), which removed the transfer
+redirect. The source remains `HonorableLordFishy/Elsepin` (ID 1435164535); origin
+points there. Anonymous access to the old address returns 404 without a redirect.
+Do not push code into the empty old repository.
+
+Public visibility is now explicitly authorized, superseding earlier private-only
+instructions. The visibility change attempt was rejected: the N3moStudio connection
+has collaborator write access but not admin access on the transferred source.
+The source was still private at the last check; HonorableLordFishy must change its
+visibility in repository Settings. Removing the redirect does not prevent discovery
+or cloning once source is public. No build or release was started in this step.
+
 ## Private ownership transfer completed — 17 November 2026
 
 The owner requested moving the source repository to `HonorableLordFishy`.
