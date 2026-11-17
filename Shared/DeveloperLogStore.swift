@@ -304,11 +304,26 @@ final class DeveloperLogStore: @unchecked Sendable {
             if byteCount > 0 {
                 let reader = try FileHandle(forReadingFrom: logURL)
                 defer { try? reader.close() }
-                let offset = max(0, byteCount - 256 * 1024)
-                try reader.seek(toOffset: UInt64(offset))
-                let tail = try reader.readToEnd() ?? Data()
-                if tail.last != 0x0A {
-                    let validEnd = tail.lastIndex(of: 0x0A).map { offset + $0 + 1 } ?? 0
+                let chunkSize = 256 * 1024
+                var endOffset = byteCount
+                var foundValidEnd: Int?
+                while endOffset > 0 {
+                    let startOffset = max(0, endOffset - chunkSize)
+                    try reader.seek(toOffset: UInt64(startOffset))
+                    let chunk = try reader.read(upToCount: endOffset - startOffset) ?? Data()
+                    if endOffset == byteCount && chunk.last == 0x0A {
+                        foundValidEnd = byteCount
+                        break
+                    }
+                    if let newline = chunk.lastIndex(of: 0x0A) {
+                        foundValidEnd = startOffset + newline + 1
+                        break
+                    }
+                    endOffset = startOffset
+                }
+                let validEnd = foundValidEnd ?? 0
+                if validEnd != byteCount {
+                    if validEnd == 0 { storageError = true }
                     try handle?.truncate(atOffset: UInt64(validEnd))
                     try handle?.seek(toOffset: UInt64(validEnd))
                     byteCount = validEnd

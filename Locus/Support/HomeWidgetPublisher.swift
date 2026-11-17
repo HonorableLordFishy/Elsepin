@@ -40,6 +40,7 @@ enum HomeWidgetPublisher {
     }
     @discardableResult
     static func publish(places: [SavedPlace], trips: [SavedTrip]) -> String? {
+        guard !AppDataWorkspace.shared.isDemo else { return nil }
         let ids = AppDataWorkspace.defaults.dictionary(forKey: "locus.widget.placeIDs") as? [String: String] ?? [:]
         let retained = Set(places.map(\.id))
         let trimmed = ids.filter { retained.contains($0.key) }

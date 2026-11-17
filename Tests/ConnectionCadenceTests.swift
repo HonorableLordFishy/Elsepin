@@ -19,6 +19,9 @@ final class ConnectionCadenceTests: XCTestCase {
                 refreshAt: now.addingTimeInterval(Double(seconds)), evidenceAt: nil,
                 operationAt: now.addingTimeInterval(0.5), helperAt: nil, interval: Double(seconds)), 0.5)
         }
+        XCTAssertEqual(SessionTiming.monitorDelay(now: now, fast: false,
+            refreshAt: nil, evidenceAt: now.addingTimeInterval(17),
+            operationAt: nil, helperAt: nil, interval: 10), 10)
     }
 
     func testLiveActivityExpiresWithoutAppUpdatesForEveryCadence() throws {

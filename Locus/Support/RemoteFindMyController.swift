@@ -172,7 +172,7 @@ final class RemoteFindMyController: ObservableObject {
             let life = status.life360 == "ready" ? "Life360: signed in." : status.life360 == "busy" ? "Life360: setup in progress." : status.life360 == nil ? "Update the helper for Life360 support." : "Life360: sign in and select your profile."
             connectionMessage = "Helper connected. \(apple) \(life) A connection test does not verify locations."
         } catch {
-            guard self.link == link, !Task.isCancelled else { return }
+            guard self.link == link, !Task.isCancelled, (error as NSError).code != NSURLErrorCancelled else { return }
             connectionMessage = CloudConnectionIssue.transport(error).localizedDescription
         }
     }
@@ -330,6 +330,7 @@ final class RemoteFindMyController: ObservableObject {
         guard alerts else { return }
         let lifeValue = life360State
         if lifeGate.shouldNotify(lifeValue, now: Date(), lastFresh: lastLifeFresh), let message = lifeValue.life360Warning {
+            cancelDeadline()
             notify(id: "shift.life360.checks", title: lifeValue.life360Title, body: checkMessage ?? message, delay: nil)
         }
         guard let message = value.warning else { return }

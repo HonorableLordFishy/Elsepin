@@ -89,6 +89,36 @@ class ReportsTests(unittest.TestCase):
         for host in ("8.8.8.8", "0.0.0.0", "127.0.0.1", "evil.example", "::1"):
             with self.assertRaises(ValueError): private_ipv4(host)
 
+    def test_secret_pairing_file_uses_owner_only_permissions(self):
+        import os, stat, tempfile
+        from pathlib import Path
+        from companion import _write_secret_text
+        if os.name != "posix":
+            self.skipTest("POSIX permissions")
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "ElsepinCompanionPairing.json"
+            _write_secret_text(target, '{"token":"secret"}')
+            self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o600)
+
+    def test_apple_connector_fetch_stops_internal_polling_even_on_error(self):
+        import threading
+        from companion import AppleConnector
+        connector = AppleConnector.__new__(AppleConnector)
+        connector.provider = "findmy-device"
+        connector.target = "iPhone"
+        connector.device_id = "dev-1"
+        class Manager:
+            def __init__(self):
+                self.stop_event = threading.Event()
+                self.devices = {}
+            def refresh(self, locate=False):
+                self.stop_event.clear()
+                raise RuntimeError("boom")
+        connector.manager = Manager()
+        with self.assertRaises(RuntimeError):
+            connector.fetch()
+        self.assertTrue(connector.manager.stop_event.is_set())
+
 
 if __name__ == "__main__":
     unittest.main()

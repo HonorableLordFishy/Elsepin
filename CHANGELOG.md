@@ -9,6 +9,15 @@ Earlier entries describe their original development checkpoints. A later build m
 supersede a pending check or an intermediate behavior. The build history records
 successful packages separately from failed attempts and simulator/device evidence.
 
+## Unreleased — reviewed fixes (17 November 2026)
+
+- Preserve saved-route editing identity and unchanged long stored paths.
+- Repair pairing cleanup, pin import metadata, and next-route jump timers.
+- Remember map style; isolate demo widgets and improve large-text actions.
+- Repair interrupted log tails and first-use encrypted push delivery.
+- Add regression coverage. Native/simulator validation is recorded separately.
+- No IPA or release produced. Existing build history remains below.
+
 ## Build 89 - Official 2.6.1 release (16 November 2026)
 
 - Switch the app's update channel to stable and increment both bundle builds.

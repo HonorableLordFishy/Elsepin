@@ -101,6 +101,7 @@ class AppleConnector:
             if not self.api.validate_verification_code(device, getpass.getpass("Apple verification code: ")):
                 raise RuntimeError("Apple didn't accept the code.")
         self.manager = self.api.devices
+        self.manager.stop_event.set()
         entries = list(self.manager.devices.items())
         selected = choose("Select YOUR iPhone from Find My Devices:", entries,
                           lambda pair: pair[1].status().get("name", "Unnamed device"))
@@ -110,7 +111,10 @@ class AppleConnector:
 
     def fetch(self):
         # Public read API. Never call play_sound, lost_device, erase_device or messages.
-        self.manager.refresh(locate=True)
+        try:
+            self.manager.refresh(locate=True)
+        finally:
+            self.manager.stop_event.set()
         device = self.manager.devices.get(self.device_id)
         if device is None:
             return missing(self.provider, self.target)
@@ -254,13 +258,28 @@ def certificate(folder, host):
     return cert_file, key_file, fingerprint
 
 
+def _write_secret_text(path, content):
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    if os.name == "posix":
+        fd = os.open(path, flags, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        os.chmod(path, 0o600)
+    else:
+        path.write_text(content, encoding="utf-8")
+
+
 def run(args):
     # Library exceptions/logging can include sensitive API responses.
     logging.disable(logging.CRITICAL)
+    if os.name == "posix":
+        os.umask(0o077)
     print("Elsepin Windows helper\nKeep this window open while computer checks are enabled.")
     host = choose_host(args.host)
     data_dir = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "ShiftCompanion"
-    data_dir.mkdir(parents=True, exist_ok=True)
+    data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if os.name == "posix":
+        os.chmod(data_dir, 0o700)
     workers = []
     with tempfile.TemporaryDirectory(prefix="session-", dir=data_dir) as temp:
         folder = Path(temp)
@@ -287,8 +306,8 @@ def run(args):
         context.load_cert_chain(cert, key)
         server.socket = context.wrap_socket(server.socket, server_side=True)
         pairing = Path(args.pairing).resolve()
-        pairing.write_text(json.dumps({"version": 1, "endpoint": f"https://{host}:{args.port}", "token": token,
-                                       "certificateSHA256": fingerprint}, indent=2), encoding="utf-8")
+        _write_secret_text(pairing, json.dumps({"version": 1, "endpoint": f"https://{host}:{args.port}", "token": token,
+                                                "certificateSHA256": fingerprint}, indent=2))
         print(f"Pairing file saved: {pairing}")
         print("Elsepin → Settings → Find My checks → Windows helper → Import setup file.")
         print("Existing pairing retained; no new import is needed on this network." if reused else "New pairing: send this file to your iPhone with LocalSend, then import it in Shift.")

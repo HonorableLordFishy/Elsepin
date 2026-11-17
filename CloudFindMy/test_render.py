@@ -289,6 +289,11 @@ class RenderWebTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.get("/pairing")).status, 401)
         self.assertEqual((await self.post("/apple/login", {"email": "x", "password": "x"})).status, 401)
 
+    async def test_public_host_accepts_https_port_only(self):
+        self.assertEqual((await self.get("/", headers={"Host": "test.onrender.com:443"})).status, 200)
+        for host in ("test.onrender.com:evil", "test.onrender.com:8080", "test.onrender.com:443:extra"):
+            self.assertEqual((await self.get("/", headers={"Host": host})).status, 400)
+
     async def test_untrusted_host_origin_and_csrf_are_rejected(self):
         self.assertEqual((await self.get("/", headers={"Host": "evil.test"})).status, 400)
         self.assertEqual((await self.post("/login", {"key": self.config.admin_key},

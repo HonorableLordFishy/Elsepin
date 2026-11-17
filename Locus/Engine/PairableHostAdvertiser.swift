@@ -111,7 +111,11 @@ final class PairableHostAdvertiser {
             port: nwPort,
             using: .tcp
         )
-        let pipe = RelayPipe(inbound: inbound, outbound: outbound)
+        let pipe = RelayPipe(inbound: inbound, outbound: outbound) { [weak self] closedID in
+            Task { @MainActor [weak self] in
+                if self?.activeRelay?.id == closedID { self?.activeRelay = nil }
+            }
+        }
         activeRelay = pipe
         pipe.start()
     }
@@ -121,11 +125,16 @@ final class PairableHostAdvertiser {
 private final class RelayPipe {
     private let inbound: NWConnection
     private let outbound: NWConnection
+    let id = UUID()
+    private let closeLock = NSLock()
+    private var onClose: ((UUID) -> Void)?
+    private var closed = false
     private let queue = DispatchQueue(label: "locus.pairable.relay")
 
-    init(inbound: NWConnection, outbound: NWConnection) {
+    init(inbound: NWConnection, outbound: NWConnection, onClose: @escaping (UUID) -> Void) {
         self.inbound = inbound
         self.outbound = outbound
+        self.onClose = onClose
     }
 
     func start() {
@@ -154,8 +163,15 @@ private final class RelayPipe {
     }
 
     func cancel() {
+        closeLock.lock()
+        guard !closed else { closeLock.unlock(); return }
+        closed = true
+        let close = onClose
+        onClose = nil
+        closeLock.unlock()
         inbound.cancel()
         outbound.cancel()
+        close?(id)
     }
 
     private func pump(from: NWConnection, to: NWConnection) {

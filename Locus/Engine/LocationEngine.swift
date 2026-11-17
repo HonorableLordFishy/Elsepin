@@ -157,6 +157,8 @@ enum LocationEngine {
             if let probeAdapter { adapter_free(probeAdapter) }
         }
         guard !cancellation.isCancelled else { return .cancelled }
+        guard DeveloperTunnelProbe.reaches(deviceIP) else { return .tunnelUnavailable }
+        guard !cancellation.isCancelled else { return .cancelled }
         let providerError = withUnsafePointer(to: &address) { pointer in
             pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                 tunnel_create_rppairing($0, socklen_t(MemoryLayout<sockaddr_in>.stride), "ElsepinSetupCheck",

@@ -4,6 +4,7 @@ struct RecentlyDeletedView: View {
     @ObservedObject private var bin = RecentlyDeletedStore.shared
     @EnvironmentObject private var library: TripLibrary
     @EnvironmentObject private var session: SpoofSession
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selecting = false
     @State private var selection = DeletedItemsSelection()
     @State private var deleting: DeletedItemsDeletion?
@@ -23,9 +24,12 @@ struct RecentlyDeletedView: View {
                     } else {
                         VStack(alignment: .leading, spacing: 8) {
                             itemLabel(item)
-                            HStack {
+                            let layout = typeSize.isAccessibilitySize
+                                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                                : AnyLayout(HStackLayout())
+                            layout {
                                 Button("Restore") { restore(item) }.frame(minHeight: 44)
-                                Spacer()
+                                if !typeSize.isAccessibilitySize { Spacer() }
                                 Button("Delete permanently", role: .destructive) { deleting = DeletedItemsDeletion(items: [item]) }.frame(minHeight: 44)
                             }.buttonStyle(.borderless).disabled(!bin.canEdit)
                         }

@@ -73,8 +73,14 @@ def load_or_create(path: Path, host: str, folder: Path, make_certificate, *, res
         finally:
             temporary.unlink(missing_ok=True)
     cert_file, key_file = folder / "cert.pem", folder / "key.pem"
-    cert_file.write_text(record["certificate"])
-    key_file.write_text(record["key"])
+    cert_file.write_text(record["certificate"], encoding="utf-8")
+    if os.name == "posix":
+        fd = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(record["key"])
+        os.chmod(key_file, 0o600)
+    else:
+        key_file.write_text(record["key"], encoding="utf-8")
     cert = x509.load_pem_x509_certificate(record["certificate"].encode())
     fingerprint = hashlib.sha256(cert.public_bytes(serialization.Encoding.DER)).hexdigest()
     return record["token"], cert_file, key_file, fingerprint, reused

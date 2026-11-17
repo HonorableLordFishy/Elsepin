@@ -114,6 +114,57 @@ private final class ValidationRouteDriver: ObservableObject {
         planner.discardDraft()
         try? await Task.sleep(for: .milliseconds(100))
         check(planner.selectedRoute == nil && !planner.isLoading, "Canceled directions replaced the discarded draft", failures: &failures)
+
+        // Split section IDs are not necessarily the IDs of their destination
+        // stops. Reopening and reversing must retain each leg's actual choice.
+        var mixed = trip
+        let length = trip.plannedRoute!.track.length
+        let boundaries = [0.0, length / 3, length * 2 / 3, length]
+        let choices: [RouteLegChoice] = [.init(mode: .walk, speedMPH: 1.4),
+            .init(mode: .drive, speedMPH: 23), .init(mode: .eBike, speedMPH: 15)]
+        mixed.travelSections = choices.enumerated().map { index, choice in
+            RouteTravelSection(id: UUID(), startMetres: boundaries[index], endMetres: boundaries[index + 1],
+                               mode: choice.mode, speedMPH: choice.speedMPH)
+        }
+        planner.useSaved(mixed)
+        let targets = stops.map(\.id) + [RouteLegChoice.destinationID]
+        for (id, choice) in zip(targets, choices) {
+            check(planner.sectionChoices[id] == choice, "Reopened split section lost its leg choice", failures: &failures)
+        }
+        planner.swap(mode: .walk)
+        await waitForDirections()
+        let reversedTargets = stops.reversed().map(\.id) + [RouteLegChoice.destinationID]
+        for (id, choice) in zip(reversedTargets, choices.reversed()) {
+            check(requests.last?.choices[id] == choice, "Swap lost a reopened leg's mode or speed", failures: &failures)
+        }
+
+        planner.useSaved(trip)
+        planner.addPathStop(name: "Added pause", fraction: 0.5, wait: 45)
+        check(planner.waypoints.count == stops.count + 1 && planner.waypoints.contains { $0.name == "Added pause" && $0.waitSeconds == 45 },
+              "Added path pause did not reach the planner waypoints", failures: &failures)
+        check(planner.prepareSelectedRoute(mode: .walk, speedMPH: 1.4, smoothMovement: true)
+                && planner.preparedRoute?.waypoints.count == stops.count + 1,
+              "Preview lost the added pause", failures: &failures)
+        planner.discardPreparedRoute()
+
+        var longRoute = ValidationFixture.route
+        longRoute.stops = (1...9).map { index in
+            RouteStop(name: "Pause \(index)", metres: longRoute.track.length * Double(index) / 10, waitSeconds: 30)
+        }
+        let longTrip = longRoute.savedTrip(name: "Nine pauses", mode: .walk, speed: 3, smooth: false, arrival: .stay)
+        planner.useSaved(longTrip)
+        let longID = planner.selectedID
+        let longStops = planner.editableWaypoints
+        let longStart = RoutePoint(longRoute.origin.coordinate), longEnd = RoutePoint(longRoute.destination.coordinate)
+        let requestCount = requests.count
+        planner.applyMapEdit(origin: longStart, destination: longEnd, stops: longStops, mode: .walk)
+        check(planner.error == nil && planner.selectedID == longID && planner.editingTripID == longTrip.id && requests.count == requestCount,
+              "Accepting an unchanged nine-pause map rejected or rebuilt the path", failures: &failures)
+        let changedStart = RoutePoint(latitude: longStart.latitude + 0.001, longitude: longStart.longitude)
+        planner.applyMapEdit(origin: changedStart, destination: longEnd, stops: longStops, mode: .walk)
+        check(planner.error != nil && planner.selectedID == longID && planner.editableWaypoints == longStops
+                && RoutePoint(planner.origin!.coordinate) == longStart && requests.count == requestCount,
+              "Over-limit map edit mutated the existing route before rejection", failures: &failures)
         planner.useSaved(trip)
         report = failures.isEmpty ? "Passed" : failures.joined(separator: "; ")
     }

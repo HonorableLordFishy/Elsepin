@@ -179,6 +179,7 @@ final class ElsepinFlowUITests: XCTestCase {
 
     func testRecalculateSavedRouteRetainsStopsAndSavesNewSpeed() throws {
         launchRoutes()
+        let countBefore = try XCTUnwrap(savedSnapshot()["count"] as? Int)
         let before = try savedTrip()
         app.buttons["Open saved route"].tap()
         routeControl(app.buttons["Stop and route options"]).tap()
@@ -192,6 +193,8 @@ final class ElsepinFlowUITests: XCTestCase {
         saveRouteChanges()
         closeRoute()
         let saved = try savedTrip()
+        XCTAssertEqual(try savedSnapshot()["count"] as? Int, countBefore,
+                       "Save changes must update the existing route instead of creating a duplicate")
         for key in ["id", "name", "originName", "destinationName"] {
             XCTAssertEqual(saved[key] as? String, before[key] as? String, key)
         }

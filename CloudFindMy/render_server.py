@@ -324,7 +324,7 @@ def make_render_app(config, connector=None, store=None, interval=60, refresh_wai
     @web.middleware
     async def boundary(request, handler):
         try:
-            if request.path != "/healthz" and request.host != urlsplit(config.origin).hostname:
+            if request.path != "/healthz" and request.host.lower() not in (urlsplit(config.origin).hostname, urlsplit(config.origin).hostname + ":443"):
                 raise web.HTTPBadRequest(text="Use the helper's public address.")
             if request.method == "POST" and not request.path.startswith("/v1/"):
                 if request.headers.get("Origin") != config.origin:

@@ -25,6 +25,8 @@ on:
     paths:
       - 'Locus/**'
       - 'LocusActivity/**'
+      - 'Companion/**'
+      - 'CloudFindMy/**'
       - 'Shared/**'
       - 'Tests/**'
       - 'Validation/**'
@@ -34,6 +36,20 @@ on:
 permissions:
   contents: read
 jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python test dependencies
+        run: |
+          pip install -r Companion/requirements.txt -r CloudFindMy/requirements.txt
+      - name: Run Companion and CloudFindMy unit tests
+        run: |
+          python3 -m unittest discover -s Companion -p "test_*.py" -v
+          python3 -m unittest discover -s CloudFindMy -p "test_*.py" -v
   regression-device:
     if: github.event_name != 'workflow_dispatch' || inputs.ui_focus == 'all' || inputs.validate_device
     runs-on: xcode-27
@@ -80,6 +96,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - name: Portable Swift regressions
+        run: swift test
       - name: Prepare isolated simulator project
         env:
           VALIDATION_RUNTIME_VERSION: ${{ inputs.simulator_runtime }}

@@ -176,9 +176,9 @@ struct BackupImportReviewView: View {
                 Spacer()
                 Button("Select none") { values.wrappedValue = [] }.disabled(values.wrappedValue.isEmpty)
             }
-            VStack(alignment: .leading) {
-                Button("Select all \(name)") { values.wrappedValue = all }.disabled(all.isEmpty)
-                Button("Select none") { values.wrappedValue = [] }.disabled(values.wrappedValue.isEmpty)
+            VStack(alignment: .leading, spacing: 8) {
+                Button("Select all \(name)") { values.wrappedValue = all }.disabled(all.isEmpty).frame(minHeight: 44)
+                Button("Select none") { values.wrappedValue = [] }.disabled(values.wrappedValue.isEmpty).frame(minHeight: 44)
             }
         }.buttonStyle(.borderless).frame(minHeight: 44)
     }
@@ -208,7 +208,7 @@ struct BackupImportReviewView: View {
                 return
             }
             if !plan.places.isEmpty || plan.preferences != nil {
-                session.importLibraryPlaces(places, settings: plan.preferences)
+                session.importLibraryPlaces(places, settings: plan.preferences, updatePlaces: !plan.places.isEmpty)
             }
             if let settings = plan.preferences { planner.preferWalkingPaths = settings.preferWalkingPaths }
             finished("Import complete. \(plan.summary).")

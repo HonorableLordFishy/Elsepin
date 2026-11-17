@@ -202,6 +202,17 @@ class PushTests(unittest.TestCase):
         self.assertFalse(post.call_args.kwargs['allow_redirects'])
         self.assertNotIn(b'Test', post.call_args.kwargs['data'])
 
+    def test_send_initializes_key_without_public_key_request(self):
+        import requests
+        state = PrivateState("a"*40)
+        push = Push(state, "https://test.onrender.com")
+        self.assertFalse(state.data["vapid"])
+        response = requests.Response(); response.status_code = 201; response._content = b''
+        with patch('requests.Session.request', return_value=response) as post:
+            self.assertEqual(push.send(push_subscription(), "Test", "id"), "sent")
+        self.assertTrue(state.data["vapid"])
+        post.assert_called_once()
+
     def test_subscription_is_deduplicated_and_can_be_removed(self):
         push = Push(PrivateState("a"*40), "https://test.onrender.com")
         value = push_subscription()

@@ -74,7 +74,7 @@ struct SavedPlaceEditorSheet: View {
                         ForEach(SavedPlaceTint.allCases) { item in
                             Button { tint = item } label: {
                                 Circle().fill(item.swatch).frame(width: 32, height: 32)
-                                    .overlay { if item == tint { Image(systemName: "checkmark").font(.body.bold()).foregroundStyle(.black) } }
+                                    .overlay { if item == tint { Image(systemName: "checkmark").font(.body.bold()).foregroundStyle(.white).shadow(color: .black.opacity(0.45), radius: 1) } }
                                     .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
                             }.buttonStyle(.plain).accessibilityLabel(item.title)
                                 .accessibilityAddTraits(item == tint ? .isSelected : [])

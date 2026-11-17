@@ -24,6 +24,24 @@ final class DeveloperLogTests: XCTestCase {
         XCTAssertFalse(summary.storageError)
     }
 
+    func testRepairKeepsRecordsBeforeLargeIncompleteTail() async throws {
+        let folder = try temporaryFolder(), defaults = try preferences(), date = start
+        let log = DeveloperLogStore(folder: folder, defaults: defaults, now: { date })
+        log.record("retained_before_partial_tail")
+        _ = await log.summary()
+        let file = folder.appendingPathComponent("events.jsonl")
+        let handle = try FileHandle(forWritingTo: file)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(repeating: 0x78, count: 600 * 1024))
+        try handle.close()
+        let reopened = DeveloperLogStore(folder: folder, defaults: defaults, now: { date })
+        reopened.record("after_repair")
+        let data = try await reopened.export()
+        let rows = try entries(data)
+        XCTAssertTrue(rows.contains { $0["event"] as? String == "retained_before_partial_tail" })
+        XCTAssertTrue(rows.contains { $0["event"] as? String == "after_repair" })
+    }
+
     func testWindowKeepsFirstDayAndResetsExactlyAt48Hours() {
         let window = DeveloperLogWindow(startedAt: start)
         XCTAssertFalse(window.needsReset(at: start.addingTimeInterval(24 * 3600)))

@@ -45,6 +45,7 @@ struct HomeWidgetsSettingsView: View {
             selected = AppDataWorkspace.defaults.stringArray(forKey: "locus.widget.selected") ?? Array(choices.prefix(4).map { $0.id.uuidString })
             selected = selected.filter { id in choices.contains { $0.id.uuidString == id } }
             primary = AppDataWorkspace.defaults.string(forKey: "locus.widget.primary") ?? ""
+            if !selected.contains(primary) { primary = "" }
             save()
         }
         .onChange(of: selected) { _, _ in save() }.onChange(of: primary) { _, _ in save() }

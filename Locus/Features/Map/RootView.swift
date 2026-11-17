@@ -62,7 +62,7 @@ struct RootView: View {
         navigationTabs
         .onChange(of: showPlaces) { _, show in if show { selectedTab = .library; showPlaces = false } }
         .fullScreenCover(isPresented: $planner.isPresented, onDismiss: {
-            if session.journey == nil { planner.rememberDraft(in: session) }
+            if session.journey == nil && !drawAfterPlanner { planner.rememberDraft(in: session) }
             planner.discardDraft()
             if drawAfterPlanner {
                 drawAfterPlanner = false

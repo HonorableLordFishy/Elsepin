@@ -84,6 +84,7 @@ class Push:
 
         try:
             entry = subscription(entry)
+            self.key()  # Initialize storage, then pass the supported Vapid wrapper.
             with NoRedirectSession() as session:
                 session.trust_env = False
                 response = webpush(entry, json.dumps({"body": body, "id": identifier}),

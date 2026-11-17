@@ -400,7 +400,17 @@ final class RoutePlanner: ObservableObject {
         selectedID = route.id
         waypoints = route.stops.map { TripWaypoint(id: $0.id, name: $0.name, point: route.track.point(at: $0.metres), waitSeconds: $0.waitSeconds) }
         usesStoredPath = true
-        sectionChoices = Dictionary(uniqueKeysWithValues: route.travelSections.map { ($0.id, RouteLegChoice(mode: $0.mode, speedMPH: $0.speedMPH)) })
+        var choices = Dictionary(uniqueKeysWithValues: route.travelSections.map { ($0.id, RouteLegChoice(mode: $0.mode, speedMPH: $0.speedMPH)) })
+        // Editing a leg can split a movement section and give the remainder a
+        // new ID. Reassociate those sections with their destination stops when
+        // reopening, so Swap and map edits retain the leg's mode and speed.
+        for target in waypoints.map(\.id) + [RouteLegChoice.destinationID] where choices[target] == nil {
+            if let range = RouteLegEditing.range(to: target, stops: route.stops, length: route.track.length),
+               let section = RouteTravelSection.current(in: route.travelSections, at: max(0, range.upperBound - 0.001)) {
+                choices[target] = RouteLegChoice(mode: section.mode, speedMPH: section.speedMPH)
+            }
+        }
+        sectionChoices = choices
         error = nil
         isPresented = true
     }
@@ -474,9 +484,13 @@ final class RoutePlanner: ObservableObject {
         let stop = RouteStop(name: title.isEmpty ? "Stop \(route.stops.count + 1)" : title,
             metres: min(1, max(0, fraction)) * route.track.length, waitSeconds: StopDuration.normalized(wait))
         guard let index = alternatives.firstIndex(where: { $0.id == route.id }) else { return }
-        alternatives[index].stops.append(stop)
-        alternatives[index].stops.sort { $0.metres < $1.metres }
+        var updated = alternatives[index]
+        updated.stops.append(stop)
+        updated.stops.sort { $0.metres < $1.metres }
+        alternatives = [updated]
+        selectedID = updated.id
         usesStoredPath = true
+        syncPathStops()
     }
     func removePathStop(_ id: UUID) {
         guard let index = alternatives.firstIndex(where: { $0.id == selectedID }) else { return }
@@ -555,6 +569,12 @@ final class RoutePlanner: ObservableObject {
                 stops: editableWaypoints.map { .init(id: $0.id, point: $0.point) })
             let edited = RouteMapGeometry(origin: start, destination: end, stops: stops.map { .init(id: $0.id, point: $0.point) })
             guard original != edited else { return }
+        }
+        // Stored paths allow twenty pauses. Accepting the unchanged map is a
+        // no-op, even above MapKit's eight-stop directions limit.
+        guard stops.count <= 8 else {
+            error = "New directions support up to eight stops. Remove stops first, or keep this path."
+            return
         }
         let previous = draftSnapshot()
         cancel()

@@ -94,7 +94,13 @@ final class SpoofSession: ObservableObject {
     private var appliedSectionID: UUID?
     @Published private(set) var activeRoute: PlannedRoute?
     @Published private(set) var journey: JourneyProgress?
-    @Published var mapStyleIndex: Int = 0
+    @Published var mapStyleIndex: Int = 0 {
+        didSet {
+            let clamped = min(2, max(0, mapStyleIndex))
+            if clamped != mapStyleIndex { mapStyleIndex = clamped; return }
+            AppDataWorkspace.defaults.set(clamped, forKey: "locus.mapStyle")
+        }
+    }
     @Published var lastError: String?
     @Published private(set) var isBusy = false
     @Published private(set) var joystickActive = false
@@ -110,7 +116,7 @@ final class SpoofSession: ObservableObject {
     @Published var recents: [SavedPlace] = []
 
     let verification = LocationVerificationController()
-    var remoteCheckSessionRequested: Bool { sessionRequested && !stopInFlight }
+    var remoteCheckSessionRequested: Bool { sessionRequested && !stopInFlight && !status.isDropped }
     let recovery = TripRecoveryStore()
     let reliability = ReliabilityRecorder()
     @Published private(set) var recoveryAvailable = false
@@ -180,6 +186,7 @@ final class SpoofSession: ObservableObject {
         for mode in TravelMode.allCases where mode != .eBike && modeSpeeds[mode.rawValue] == nil {
             modeSpeeds[mode.rawValue] = UsualSpeedRules.value(for: mode, stored: usualSpeeds)
         }
+        mapStyleIndex = min(2, max(0, AppDataWorkspace.defaults.integer(forKey: "locus.mapStyle")))
         savedPins = SavedPlace.load(key: favoritesKey)
         recents = SavedPlace.loadRecents(retention: preferences.recentHistoryRetention, saveEnabled: preferences.saveRecentLocations)
         recentRoutes = RecentRoute.kept(recentRouteStore.load(), retention: preferences.recentHistoryRetention, enabled: preferences.saveRecentLocations)
@@ -329,9 +336,15 @@ final class SpoofSession: ObservableObject {
             visualStyle: preferences.visualStyle, material: preferences.appearanceOverrides.material,
             font: AppearanceFixed.font, textSize: AppearanceFixed.textSize)
     }
-    func importLibraryPlaces(_ places: [BackupPlace], settings: BackupPreferences?) {
-        savedPins = places.map { SavedPlace(name: $0.name, latitude: $0.latitude, longitude: $0.longitude, folder: $0.folder, icon: $0.icon, color: $0.color, favorite: $0.favorite, address: $0.address, emoji: $0.emoji) }
-        SavedPlace.save(savedPins, key: favoritesKey)
+    func importLibraryPlaces(_ places: [BackupPlace], settings: BackupPreferences?, updatePlaces: Bool = true) {
+        if updatePlaces {
+            let existingByID = Dictionary(savedPins.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            savedPins = places.map {
+                let id = "\($0.latitude),\($0.longitude)"
+                return SavedPlace(name: $0.name, latitude: $0.latitude, longitude: $0.longitude, visitedAt: existingByID[id]?.visitedAt, folder: $0.folder, icon: $0.icon, color: $0.color, favorite: $0.favorite, address: $0.address, emoji: $0.emoji)
+            }
+            SavedPlace.save(savedPins, key: favoritesKey)
+        }
         if let settings {
             usualSpeeds = settings.usualSpeeds
             if let material = settings.material { preferences.appearanceOverrides.material = material }
@@ -516,6 +529,7 @@ final class SpoofSession: ObservableObject {
                                                routeID: plan.id, now: Date()) else {
             trace.record("rejected", ["reason": "undo_unavailable_expired_or_connection_not_ready"]); return
         }
+        nextRouteTask?.cancel(); nextRouteTask = nil; nextRouteDueAt = nil
         pendingSeek = (accepted, undo.wasPaused, undo, trace)
         trace.record("queued", ["epoch": String(epoch)])
         routeJumping = true
@@ -1085,6 +1099,7 @@ final class SpoofSession: ObservableObject {
             lastError = isSpoofing ? "Wait for the pending route command to finish." : "Reconnect before teleporting along this route."
             return false
         }
+        nextRouteTask?.cancel(); nextRouteTask = nil; nextRouteDueAt = nil
         pendingSeek = (accepted, routePaused, nil, trace)
         trace.record("queued", ["epoch": String(epoch)])
         routeJumping = true
@@ -1396,8 +1411,8 @@ final class SpoofSession: ObservableObject {
                 if pinIsPreview { previewSpotName = confirmedName }
                 startedAt = nil
                 SessionNotifications.shared.cancelReminder()
-                monitorTask?.cancel(); monitorTask = nil
             }
+            monitorTask?.cancel(); monitorTask = nil
             status = .dropped(error.localizedDescription)
             RemoteFindMyController.shared.refreshLifecycle()
             lastError = requiresClear ? "The update failed. The last location may still be set; Try clearing location sends a clear command. " + error.localizedDescription
@@ -1513,7 +1528,13 @@ final class SpoofSession: ObservableObject {
         RemoteFindMyController.shared.refreshLifecycle()
         CompanionClient.shared.attach(self)
         CompanionClient.shared.tick()
-        if sessionRequested { startMonitor(pairing: pairing); lastAttemptAt = .distantPast }
+        if sessionRequested {
+            lastAttemptAt = .distantPast
+            if !status.isDropped {
+                monitorTask?.cancel(); monitorTask = nil
+                startMonitor(pairing: pairing)
+            }
+        }
         updateLocationTracking()
         publishActivity(force: true)
         Task {
@@ -1768,6 +1789,9 @@ final class SpoofSession: ObservableObject {
             lastError = RecentlyDeletedStore.shared.error; return
         }
         savedPins.removeAll { $0.id == place.id }
+        if pinIsPreview, let currentPin = pin, "\(currentPin.latitude),\(currentPin.longitude)" == place.id {
+            pin = nil; pinIsPreview = false; previewSpotName = nil
+        }
         SavedPlace.save(savedPins, key: favoritesKey)
     }
 
@@ -1851,7 +1875,7 @@ final class SpoofSession: ObservableObject {
         eBikeSpeedMPH = EBikeSpeed.clamped((defaults.object(forKey: EBikeSpeed.preferenceKey) as? Double)
             ?? UsualSpeedRules.value(for: .eBike, stored: usualSpeeds))
         smoothMovement = MovementDefaults.loadSmoothMovement(from: defaults)
-        travelMode = .walk; mapStyleIndex = 0
+        travelMode = .walk; mapStyleIndex = min(2, max(0, defaults.integer(forKey: "locus.mapStyle")))
         recovery.reloadWorkspace()
         recoveryAvailable = recovery.checkpoint != nil
         // Switching datasets never grants permission to resume a checkpoint.

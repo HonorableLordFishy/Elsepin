@@ -6,6 +6,7 @@ import Foundation
 final class SilentAudioKeepAlive {
     private var player: AVAudioPlayer?
     private var wasActive = false
+    private var interruptionObserver: NSObjectProtocol?
 
     func start() {
         guard !wasActive else { return }
@@ -22,6 +23,23 @@ final class SilentAudioKeepAlive {
             guard p.prepareToPlay(), p.play() else { throw AudioStartError.unavailable }
             player = p
             wasActive = true
+            if interruptionObserver == nil {
+                interruptionObserver = NotificationCenter.default.addObserver(
+                    forName: AVAudioSession.interruptionNotification,
+                    object: session,
+                    queue: .main
+                ) { [weak self] note in
+                    guard let self, self.wasActive,
+                          let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                          let type = AVAudioSession.InterruptionType(rawValue: raw),
+                          type == .ended else { return }
+                    let optionsRaw = note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+                    if AVAudioSession.InterruptionOptions(rawValue: optionsRaw).contains(.shouldResume) {
+                        try? AVAudioSession.sharedInstance().setActive(true)
+                        self.player?.play()
+                    }
+                }
+            }
             DeveloperLogStore.shared.record("pairing_audio_started")
             NSLog("[Elsepin] silent audio keep-alive started")
         } catch {
@@ -31,6 +49,10 @@ final class SilentAudioKeepAlive {
     }
 
     func stop() {
+        if let interruptionObserver {
+            NotificationCenter.default.removeObserver(interruptionObserver)
+            self.interruptionObserver = nil
+        }
         player?.stop()
         player = nil
         wasActive = false

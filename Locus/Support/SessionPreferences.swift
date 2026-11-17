@@ -82,6 +82,7 @@ final class SessionPreferences: ObservableObject {
     }
 
     func publishAppearance() {
+        guard !AppDataWorkspace.shared.isDemo else { return }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         guard let container = WidgetLibrary.containerURL,

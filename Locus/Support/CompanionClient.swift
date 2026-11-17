@@ -45,7 +45,9 @@ final class CompanionClient: ObservableObject {
         if provider == "life360" && report == nil && !reportedProviders.contains(provider) { return nil }
         var state: RemoteFindMyState = .waiting
         if !session.isSpoofing { state = .paused }
-        else if connectedAt == nil || message != nil || Date().timeIntervalSince(connectedAt!) > 90 { state = .unavailable }
+        else if message != nil { state = .unavailable }
+        else if let connectedAt, Date().timeIntervalSince(connectedAt) > 90 { state = .unavailable }
+        else if connectedAt == nil { state = .waiting }
         else if report?.state == "sign-in" { state = .signIn }
         else if report?.state == "blocked" { state = .blocked }
         else if report?.state == "unavailable" || report == nil { state = .unavailable }
