@@ -12,6 +12,7 @@ successful packages separately from failed attempts and simulator/device evidenc
 ## Unreleased — reviewed fixes (17 November 2026)
 
 - Preserve saved-route editing identity and unchanged long stored paths.
+- Keep each incoming leg's movement mode and speed when reopening or reversing a saved route.
 - Repair pairing cleanup, pin import metadata, and next-route jump timers.
 - Remember map style; isolate demo widgets and improve large-text actions.
 - Repair interrupted log tails and first-use encrypted push delivery.

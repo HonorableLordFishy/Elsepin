@@ -1,5 +1,67 @@
 # Elsepin current handoff
 
+## Reviewed ZIP integration — 17 November 2026 (no IPA)
+
+Integrated the reviewed portions of `Elsepin-fixed.zip` in the existing checkout
+on `codex/reviewed-fixes-validation-20261117`. Source commits: `f6d423f`, then
+`8844817`. All earlier changelog/build entries remain intact. Python caches and
+the incoming replacement changelog were not copied.
+
+Corrected the incoming Swift initializer ordering, relay-close callback identity
+and synchronization, first-use push key initialization, and Host-header validation.
+Preserved saved-route identity, fast session monitoring, setup detection cadence,
+and the existing timeline refresh. Accepted fixes include stored map style, pin
+import metadata/name preservation, stale pin preview cleanup, demo-widget isolation,
+path-pause synchronization, next-route timer cancellation on jumps, audio interruption
+recovery, helper polling cleanup and interrupted log-tail repair. Helper source ZIPs
+were refreshed with explicit owner approval; no app/IPA was packaged.
+
+Local verification: 24 resource/script tests, 106 cloud tests and 20 Companion tests
+passed. One POSIX-only Companion test skipped on Windows; the Windows DPAPI case
+passed. Identity/appearance/helper archive checks passed. Linux CI also passed
+the helper suites, including POSIX permissions (Windows-only DPAPI skipped there).
+
+Private validation run `44174648746` was blocked before execution by GitHub billing.
+The owner then explicitly authorized temporary public visibility for testing, with
+privacy restored afterwards. No billing changes or release publication are authorized.
+
+First public validation `44174856809` passed 582 Swift regressions and compiled the
+isolated simulator app/UI tests. Two UI cases hit XCTest background-assertion
+startup timeouts; the third exposed an actual incoming-leg boundary lookup error
+in the newly integrated reopening fallback. Commit `8844817` fixes that by choosing
+the incoming section directly, without playback's forward-boundary epsilon.
+The workflow permits one bounded retry of failed UI tests; raw attempts are retained.
+Privacy was restored after that run, then temporarily reopened for the corrected
+rerun `44177155315`. During that run the owner raised concern about public clone
+traffic. Source was immediately restored to private and verified via GitHub API;
+keep it private for subsequent work. The already-running job continued. Traffic
+showed 302 clones/113 unique cloners over 14 days, with 64 workflow runs on
+November 13–16. These counts cannot identify cloners or exclude outside copies.
+Do not represent all clones as ours. Anonymous repository access also returned 404.
+
+Corrected run `44177155315` **passed** on iPhone 17 / iOS 26.5, macOS 26 runner:
+582 Swift tests, simulator app/extension and UI-test compilation, and all three
+focused UI tests. Each UI test passed on its first attempt; no retry was needed.
+Verified usual speeds for new drawn/planned routes, saved per-leg modes and custom
+speeds after reopening, and recalculation preserving stops/settings and a single
+saved Library identity. The in-app assertions also passed for split-section reopening/
+reversal, inserted pauses and unchanged nine-pause paths. Inspected screenshots of
+the reopened recalculated leg, custom e-bike leg and new drawn-route preview.
+No new overlapping controls were demonstrated in those inspected screens.
+The build reported an App Intents metadata-extraction warning (no framework dependency),
+not a Swift compiler error. No full visual/accessibility sweep or physical-phone
+test is claimed. The final source privacy check returned `private: true`.
+
+Overall distinct checks: 732 non-UI tests plus 3 focused native UI tests passed.
+Local Windows and Linux runs cover complementary platform-specific helper cases;
+the aggregate does not count duplicate cross-platform executions twice.
+No IPA, release, deployment or billing change was made.
+
+Evidence: `.build/reviews/gemini-2026-11-17/`. Simulator fixtures isolate native
+device-only libraries and use disposable data; they do not prove actual pairing,
+spoofing, Stop/clear, provider access, background interruption recovery or battery
+behavior. Production device app/extension compilation is not part of these runs.
+
 ## Official 2.6.1 (89) published - 16 November 2026
 
 The owner explicitly requested publication and private source. Published release
