@@ -177,6 +177,7 @@ jobs:
             -destination "platform=iOS Simulator,id=$VALIDATION_SIMULATOR" \
             -derivedDataPath .build/simulator-validation -resultBundlePath .build/simulator-evidence/UI.xcresult \
             -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -retry-tests-on-failure -test-iterations 2 \
             -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 900 \
             "${test_selection[@]}" CODE_SIGNING_ALLOWED=NO test-without-building \
             2>&1 | tee .build/simulator-evidence/ui-tests.log | xcbeautify

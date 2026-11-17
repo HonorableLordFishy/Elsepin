@@ -406,7 +406,9 @@ final class RoutePlanner: ObservableObject {
         // reopening, so Swap and map edits retain the leg's mode and speed.
         for target in waypoints.map(\.id) + [RouteLegChoice.destinationID] where choices[target] == nil {
             if let range = RouteLegEditing.range(to: target, stops: route.stops, length: route.track.length),
-               let section = RouteTravelSection.current(in: route.travelSections, at: max(0, range.upperBound - 0.001)) {
+               // Playback intentionally advances at a boundary. Reopening needs
+               // the incoming section instead, without playback's epsilon.
+               let section = route.travelSections.last(where: { $0.startMetres < range.upperBound }) {
                 choices[target] = RouteLegChoice(mode: section.mode, speedMPH: section.speedMPH)
             }
         }
