@@ -52,9 +52,9 @@ The build reported an App Intents metadata-extraction warning (no framework depe
 not a Swift compiler error. No full visual/accessibility sweep or physical-phone
 test is claimed. The final source privacy check returned `private: true`.
 
-Overall distinct checks: 732 non-UI tests plus 3 focused native UI tests passed.
-Local Windows and Linux runs cover complementary platform-specific helper cases;
-the aggregate does not count duplicate cross-platform executions twice.
+Counts: 582 Swift, 24 resource, 106 cloud and 3 focused native UI tests passed.
+Each Companion run passed 20 tests and skipped one platform-specific case;
+Windows and Linux runs cover those two platform-specific cases between them.
 No IPA, release, deployment or billing change was made.
 
 Evidence: `.build/reviews/gemini-2026-11-17/`. Simulator fixtures isolate native
