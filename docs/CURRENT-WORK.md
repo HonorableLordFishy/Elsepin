@@ -1,12 +1,14 @@
 # Elsepin current handoff
 
-## Private ownership transfer requested — 17 November 2026
+## Private ownership transfer completed — 17 November 2026
 
 The owner requested moving the source repository to `HonorableLordFishy`.
-GitHub accepted the transfer API request; acceptance by the receiving account is
-still pending at this checkpoint. `N3moStudio/Elsepin` remains private. Do not
-change origin until the new owner is verified; then update the remote in this same
-local checkout. Keep the GitLab remote and the separate Elsepin-Releases repository.
+GitHub now reports `HonorableLordFishy/Elsepin` with `private: true`. The existing
+N3moStudio connection retains read/write collaborator access, but not administrator
+access. Both validation and IPA workflows remain active; the new owner's available
+Actions minutes/billing have not been verified. Updated origin in this same checkout
+to `https://github.com/HonorableLordFishy/Elsepin.git`. Keep the GitLab remote and
+the separate Elsepin-Releases repository.
 Keep source private; moving ownership cannot revoke previously downloaded clones.
 
 Prepared `Downloads/Elsepin-reviewed-source-2026-11-17.zip` for another Google AI
