@@ -85,6 +85,13 @@ private struct ValidationHost: View {
                 VStack(spacing: 0) {
                 Text("SIMULATOR TEST DATA")
                     .accessibilityIdentifier("validation.banner")
+                if ValidationFixture.scenario == "import-root" {
+                    Button("Open validation GPX") {
+                        let url = FileManager.default.temporaryDirectory.appendingPathComponent("root-flow.gpx")
+                        try? Data(ValidationImportHarness.valid.utf8).write(to:url)
+                        NotificationCenter.default.post(name:.locusImportGPX,object:url)
+                    }.accessibilityIdentifier("validation.openGPX")
+                }
                 if sessionScenario && !runSession {
                     Button("Start validation session") { runSession = true }
                         .accessibilityIdentifier("validation.start")

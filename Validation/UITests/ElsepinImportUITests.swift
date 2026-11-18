@@ -30,6 +30,17 @@ final class ElsepinImportUITests: XCTestCase {
         app.buttons["gpx.apply"].tap()
         XCTAssertTrue(app.staticTexts["Imported 2 points into planner"].waitForExistence(timeout:10))
     }
+    func testRootImportOpensActualPlannerAfterReview() {
+        app = XCUIApplication(); app.launchArguments = ["--elsepin-ui-test"]
+        app.launchEnvironment["ELSEPIN_TEST_SCENARIO"] = "import-root"
+        app.launch()
+        XCTAssertTrue(app.buttons["validation.openGPX"].waitForExistence(timeout:20))
+        app.buttons["validation.openGPX"].tap()
+        XCTAssertTrue(app.buttons["gpx.apply"].waitForExistence(timeout:10))
+        app.buttons["gpx.apply"].tap()
+        XCTAssertTrue(app.navigationBars["Plan a route"].waitForExistence(timeout:15))
+        capture("gpx-root-planner")
+    }
     func testFailureRetryAndCancellationNeverReplaceEditor() {
         launch()
         app.buttons["Open broken GPX"].tap()

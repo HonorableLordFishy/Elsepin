@@ -43,7 +43,7 @@ struct RootView: View {
             GPXImportReviewView(model: gpxImport) { pendingGPX = $0 }
         }
         .onDisappear { gpxImport.cancel(); pendingGPX = nil }
-        .onChange(of: reset.isResetting) { _, resetting in if resetting { gpxImport.cancel() } }
+        .onChange(of: reset.isResetting) { _, resetting in if resetting { gpxImport.cancel(); pendingGPX = nil } }
         .onChange(of: incomingSessionDetails) { _, _ in openShortcutIfAllowed() }
         .onChange(of: incomingShortcut) { _, _ in openShortcutIfAllowed() }
         .onChange(of: privacy.canOpenContent) { _, _ in openShortcutIfAllowed() }

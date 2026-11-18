@@ -32,7 +32,11 @@ struct ValidationImportHarness: View {
                 if let points = pending {
                     pending = nil
                     planner.useCustom(points.map(\.coordinate),source:.gpx)
-                    original = planner.alternatives.first?.coordinates.count == points.count ? "Imported \(points.count) points into planner" : "Planner import failed"
+                    if let route = planner.alternatives.first,
+                       RoutePoint(route.origin.coordinate) == points.first,
+                       RoutePoint(route.destination.coordinate) == points.last, route.source == .gpx {
+                        original = "Imported \(points.count) points into planner"
+                    } else { original = "Planner import failed" }
                 }
             }) {
                 GPXImportReviewView(model:model) { pending = $0 }

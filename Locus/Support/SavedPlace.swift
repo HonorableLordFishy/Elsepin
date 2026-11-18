@@ -57,6 +57,7 @@ struct SavedPlace: Identifiable, Codable, Equatable {
             discardRecovery(key: "locus.recents")
             return []
         }
+        _ = archive("locus.recents").load() // Preserve unreadable originals before retention can remove the live key.
         let kept = Array(places.filter {
             $0.latitude.isFinite && $0.longitude.isFinite && (-90...90).contains($0.latitude)
                 && (-180...180).contains($0.longitude) && retention.keeps(visitedAt: $0.visitedAt, now: now)
