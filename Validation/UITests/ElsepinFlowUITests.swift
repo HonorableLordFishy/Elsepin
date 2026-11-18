@@ -294,7 +294,7 @@ final class ElsepinFlowUITests: XCTestCase {
         app.buttons["Select"].tap()
         for _ in 0..<3 { app.swipeUp(velocity: .fast) }
         app.swipeDown(velocity: .slow)
-        let rows = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Test deleted pin'"))
+        let rows = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Test deleted pin' AND label CONTAINS ', expires '"))
             .allElementsBoundByIndex.filter {
                 $0.value != nil && $0.isHittable && $0.frame.minY > 160 && $0.frame.maxY < app.frame.maxY - 150
             }.sorted { $0.frame.minY < $1.frame.minY }
