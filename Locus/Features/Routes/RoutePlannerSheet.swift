@@ -24,6 +24,8 @@ struct RoutePlannerSheet: View {
     @State private var confirmPathChange = false
     @State private var pendingLiveAddStop = false
     @State private var showImporter = false
+    @StateObject private var gpxImport = GPXImportReviewModel()
+    @State private var pendingGPX: [RoutePoint]?
     @State private var showExporter = false
     @State private var exportDocument = GPXRouteDocument(text: "")
     @State private var showPathStop = false
@@ -257,15 +259,23 @@ struct RoutePlannerSheet: View {
                 }
             } message: { Text("Saves the whole path from its start, travel mode, target speed, and all stops.") }
             .fileImporter(isPresented: $showImporter, allowedContentTypes: [.xml, .data]) { result in
-                do {
-                    let coordinates = try GPXCodec.parse(result.get())
-                    planner.useCustom(coordinates, source: .gpx)
-                } catch { planner.error = error.localizedDescription }
+                if case .success(let url) = result { gpxImport.start(url) }
+                else if case .failure(let error) = result { planner.error = error.localizedDescription }
+            }
+            .sheet(isPresented: $gpxImport.isPresented, onDismiss: {
+                gpxImport.cancel()
+                guard let points = pendingGPX else { return }
+                pendingGPX = nil
+                guard library.isCurrentWorkspace, session.journey == nil, !session.isBusy else { return }
+                planner.useCustom(points.map(\.coordinate), source: .gpx)
+            }) {
+                GPXImportReviewView(model: gpxImport) { pendingGPX = $0 }
             }
             .fileExporter(isPresented: $showExporter, document: exportDocument, contentType: .xml,
                           defaultFilename: "Elsepin-Route.gpx") { result in
                 if case .failure(let error) = result { planner.error = error.localizedDescription }
             }
+            .onDisappear { gpxImport.cancel(); pendingGPX = nil }
         }
     }
 

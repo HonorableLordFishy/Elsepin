@@ -5,7 +5,7 @@ on:
       ui_focus:
         description: Run all validation, or a focused simulator recheck
         type: choice
-        options: [all, search, home, pins, routes, backups]
+        options: [all, search, home, pins, routes, backups, imports]
         default: all
       validate_device:
         description: Also run full regressions and compile the device app for a focused UI run
@@ -155,6 +155,8 @@ jobs:
             done
           elif [[ "$UI_FOCUS" == backups ]]; then
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinBackupUITests")
+          elif [[ "$UI_FOCUS" == imports ]]; then
+            test_selection+=("-only-testing:LocusValidationUITests/ElsepinImportUITests")
           fi
           python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "install", os.environ["VALIDATION_SIMULATOR"], ".build/simulator-validation/Build/Products/Debug-iphonesimulator/ElsepinValidation.app"], check=True, timeout=180)'
           xcrun simctl privacy "$VALIDATION_SIMULATOR" grant location-always com.n3mostudio.elsepin.validation

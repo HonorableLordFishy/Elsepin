@@ -50,6 +50,21 @@ struct LibraryBackupView: View {
                         return .handled
                     })
             }.shiftSettingsRows()
+            if session.savedPinRecoveryCount > 0 || session.recentPinRecoveryCount > 0 {
+                Section {
+                    NavigationLink { SavedPlaceRecoveryView() } label: {
+                        HStack(spacing: 12) {
+                            ShiftSettingsIcon(symbol: "clock.arrow.circlepath")
+                            Text("Review recovery copy").foregroundStyle(.primary)
+                            Spacer(minLength: 4)
+                            Text("\(session.savedPinRecoveryCount + session.recentPinRecoveryCount)")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }.frame(minHeight: 44)
+                    }
+                } header: { Text("Unreadable saved-place data") } footer: {
+                    Text("The original saved-place data is preserved instead of being erased. Review it, then restore or discard it.")
+                }.shiftSettingsRows()
+            }
             if let notice = message ?? input.state.message {
                 Section { Text(notice).font(.footnote).textSelection(.enabled) }.shiftSettingsRows()
             }

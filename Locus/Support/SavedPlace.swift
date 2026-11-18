@@ -24,27 +24,37 @@ struct SavedPlace: Identifiable, Codable, Equatable {
     }
 
     static func load(key: String) -> [SavedPlace] {
-        guard let data = AppDataWorkspace.defaults.data(forKey: key),
-              let decoded = try? JSONDecoder().decode([SavedPlace].self, from: data) else {
-            return []
+        switch archive(key).load() {
+        case .loaded(let places): return places
+        case .missing, .unreadable: return []
         }
-        return decoded
     }
 
     static func save(_ places: [SavedPlace], key: String) {
-        if let data = try? JSONEncoder().encode(places) {
-            AppDataWorkspace.defaults.set(data, forKey: key)
-        }
+        _ = archive(key).save(places)
     }
 
     static func loadRecents(retention: RecentHistoryRetention, saveEnabled: Bool, now: Date = Date()) -> [SavedPlace] {
-        saveRecents(load(key: "locus.recents"), retention: retention, saveEnabled: saveEnabled, now: now)
+        guard saveEnabled else {
+            AppDataWorkspace.defaults.removeObject(forKey: "locus.recents")
+            discardRecovery(key: "locus.recents")
+            return []
+        }
+        // Do not turn an unreadable archive into an empty one and delete it.
+        // The original is preserved under locus.recents.recovery.
+        switch archive("locus.recents").load() {
+        case .missing: return []
+        case .loaded(let places):
+            return saveRecents(places, retention: retention, saveEnabled: saveEnabled, now: now)
+        case .unreadable: return []
+        }
     }
 
     @discardableResult
     static func saveRecents(_ places: [SavedPlace], retention: RecentHistoryRetention, saveEnabled: Bool, now: Date = Date()) -> [SavedPlace] {
         guard saveEnabled else {
             AppDataWorkspace.defaults.removeObject(forKey: "locus.recents")
+            discardRecovery(key: "locus.recents")
             return []
         }
         let kept = Array(places.filter {
@@ -54,5 +64,28 @@ struct SavedPlace: Identifiable, Codable, Equatable {
         if kept.isEmpty { AppDataWorkspace.defaults.removeObject(forKey: "locus.recents") }
         else if kept != load(key: "locus.recents") { save(kept, key: "locus.recents") }
         return kept
+    }
+
+    static func hasRecovery(key: String) -> Bool {
+        archive(key).hasRecovery
+    }
+
+    static func recovery(key: String) -> [SavedPlace]? {
+        archive(key).recovery()
+    }
+
+    static func restoreRecovery(key: String) -> [SavedPlace]? {
+        archive(key).restoreRecovery()
+    }
+
+    static func discardRecovery(key: String) {
+        archive(key).discardRecovery()
+    }
+
+    static func exportRecovery(key: String) -> Data? { archive(key).exportRecovery() }
+    static func recoveryCopyCount(key: String) -> Int { archive(key).recoveryCopies.count }
+
+    private static func archive(_ key: String) -> RecoverableJSONList<SavedPlace> {
+        RecoverableJSONList(key: key, store: AppDataWorkspace.defaults)
     }
 }

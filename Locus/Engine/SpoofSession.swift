@@ -110,10 +110,12 @@ final class SpoofSession: ObservableObject {
     @Published private(set) var notificationPermission = false
     // Legacy storage key is retained; nil favorite flags mean an older favorite.
     @Published var savedPins: [SavedPlace] = []
+    @Published private(set) var savedPinRecoveryCount = 0
     @Published private(set) var recentRoutes: [RecentRoute] = []
     private let recentRouteStore = RecentRouteStore()
     var favorites: [SavedPlace] { savedPins.filter(\.isFavorite) }
     @Published var recents: [SavedPlace] = []
+    @Published private(set) var recentPinRecoveryCount = 0
 
     let verification = LocationVerificationController()
     var remoteCheckSessionRequested: Bool { sessionRequested && !stopInFlight && !status.isDropped }
@@ -212,6 +214,7 @@ final class SpoofSession: ObservableObject {
         CompanionClient.shared.attach(self)
         SessionNotifications.shared.cancelReminder()
         activity.sync(id: sessionID, snapshot: nil)
+        refreshSavedPlaceRecoveryCounts()
     }
 
     func discardRecovery() {
@@ -1821,18 +1824,24 @@ final class SpoofSession: ObservableObject {
         recentRouteStore.save(recentRoutes)
         let loaded = SavedPlace.loadRecents(retention: preferences.recentHistoryRetention, saveEnabled: preferences.saveRecentLocations)
         if loaded != recents { recents = loaded }
+        refreshSavedPlaceRecoveryCounts()
     }
     func clearRecentHistory() {
         recentRoutes = []; recentRouteStore.save([])
         recents = []
         AppDataWorkspace.defaults.removeObject(forKey: recentsKey)
+        SavedPlace.discardRecovery(key: recentsKey)
+        recentPinRecoveryCount = 0
     }
     /// Called only by the confirmed reset coordinator after it verifies no session remains.
     func resetPlacesAndAreas() {
         precondition(!hasSession && !isBusy)
         clearRecentHistory()
         savedPins = []; recents = []; namedAreas = []; chosenNames = []
-        for key in [favoritesKey, recentsKey, "locus.namedAreas"] { AppDataWorkspace.defaults.removeObject(forKey: key) }
+        for key in [favoritesKey, recentsKey, "locus.favorites.recovery", "locus.recents.recovery", "locus.favorites.recovery.history", "locus.recents.recovery.history", "locus.namedAreas"] {
+            AppDataWorkspace.defaults.removeObject(forKey: key)
+        }
+        savedPinRecoveryCount = 0; recentPinRecoveryCount = 0
         pinSelectionID = UUID(); pin = nil; pinIsPreview = false
         previewSpotName = nil; sessionSpotName = nil; activeSavedTripID = nil
         epoch += 1
@@ -1865,6 +1874,7 @@ final class SpoofSession: ObservableObject {
         arrivalChoice = .stay
         savedPins = SavedPlace.load(key: favoritesKey)
         recents = SavedPlace.loadRecents(retention: preferences.recentHistoryRetention, saveEnabled: preferences.saveRecentLocations)
+        refreshSavedPlaceRecoveryCounts()
         recentRoutes = RecentRoute.kept(recentRouteStore.load(), retention: preferences.recentHistoryRetention, enabled: preferences.saveRecentLocations)
         let defaults = AppDataWorkspace.defaults
         namedAreas = defaults.data(forKey: "locus.namedAreas")
@@ -1892,6 +1902,43 @@ final class SpoofSession: ObservableObject {
         guard RecentlyDeletedStore.shared.clear(kind: "Saved place") else { lastError = RecentlyDeletedStore.shared.error; return }
         savedPins = []
         SavedPlace.save(savedPins, key: favoritesKey)
+    }
+
+    var savedPinRecovery: [SavedPlace]? { SavedPlace.recovery(key: favoritesKey) }
+    var recentPinRecovery: [SavedPlace]? { SavedPlace.recovery(key: recentsKey) }
+    var savedPinRecoveryExport: Data? { SavedPlace.exportRecovery(key: favoritesKey) }
+    var recentPinRecoveryExport: Data? { SavedPlace.exportRecovery(key: recentsKey) }
+
+    @discardableResult
+    func restoreSavedPinRecovery() -> Bool {
+        guard let places = SavedPlace.restoreRecovery(key: favoritesKey) else { return false }
+        savedPins = places
+        refreshSavedPlaceRecoveryCounts()
+        return true
+    }
+
+    @discardableResult
+    func restoreRecentPinRecovery() -> Bool {
+        guard preferences.saveRecentLocations else { return false }
+        guard let places = SavedPlace.restoreRecovery(key: recentsKey) else { return false }
+        recents = places
+        refreshSavedPlaceRecoveryCounts()
+        return true
+    }
+
+    func discardSavedPinRecovery() {
+        SavedPlace.discardRecovery(key: favoritesKey)
+        refreshSavedPlaceRecoveryCounts()
+    }
+
+    func discardRecentPinRecovery() {
+        SavedPlace.discardRecovery(key: recentsKey)
+        refreshSavedPlaceRecoveryCounts()
+    }
+
+    private func refreshSavedPlaceRecoveryCounts() {
+        savedPinRecoveryCount = SavedPlace.recoveryCopyCount(key: favoritesKey)
+        recentPinRecoveryCount = SavedPlace.recoveryCopyCount(key: recentsKey)
     }
 
     func removeRecent(_ place: SavedPlace) {

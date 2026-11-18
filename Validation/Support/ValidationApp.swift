@@ -47,6 +47,7 @@ enum ValidationFixture {
             _ = TripLibrary().save(route: route, name: longName, mode: .walk,
                 speed: 1.4, smooth: false, favorite: true)
         }
+        if scenario == "import-review" { AppDataWorkspace.defaults.set(Data("corrupt disposable pins".utf8),forKey:"locus.favorites") }
     }
 }
 
@@ -73,6 +74,7 @@ private struct ValidationHost: View {
     var body: some View {
         Group {
             if ValidationFixture.scenario == "route-editing" { ValidationRouteHarness() }
+            else if ValidationFixture.scenario == "import-review" { ValidationImportHarness() }
             else if ValidationFixture.scenario == "backup-settings" { ValidationBackupHarness() }
             else if ValidationFixture.scenario == "deleted-selection" { NavigationStack { RecentlyDeletedView() } }
             else { RootView(incomingShortcut: $shortcut, incomingSessionDetails: $details) }

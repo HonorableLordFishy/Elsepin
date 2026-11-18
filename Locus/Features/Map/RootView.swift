@@ -24,10 +24,26 @@ struct RootView: View {
     @State private var showPlaces = false
     @State private var notice: String?
     @State private var noticeID = UUID()
+    @StateObject private var gpxImport = GPXImportReviewModel()
+    @State private var pendingGPX: [RoutePoint]?
 
     var body: some View {
         presentedTabs
         .onReceive(NotificationCenter.default.publisher(for: .locusImportGPX), perform: importGPX)
+        .sheet(isPresented: $gpxImport.isPresented, onDismiss: {
+            gpxImport.cancel()
+            guard let points = pendingGPX else { return }
+            pendingGPX = nil
+            guard !reset.isResetting, tripLibrary.isCurrentWorkspace,
+                  session.journey == nil, !session.isBusy, !planner.isDrawing, !planner.isPresented else { return }
+            selectedTab = .map
+            planner.useCustom(points.map(\.coordinate), source: .gpx)
+            if let error = planner.error { session.lastError = error }
+        }) {
+            GPXImportReviewView(model: gpxImport) { pendingGPX = $0 }
+        }
+        .onDisappear { gpxImport.cancel(); pendingGPX = nil }
+        .onChange(of: reset.isResetting) { _, resetting in if resetting { gpxImport.cancel() } }
         .onChange(of: incomingSessionDetails) { _, _ in openShortcutIfAllowed() }
         .onChange(of: incomingShortcut) { _, _ in openShortcutIfAllowed() }
         .onChange(of: privacy.canOpenContent) { _, _ in openShortcutIfAllowed() }
@@ -89,11 +105,7 @@ struct RootView: View {
             session.lastError = "Close the current editor and end any moving route before importing a GPX file."
             return
         }
-        do {
-            let points = try GPXCodec.parse(url)
-            selectedTab = .map
-            planner.useCustom(points, source: .gpx)
-        } catch { session.lastError = error.localizedDescription }
+        gpxImport.start(url)
     }
 
     @ViewBuilder private var noticeOverlay: some View {

@@ -1,5 +1,9 @@
 import Foundation
 
+extension Notification.Name {
+    static let developerLoggingDidChange = Notification.Name("locus.developerLoggingDidChange")
+}
+
 /// File I/O stays off the main thread and all changes use one serial queue.
 /// This log is intentionally separate from the short, coordinate-free report.
 final class DeveloperLogStore: @unchecked Sendable {
@@ -90,6 +94,7 @@ final class DeveloperLogStore: @unchecked Sendable {
         defaults.set(value, forKey: Self.enabledKey)
         if value { record("recording_resumed") }
         maintenance(flush: true)
+        NotificationCenter.default.post(name: .developerLoggingDidChange, object: nil)
     }
 
     func clear() async {

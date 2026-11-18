@@ -17,6 +17,7 @@ struct DeveloperLogExportSection: View {
                 .onChange(of: recording) { _, value in
                     DeveloperLogStore.shared.setEnabled(value)
                     DeveloperLogObserver.shared.updateEnergySampling()
+                    DeveloperLogObserver.shared.updateNetworkMonitors()
                 }
             Button { confirmExport = true
             } label: {

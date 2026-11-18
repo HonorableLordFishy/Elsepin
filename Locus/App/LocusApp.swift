@@ -196,7 +196,10 @@ struct LocusApp: App {
         guard !reset.isResetting, !demo.switching else { return }
         if let shortcut = LocusShortcut(url: url) { pendingShortcut = shortcut; drainIncoming(); return }
         guard url.isFileURL, ["plist", "mobiledevicepairing", "mobiledevicepair", "gpx"].contains(url.pathExtension.lowercased()) else { return }
-        let item = PendingImport(url: url, holdsSecurityScope: url.startAccessingSecurityScopedResource())
+        // GPX is parsed asynchronously, so its importer owns the security scope
+        // for the whole read. Ending it here would close access before parsing.
+        let isGPX = url.pathExtension.lowercased() == "gpx"
+        let item = PendingImport(url: url, holdsSecurityScope: isGPX ? false : url.startAccessingSecurityScopedResource())
         if pendingImports.count == 5 {
             let oldest = pendingImports.removeFirst()
             if oldest.holdsSecurityScope { oldest.url.stopAccessingSecurityScopedResource() }

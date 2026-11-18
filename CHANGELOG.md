@@ -9,6 +9,14 @@ Earlier entries describe their original development checkpoints. A later build m
 supersede a pending check or an intermediate behavior. The build history records
 successful packages separately from failed attempts and simulator/device evidence.
 
+## Unreleased — GPX imports, recovery and optional diagnostics
+
+- Read GPX files off the main thread with bounded reads, cancellation and namespace-aware XML parsing. Review tracks, routes or waypoints before applying; choose separated sections or explicitly connect gaps. Imports never start movement.
+- Keep unreadable saved-place originals, including later damaged copies. Export recovery bytes, restore readable copies or explicitly discard them without deleting readable saved pins. Surface recovery in the Library and Import & export.
+- Stop diagnostic network monitors when recording is off, while preserving background observations when recording is enabled. Ignore stale callbacks and avoid repeated idle remote-notification cleanup.
+- Correct GPX Files registration; preserve settings file import/export and copy/paste. Existing build 90 map gestures and production location engine are unchanged.
+- Added cancellation, stale-result, XML, recovery, lifecycle and native import UI regression coverage. Validation evidence will be recorded after the Mac run; no IPA or release is part of this change.
+
 ## Build 90 - private test candidate (18 November 2026)
 
 - Fix continuous saved-pin visibility measurement during zoom and rotation.

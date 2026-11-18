@@ -357,6 +357,12 @@ struct PlacesView: View {
             }
             if category == .favorites || category == .pins {
                 Section("Pins") {
+                    if session.savedPinRecoveryCount > 0 {
+                        NavigationLink { SavedPlaceRecoveryView() } label: {
+                            Label("Some saved-place data couldn't be read. Review recovery copies.", systemImage: "exclamationmark.triangle")
+                                .font(.subheadline)
+                        }
+                    }
                     if category == .pins {
                         Button("Add pin", systemImage: "mappin.and.ellipse") {
                             pinEditor = PinDraft(place: nil, center: session.pin ?? session.simulated ?? session.realCoordinate)

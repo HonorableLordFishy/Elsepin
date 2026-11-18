@@ -9,6 +9,7 @@ final class DeveloperLogObserver {
     private var observers: [NSObjectProtocol] = []
     private var subscriptions = Set<AnyCancellable>()
     private var monitors: [NWPathMonitor] = []
+    private let monitorLifecycle = DiagnosticMonitorLifecycle()
     private var started = false
     private weak var observedSession: SpoofSession?
     private var energyTask: Task<Void, Never>?
@@ -20,6 +21,7 @@ final class DeveloperLogObserver {
         observedSession = session
         SystemDiagnosticCollector.shared.start()
         updateEnergySampling()
+        updateNetworkMonitors()
         DeveloperLogStore.shared.record("observation_started", ["device": UIDevice.current.model])
         let names: [(Notification.Name, String)] = [
             (UIApplication.didBecomeActiveNotification, "app_active"),
@@ -43,25 +45,18 @@ final class DeveloperLogObserver {
                 Task { @MainActor in
                     if name == UIApplication.willResignActiveNotification || name == UIApplication.didEnterBackgroundNotification {
                         Self.shared.stopEnergySampling()
-                    } else { Self.shared.updateEnergySampling() }
+                    } else {
+                        Self.shared.updateEnergySampling()
+                        Self.shared.updateNetworkMonitors()
+                    }
                     if name == ProcessInfo.thermalStateDidChangeNotification { Self.shared.recordEnergy(reason: "thermal_changed") }
                 }
             })
         }
-        // Network observations never change session status or gate Stop/writes.
-        // A Wi-Fi path being available is not proof of a developer connection.
-        for (label, monitor) in [("default", NWPathMonitor()), ("wifi", NWPathMonitor(requiredInterfaceType: .wifi))] {
-            monitor.pathUpdateHandler = { path in
-                let interfaces = [NWInterface.InterfaceType.wifi, .cellular, .wiredEthernet, .loopback, .other]
-                    .filter { path.usesInterfaceType($0) }.map { String(describing: $0) }.joined(separator: ",")
-                DeveloperLogStore.shared.record("network_path_changed", ["monitor": label,
-                    "status": String(describing: path.status), "interfaces": interfaces,
-                    "expensive": String(path.isExpensive), "constrained": String(path.isConstrained),
-                    "meaning": "Observed path only; does not identify an Airplane Mode toggle or VPN health."])
-            }
-            monitor.start(queue: DispatchQueue(label: "locus.log.network.\(label)", qos: .utility))
-            monitors.append(monitor)
-        }
+        // Recording changes are also delivered by DeveloperLogStore.setEnabled.
+        observers.append(NotificationCenter.default.addObserver(forName: .developerLoggingDidChange, object: nil, queue: .main) { _ in
+            Task { @MainActor in Self.shared.updateNetworkMonitors() }
+        })
         session.$status.removeDuplicates().sink { status in
             DeveloperLogStore.shared.record("session_status", ["phase": status.phase.rawValue])
         }.store(in: &subscriptions)
@@ -98,6 +93,45 @@ final class DeveloperLogObserver {
                 self.recordEnergy(reason: "interval")
             }
         }
+    }
+
+    func updateNetworkMonitors() {
+        let needed = DiagnosticMonitorPolicy.observesNetwork(
+            loggingEnabled: DeveloperLogStore.shared.enabled,
+            appActive: UIApplication.shared.applicationState == .active)
+        monitorLifecycle.update(enabled: needed, start: { startNetworkMonitors(token: $0) }, stop: { stopNetworkMonitors() })
+    }
+
+    /// Network observations never change session status or gate Stop/writes.
+    /// A Wi-Fi path being available is not proof of a developer connection.
+    private func startNetworkMonitors(token: UUID) {
+        guard monitors.isEmpty else { return }
+        for (label, monitor) in [("default", NWPathMonitor()), ("wifi", NWPathMonitor(requiredInterfaceType: .wifi))] {
+            monitor.pathUpdateHandler = { path in
+                guard DeveloperLogStore.shared.enabled else { return }
+                let interfaces = [NWInterface.InterfaceType.wifi, .cellular, .wiredEthernet, .loopback, .other]
+                    .filter { path.usesInterfaceType($0) }.map { String(describing: $0) }.joined(separator: ",")
+                let details = ["monitor": label,
+                    "status": String(describing: path.status), "interfaces": interfaces,
+                    "expensive": String(path.isExpensive), "constrained": String(path.isConstrained),
+                    "meaning": "Observed path only; does not identify an Airplane Mode toggle or VPN health."]
+                Task { @MainActor in
+                    guard Self.shared.monitorLifecycle.accepts(token) else { return }
+                    DeveloperLogStore.shared.record("network_path_changed", details)
+                }
+            }
+            monitor.start(queue: DispatchQueue(label: "locus.log.network.\(label)", qos: .utility))
+            monitors.append(monitor)
+        }
+    }
+
+    private func stopNetworkMonitors() {
+        guard !monitors.isEmpty else { return }
+        for monitor in monitors {
+            monitor.pathUpdateHandler = nil
+            monitor.cancel()
+        }
+        monitors.removeAll()
     }
 
     private func stopEnergySampling() {

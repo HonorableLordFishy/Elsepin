@@ -237,7 +237,9 @@ final class RemoteFindMyController: ObservableObject {
         return dates.filter { $0 > now }.min()
     }
     func stop() {
-        guard monitoring || task != nil || response != nil else { cancelDeadline(); return }
+        guard RemoteCheckLifecyclePolicy.needsTeardown(
+            monitoring: monitoring, hasTask: task != nil, hasResponse: response != nil,
+            hasNetwork: network != nil, checking: checking) else { return }
         let oldID = ticket; let oldLink = link
         monitoring = false
         ticket = UUID(); task?.cancel(); task = nil; network?.invalidateAndCancel(); network = nil

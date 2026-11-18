@@ -240,61 +240,7 @@ extension RoutePoint {
 }
 
 enum GPXCodec {
-    static func parse(_ url: URL) throws -> [CLLocationCoordinate2D] {
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-        let data = try Data(contentsOf: url)
-        let text = String(decoding: data, as: UTF8.self)
-        var coords: [CLLocationCoordinate2D] = []
-        let pattern = #"lat="([^"]+)"[^>]*lon="([^"]+)""#
-        let regex = try NSRegularExpression(pattern: pattern)
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        regex.enumerateMatches(in: text, range: range) { match, _, _ in
-            guard let match,
-                  let latR = Range(match.range(at: 1), in: text),
-                  let lonR = Range(match.range(at: 2), in: text),
-                  let lat = Double(text[latR]),
-                  let lon = Double(text[lonR]) else { return }
-            coords.append(CLLocationCoordinate2D(latitude: lat, longitude: lon))
-        }
-        // Also support lon before lat
-        if coords.isEmpty {
-            let alt = #"lon="([^"]+)"[^>]*lat="([^"]+)""#
-            let altRegex = try NSRegularExpression(pattern: alt)
-            altRegex.enumerateMatches(in: text, range: range) { match, _, _ in
-                guard let match,
-                      let lonR = Range(match.range(at: 1), in: text),
-                      let latR = Range(match.range(at: 2), in: text),
-                      let lon = Double(text[lonR]),
-                      let lat = Double(text[latR]) else { return }
-                coords.append(CLLocationCoordinate2D(latitude: lat, longitude: lon))
-            }
-        }
-        guard !coords.isEmpty else {
-            throw NSError(domain: "Locus", code: 2, userInfo: [NSLocalizedDescriptionKey: "No track points found in GPX"])
-        }
-        return coords
-    }
-
     static func export(_ coordinates: [CLLocationCoordinate2D], name: String = "Elsepin Route") -> String {
-        let escapedName = name.replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
-        var body = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <gpx version="1.1" creator="Elsepin" xmlns="http://www.topografix.com/GPX/1/1">
-          <trk>
-            <name>\(escapedName)</name>
-            <trkseg>
-
-        """
-        for c in coordinates {
-            body += String(format: "      <trkpt lat=\"%.6f\" lon=\"%.6f\"></trkpt>\n", c.latitude, c.longitude)
-        }
-        body += """
-            </trkseg>
-          </trk>
-        </gpx>
-        """
-        return body
+        GPXDocument.export(coordinates.map(RoutePoint.init), name: name)
     }
 }
