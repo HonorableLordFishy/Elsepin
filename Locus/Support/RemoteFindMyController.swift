@@ -27,6 +27,7 @@ final class RemoteFindMyController: ObservableObject {
         didSet {
             UserDefaults.standard.set(enabled, forKey: "locus.remoteFindMy.enabled")
             if enabled { CompanionClient.shared.enabled = false }
+            else if oldValue { clearDeliveredAlerts() }
             refreshLifecycle()
         }
     }
@@ -70,6 +71,7 @@ final class RemoteFindMyController: ObservableObject {
         }
         // A new app process never adopts an old monitoring session.
         cancelDeadline()
+        clearDeliveredAlerts()
     }
     func attach(_ session: SpoofSession) { self.session = session }
     var helperWebsite: URL? {
@@ -235,6 +237,9 @@ final class RemoteFindMyController: ObservableObject {
         if let reportDate { dates.append(reportDate.addingTimeInterval(90)) }
         if let life360ReportDate { dates.append(life360ReportDate.addingTimeInterval(90)) }
         return dates.filter { $0 > now }.min()
+    }
+    private func clearDeliveredAlerts() {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [notificationID])
     }
     func stop() {
         guard RemoteCheckLifecyclePolicy.needsTeardown(

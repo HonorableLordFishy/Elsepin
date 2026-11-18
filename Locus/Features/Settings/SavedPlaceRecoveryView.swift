@@ -119,10 +119,10 @@ struct SavedPlaceRecoveryView: View {
         case .restoreSaved:
             message = session.restoreSavedPinRecovery()
                 ? "Saved places restored from the recovery copy."
-                : "Couldn't restore the saved-place recovery copy. The current library is unchanged."
+                : "Couldn't restore this copy within the saved-place limits. Export it to keep all entries. The current library is unchanged."
         case .restoreRecent:
             message = session.restoreRecentPinRecovery()
-                ? "Recent locations restored from the recovery copy."
+                ? "Recent locations restored using your history limits. The full recovery copy is still available to export."
                 : "Couldn't restore the recent-location recovery copy. Current recent locations are unchanged."
         case .discardSaved:
             session.discardSavedPinRecovery()
@@ -155,9 +155,9 @@ private enum RecoveryAction: String, Identifiable {
     var detail: String {
         switch self {
         case .restoreSaved:
-            return "This replaces the current saved-place library with the preserved copy and removes the recovery copy."
+            return "This replaces the current saved-place library with the readable copy. Other recovery copies stay available to export."
         case .restoreRecent:
-            return "This replaces the current recent-location history with the preserved copy and removes the recovery copy."
+            return "This replaces recent locations using your current history limits. The full recovery copy stays available to export."
         case .discardSaved:
             return "This removes all saved-place recovery copies and any unreadable original. Readable saved places stay unchanged. Export a copy first if you want to keep it."
         case .discardRecent:

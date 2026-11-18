@@ -219,15 +219,21 @@ enum RouteBuilder {
     static func sample(coordinates: [CLLocationCoordinate2D], every meters: CLLocationDistance) -> [CLLocationCoordinate2D] {
         guard coordinates.count > 1 else { return coordinates }
         guard coordinates.allSatisfy({ CLLocationCoordinate2DIsValid($0) }), meters.isFinite, meters > 0 else { return [] }
-        let spacing = max(meters, distance(of: coordinates) / 50_000)
-        var sampled = [coordinates[0]]
-        for (a, b) in zip(coordinates, coordinates.dropFirst()) {
-            let dist = CLLocation(latitude: a.latitude, longitude: a.longitude)
+        let distances = zip(coordinates, coordinates.dropFirst()).map { a, b in
+            CLLocation(latitude: a.latitude, longitude: a.longitude)
                 .distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude))
-            let steps = max(1, Int(ceil(dist / spacing)))
+        }
+        let spacing = max(meters, distances.reduce(0, +) / 50_000)
+        let subdivisions = RouteSamplingBudget.steps(distances: distances, spacing: spacing)
+        guard subdivisions.count == distances.count else { return [] }
+        var sampled = [coordinates[0]]
+        sampled.reserveCapacity(1 + subdivisions.reduce(0, +))
+        for (index, pair) in zip(coordinates, coordinates.dropFirst()).enumerated() {
+            let (a, b) = pair
+            let steps = subdivisions[index]
             for i in 1...steps {
                 let t = Double(i) / Double(steps)
-                sampled.append(RoutePoint(a).interpolated(to: RoutePoint(b), fraction: t).coordinate)
+                sampled.append(i == steps ? b : RoutePoint(a).interpolated(to: RoutePoint(b), fraction: t).coordinate)
             }
         }
         return sampled

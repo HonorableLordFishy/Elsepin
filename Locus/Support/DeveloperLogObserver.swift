@@ -55,7 +55,10 @@ final class DeveloperLogObserver {
         }
         // Recording changes are also delivered by DeveloperLogStore.setEnabled.
         observers.append(NotificationCenter.default.addObserver(forName: .developerLoggingDidChange, object: nil, queue: .main) { _ in
-            Task { @MainActor in Self.shared.updateNetworkMonitors() }
+            Task { @MainActor in
+                Self.shared.updateNetworkMonitors()
+                Self.shared.updateEnergySampling()
+            }
         })
         session.$status.removeDuplicates().sink { status in
             DeveloperLogStore.shared.record("session_status", ["phase": status.phase.rawValue])
@@ -160,6 +163,7 @@ final class DeveloperLogObserver {
     }
 
     func snapshot(session: SpoofSession) {
+        guard DeveloperLogStore.shared.enabled else { return }
         recordEnergy(reason: "export_or_problem")
         DeveloperLogStore.shared.record("session_snapshot", ["phase": session.effectivePhase.rawValue,
             "has_session": String(session.hasSession), "route_active": String(session.routeActive),

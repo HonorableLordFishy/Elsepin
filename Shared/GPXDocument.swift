@@ -9,7 +9,7 @@ struct GPXPath: Identifiable, Equatable, Sendable {
     let name: String
     let kind: GPXPathKind
     let segments: [[RoutePoint]]
-    var points: [RoutePoint] { segments.flatMap { $0 } }
+    var points: [RoutePoint] { segments.count == 1 ? segments[0] : segments.flatMap { $0 } }
     var hasGaps: Bool {
         zip(segments, segments.dropFirst()).contains { left, right in
             guard let end = left.last, let start = right.first else { return false }
@@ -146,7 +146,7 @@ private final class GPXParserDelegate: NSObject, XMLParserDelegate {
     private(set) var cancelled = false
     func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?,
                 qualifiedName qName: String?, attributes: [String: String] = [:]) {
-        if Task.isCancelled { cancelled = true; parser.abortParsing(); return }
+        guard !stopIfCancelled(parser) else { return }
         let ns = namespaceURI ?? ""
         if stack.isEmpty {
             guard elementName == "gpx", ["", "http://www.topografix.com/GPX/1/0", "http://www.topografix.com/GPX/1/1"].contains(ns) else {
@@ -169,12 +169,22 @@ private final class GPXParserDelegate: NSObject, XMLParserDelegate {
         default: break
         }
     }
+    private func stopIfCancelled(_ parser: XMLParser) -> Bool {
+        guard Task.isCancelled else { return false }
+        cancelled = true; parser.abortParsing(); return true
+    }
+    func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
+        guard !stopIfCancelled(parser) else { return }
+        if let text = String(data: CDATABlock, encoding: .utf8) { self.parser(parser, foundCharacters: text) }
+    }
     func parser(_ parser: XMLParser, foundCharacters string: String) {
+        guard !stopIfCancelled(parser) else { return }
         if stack == ["gpx", "trk", "name"] || stack == ["gpx", "rte", "name"] {
             if name.count < 256 { name += String(string.prefix(256 - name.count)) }
         }
     }
     func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
+        guard !stopIfCancelled(parser) else { return }
         if stack == ["gpx", "trk"] || stack == ["gpx", "rte"] {
             let nonempty = segments.filter { !$0.isEmpty }
             if !nonempty.isEmpty {

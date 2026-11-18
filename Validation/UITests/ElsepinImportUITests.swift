@@ -30,6 +30,20 @@ final class ElsepinImportUITests: XCTestCase {
         app.buttons["gpx.apply"].tap()
         XCTAssertTrue(app.staticTexts["Imported 2 points into planner"].waitForExistence(timeout:10))
     }
+    func testLargeGPXCanSaveAndReopenWithoutLosingCorners() {
+        launch()
+        app.buttons["Open large GPX"].tap()
+        XCTAssertTrue(app.buttons["gpx.apply"].waitForExistence(timeout:30))
+        capture("large-gpx-review")
+        app.buttons["gpx.apply"].tap()
+        XCTAssertTrue(app.staticTexts["Large GPX saved and reopened; all corners preserved"].waitForExistence(timeout:30))
+    }
+    func testRecoveryLimitsRetainExportableOriginals() {
+        launch()
+        app.buttons["Check recovery edge cases"].tap()
+        XCTAssertTrue(app.staticTexts["Recovery limits and raw copies preserved"].waitForExistence(timeout:15))
+        capture("recovery-edge-results")
+    }
     func testRootImportOpensActualPlannerAfterReview() {
         app = XCUIApplication(); app.launchArguments = ["--elsepin-ui-test"]
         app.launchEnvironment["ELSEPIN_TEST_SCENARIO"] = "import-root"

@@ -258,7 +258,7 @@ struct RoutePlannerSheet: View {
                     }
                 }
             } message: { Text("Saves the whole path from its start, travel mode, target speed, and all stops.") }
-            .fileImporter(isPresented: $showImporter, allowedContentTypes: [.xml, .data]) { result in
+            .fileImporter(isPresented: $showImporter, allowedContentTypes: [.item]) { result in
                 if case .success(let url) = result { gpxImport.start(url) }
                 else if case .failure(let error) = result { planner.error = error.localizedDescription }
             }

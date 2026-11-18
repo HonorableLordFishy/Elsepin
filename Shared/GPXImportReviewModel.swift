@@ -5,11 +5,13 @@ import Combine
 @MainActor final class GPXImportReviewModel: ObservableObject {
     @Published var isPresented = false
     @Published private(set) var loading = false
-    @Published private(set) var document: GPXImport?
+    @Published private(set) var document: GPXImport? { didSet { updateSelection() } }
     @Published private(set) var error: String?
     @Published var pathIndex = 0 { didSet { segmentIndex = 0 } }
     // -1 explicitly joins every segment. A separated track defaults to one segment.
-    @Published var segmentIndex = 0
+    @Published var segmentIndex = 0 { didSet { updateSelection() } }
+    @Published private(set) var selectedPoints: [RoutePoint] = []
+    private var selectionIsUsable = false
     private var task: Task<Void, Never>?
     private var request = UUID()
     private var workspace = UUID()
@@ -24,15 +26,16 @@ import Combine
         guard let paths = document?.paths, paths.indices.contains(pathIndex) else { return nil }
         return paths[pathIndex]
     }
-    var selectedPoints: [RoutePoint] {
-        guard let path = selectedPath else { return [] }
-        if !path.hasGaps || segmentIndex == -1 { return path.points }
-        return path.segments.indices.contains(segmentIndex) ? path.segments[segmentIndex] : []
+    private func updateSelection() {
+        let points: [RoutePoint]
+        if let path = selectedPath {
+            points = !path.hasGaps || segmentIndex == -1 ? path.points
+                : (path.segments.indices.contains(segmentIndex) ? path.segments[segmentIndex] : [])
+        } else { points = [] }
+        selectionIsUsable = points.count > 1 && points.dropFirst().contains { $0 != points.first }
+        selectedPoints = points
     }
-    var canImport: Bool {
-        let points = selectedPoints
-        return !loading && error == nil && points.count > 1 && points.dropFirst().contains { $0 != points.first }
-    }
+    var canImport: Bool { !loading && error == nil && selectionIsUsable }
     func start(_ url: URL) {
         invalidate()
         self.url = url; workspace = currentWorkspace()

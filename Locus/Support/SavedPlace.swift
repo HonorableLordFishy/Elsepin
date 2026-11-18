@@ -76,7 +76,22 @@ struct SavedPlace: Identifiable, Codable, Equatable {
     }
 
     static func restoreRecovery(key: String) -> [SavedPlace]? {
-        archive(key).restoreRecovery()
+        archive(key).restoreRecovery { places in
+            guard places.count <= 1_000, Set(places.map(\.id)).count == places.count,
+                  places.allSatisfy({ $0.coordinate.isValidForRecovery }) else { return nil }
+            return places
+        }
+    }
+
+    static func restoreRecentRecovery(retention: RecentHistoryRetention, now: Date = Date()) -> [SavedPlace]? {
+        // Keep the full copy available for export, including expired/overflow entries.
+        archive("locus.recents").restoreRecovery(keepingOriginal: true) { places in
+            var seen = Set<String>()
+            return Array(places.filter {
+                $0.coordinate.isValidForRecovery && retention.keeps(visitedAt: $0.visitedAt, now: now)
+                    && seen.insert($0.id).inserted
+            }.prefix(20))
+        }
     }
 
     static func discardRecovery(key: String) {
@@ -88,5 +103,11 @@ struct SavedPlace: Identifiable, Codable, Equatable {
 
     private static func archive(_ key: String) -> RecoverableJSONList<SavedPlace> {
         RecoverableJSONList(key: key, store: AppDataWorkspace.defaults)
+    }
+}
+
+private extension CLLocationCoordinate2D {
+    var isValidForRecovery: Bool {
+        latitude.isFinite && longitude.isFinite && CLLocationCoordinate2DIsValid(self)
     }
 }

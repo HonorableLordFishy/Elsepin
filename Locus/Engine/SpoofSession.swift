@@ -1820,8 +1820,8 @@ final class SpoofSession: ObservableObject {
         recentRouteStore.save(recentRoutes)
     }
     func refreshRecentHistory() {
-        recentRoutes = RecentRoute.kept(recentRoutes, retention: preferences.recentHistoryRetention, enabled: preferences.saveRecentLocations)
-        recentRouteStore.save(recentRoutes)
+        let kept = RecentRoute.kept(recentRoutes, retention: preferences.recentHistoryRetention, enabled: preferences.saveRecentLocations)
+        if kept != recentRoutes { recentRoutes = kept; recentRouteStore.save(kept) }
         let loaded = SavedPlace.loadRecents(retention: preferences.recentHistoryRetention, saveEnabled: preferences.saveRecentLocations)
         if loaded != recents { recents = loaded }
         refreshSavedPlaceRecoveryCounts()
@@ -1920,7 +1920,7 @@ final class SpoofSession: ObservableObject {
     @discardableResult
     func restoreRecentPinRecovery() -> Bool {
         guard preferences.saveRecentLocations else { return false }
-        guard let places = SavedPlace.restoreRecovery(key: recentsKey) else { return false }
+        guard let places = SavedPlace.restoreRecentRecovery(retention: preferences.recentHistoryRetention) else { return false }
         recents = places
         refreshSavedPlaceRecoveryCounts()
         return true

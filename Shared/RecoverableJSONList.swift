@@ -35,12 +35,15 @@ struct RecoverableJSONList<Element: Codable> {
     private var historyKey: String { recoveryKey + ".history" }
     var recoveryCopies: [Data] {
         var copies = store.data(forKey: recoveryKey).map { [$0] } ?? []
-        if let data = store.data(forKey: historyKey), let history = try? decoder.decode([Data].self, from: data) {
-            copies += history.filter { !copies.contains($0) }
+        if let data = store.data(forKey: historyKey) {
+            // A damaged container is itself a recoverable original, even without
+            // a subsequent save. It must remain visible and exportable.
+            let history = (try? decoder.decode([Data].self, from: data)) ?? [data]
+            for copy in history where !copies.contains(copy) { copies.append(copy) }
         }
         return copies
     }
-    var hasRecovery: Bool { !recoveryCopies.isEmpty }
+    var hasRecovery: Bool { store.data(forKey: recoveryKey) != nil || store.data(forKey: historyKey) != nil }
 
     func load() -> LoadResult {
         guard let data = store.data(forKey: key) else { return .missing }
@@ -64,15 +67,37 @@ struct RecoverableJSONList<Element: Codable> {
     }
 
     func recovery() -> [Element]? {
-        recoveryCopies.compactMap { try? decoder.decode([Element].self, from: $0) }.first
+        if let primary = store.data(forKey: recoveryKey), let values = try? decoder.decode([Element].self, from: primary) { return values }
+        for copy in recoveryCopies {
+            if let values = try? decoder.decode([Element].self, from: copy) { return values }
+        }
+        return nil
     }
 
-    /// Write the preserved array back to the live key, then remove the
-    /// recovery copy only after the save succeeds.
-    func restoreRecovery() -> [Element]? {
-        guard let values = recovery(), save(values) else { return nil }
-        discardRecovery()
-        return values
+    /// Consume only the restored copy. Other originals remain exportable.
+    /// A filtered restore retains its original, so limits never discard data.
+    func restoreRecovery(keepingOriginal: Bool = false,
+                         prepare: ([Element]) -> [Element]? = { $0 }) -> [Element]? {
+        for copy in recoveryCopies {
+            guard let decoded = try? decoder.decode([Element].self, from: copy),
+                  let values = prepare(decoded) else { continue }
+            guard save(values) else { return nil }
+            if !keepingOriginal {
+                let remaining = recoveryCopies.filter { $0 != copy }
+                // Prepare the complete replacement before changing any keys.
+                guard let history = try? encoder.encode(Array(remaining.dropFirst())) else { return values }
+                if let first = remaining.first {
+                    store.set(first, forKey: recoveryKey)
+                    if remaining.count > 1 { store.set(history, forKey: historyKey) }
+                    else { store.removeObject(forKey: historyKey) }
+                } else {
+                    store.removeObject(forKey: recoveryKey)
+                    store.removeObject(forKey: historyKey)
+                }
+            }
+            return values
+        }
+        return nil
     }
 
     func discardRecovery() {
@@ -95,8 +120,6 @@ struct RecoverableJSONList<Element: Codable> {
         if store.data(forKey: recoveryKey) == nil { store.set(data, forKey: recoveryKey); return true }
         var copies = recoveryCopies
         if copies.contains(data) { return true }
-        // Preserve a damaged history envelope itself before replacing it.
-        if let history = store.data(forKey: historyKey), (try? decoder.decode([Data].self, from: history)) == nil { copies.append(history) }
         copies.append(data)
         guard let encoded = try? encoder.encode(Array(copies.dropFirst())) else { return false }
         store.set(encoded, forKey: historyKey)
