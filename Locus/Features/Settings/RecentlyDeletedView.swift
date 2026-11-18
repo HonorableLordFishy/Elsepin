@@ -43,6 +43,7 @@ struct RecentlyDeletedView: View {
                 if let error = bin.error { Text(error).foregroundStyle(LocusTheme.statusWarn) }
             } footer: { Text(selecting ? "Drag down the circles to select several items. Kept for 30 days." : "Kept for 30 days.") }
         }
+        .gesture(selectionDrag)
         .onPreferenceChange(DeletedSelectionFrames.self) { rowFrames = $0 }
         .overlay(alignment: .top) {
 #if ELSEPIN_UI_TESTING
@@ -99,10 +100,11 @@ struct RecentlyDeletedView: View {
         HStack(spacing: 4) {
             // Only this gutter claims a drag. Text and trailing whitespace keep
             // native List scrolling; taps remain ordinary accessible buttons.
-            DeletedSelectionCircle(selected: selection.ids.contains(item.id),
-                tint: UIColor(LocusTheme.accent), onTap: { selection.toggle(item.id) },
-                gesture: selectionDrag(from: item.id))
-                .frame(width: 44, height: 52)
+            Button { selection.toggle(item.id) } label: {
+                Image(systemName: selection.ids.contains(item.id) ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(selection.ids.contains(item.id) ? LocusTheme.accent : .secondary)
+                    .frame(width: 44, height: 52).contentShape(Rectangle())
+            }
             Button { selection.toggle(item.id) } label: {
                 itemLabel(item).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                     .contentShape(Rectangle())
@@ -122,25 +124,21 @@ struct RecentlyDeletedView: View {
         .accessibilityAction { selection.toggle(item.id) }
     }
 
-    private func selectionDrag(from anchor: UUID) -> DeletedSelectionPanGesture {
-        // List cells have separate hosting roots. Match the gesture and row
-        // geometry in global space, not a named space across those roots.
-        DeletedSelectionPanGesture(onChanged: { point in
-                guard selecting, deleting == nil, point.y.isFinite else { return }
-                let items = visibleItems
-                if sweep == nil {
-                    sweep = DeletedItemsSelectionSweep(anchor: anchor, orderedIDs: items.map(\.id), selectedIDs: selection.ids)
-                }
-                // Row bounds handle variable heights; nearest edges bridge gaps.
-                // The immutable ordered range also covers rows skipped by touch events.
-                let available = Set(items.map(\.id))
-                guard let target = SelectionRowHitTest.target(y: point.y,
-                    frames: rowFrames.filter { available.contains($0.key) }) else { return }
-#if ELSEPIN_UI_TESTING
-                ValidationGestureTrace.record("drag y=\(point.y) rows=\(rowFrames.count) anchor=\(items.firstIndex(where: { $0.id == anchor }) ?? -1) target=\(items.firstIndex(where: { $0.id == target }) ?? -1) bounds=\(String(describing: rowFrames[anchor]))")
-#endif
-                if let ids = sweep?.selection(through: target), ids != selection.ids { selection.ids = ids }
-            }, onEnded: { sweep = nil })
+    private var selectionDrag: DeletedSelectionPanGesture {
+        DeletedSelectionPanGesture(canBegin: { point in
+            selecting && deleting == nil && rowFrames.contains { _, frame in
+                CGRect(x: frame.minX, y: frame.minY, width: 44, height: frame.height).contains(point)
+            }
+        }, onBegan: { point in
+            guard let anchor = SelectionRowHitTest.target(y: point.y, frames: rowFrames) else { return }
+            sweep = DeletedItemsSelectionSweep(anchor: anchor,
+                orderedIDs: visibleItems.map(\.id), selectedIDs: selection.ids)
+        }, onChanged: { point in
+            guard selecting, deleting == nil,
+                  let target = SelectionRowHitTest.target(y: point.y, frames: rowFrames),
+                  let ids = sweep?.selection(through: target) else { return }
+            if ids != selection.ids { selection.ids = ids }
+        }, onEnded: { sweep = nil })
     }
 
     private func itemLabel(_ item: DeletedLibraryItem) -> some View {
@@ -174,52 +172,46 @@ struct RecentlyDeletedView: View {
     }
 }
 
-/// Give the circle gutter first refusal over List's native scrolling pan.
-/// Drags on the text remain ordinary scrolling; taps still use the Button.
-private struct DeletedSelectionPanGesture {
+/// A list-level recognizer survives selection-driven cell replacement. Only
+/// touches beginning in a measured circle gutter can claim the scrolling pan.
+private struct DeletedSelectionPanGesture: UIGestureRecognizerRepresentable {
+    var canBegin: (CGPoint) -> Bool
+    var onBegan: (CGPoint) -> Void
     var onChanged: (CGPoint) -> Void
     var onEnded: () -> Void
-}
-
-private struct DeletedSelectionCircle: UIViewRepresentable {
-    var selected: Bool
-    var tint: UIColor
-    var onTap: () -> Void
-    var gesture: DeletedSelectionPanGesture
-    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
-    func makeUIView(context: Context) -> UIButton {
-        let button = UIButton(type: .custom)
-        button.addTarget(context.coordinator, action: #selector(Coordinator.tap), for: .touchUpInside)
-        let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pan(_:)))
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator(parent: self) }
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
         pan.maximumNumberOfTouches = 1
         pan.cancelsTouchesInView = true
         pan.delegate = context.coordinator
-        button.addGestureRecognizer(pan)
-        return button
+        return pan
     }
-    func updateUIView(_ button: UIButton, context: Context) {
+    func updateUIGestureRecognizer(_ recognizer: UIPanGestureRecognizer, context: Context) {
         context.coordinator.parent = self
-        button.setImage(UIImage(systemName: selected ? "checkmark.circle.fill" : "circle",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 20)), for: .normal)
-        button.tintColor = selected ? tint : .secondaryLabel
-        button.isAccessibilityElement = false // The whole row exposes its selection action.
     }
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        var parent: DeletedSelectionCircle
-        init(parent: DeletedSelectionCircle) { self.parent = parent }
-        @objc func tap() { parent.onTap() }
-        @objc func pan(_ recognizer: UIPanGestureRecognizer) {
+    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
 #if ELSEPIN_UI_TESTING
-        ValidationGestureTrace.record("pan state \(recognizer.state.rawValue)")
+        ValidationGestureTrace.record("list pan state \(recognizer.state.rawValue)")
 #endif
         switch recognizer.state {
-        case .began, .changed: parent.gesture.onChanged(recognizer.location(in: nil))
+        case .began:
+            onBegan(context.coordinator.start)
+            onChanged(recognizer.location(in: nil))
+        case .changed: onChanged(recognizer.location(in: nil))
         case .ended:
-            parent.gesture.onChanged(recognizer.location(in: nil))
-            parent.gesture.onEnded()
-        case .cancelled, .failed: parent.gesture.onEnded()
+            onChanged(recognizer.location(in: nil)); onEnded()
+        case .cancelled, .failed: onEnded()
         default: break
         }
+    }
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var parent: DeletedSelectionPanGesture
+        var start = CGPoint.zero
+        init(parent: DeletedSelectionPanGesture) { self.parent = parent }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            start = touch.location(in: nil)
+            return parent.canBegin(start)
         }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
             !(other is UIPanGestureRecognizer)
