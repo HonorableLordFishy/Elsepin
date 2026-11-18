@@ -175,6 +175,7 @@ private final class GPXParserDelegate: NSObject, XMLParserDelegate {
     }
     func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
         guard !stopIfCancelled(parser) else { return }
+        guard stack == ["gpx", "trk", "name"] || stack == ["gpx", "rte", "name"] else { return }
         if let text = String(data: CDATABlock, encoding: .utf8) { self.parser(parser, foundCharacters: text) }
     }
     func parser(_ parser: XMLParser, foundCharacters string: String) {

@@ -9,6 +9,15 @@ Earlier entries describe their original development checkpoints. A later build m
 supersede a pending check or an intermediate behavior. The build history records
 successful packages separately from failed attempts and simulator/device evidence.
 
+## Build 92 - review follow-up (18 November 2026)
+
+- Keep all supplied GPX corners while budgeting added interpolation points, so accepted large imports remain saveable. Calculate segment distances once and cache the chosen import preview.
+- Export damaged recovery-history containers immediately. Restore only the chosen copy, keep unrelated originals, and retain complete recent-history recovery data when applying retention limits. Refuse invalid or oversized saved-place restores without trimming their originals.
+- Stop optional energy sampling when developer logging is disabled, skip disabled-log snapshots and unchanged recent-route writes, and clear stale remote-check alerts at startup or explicit disabling without repeated idle cleanup.
+- Check cancellation during XML text/CDATA/end callbacks. Let GPX Files selection accept provider items, with format and size validation still enforced after selection.
+- Preserve copy/paste settings import, existing UI, recovery formats, all historical changelog entries and the production location engine. No hard cap silently removes recovery copies. Storage growth from repeated distinct corruption remains an explicit preservation tradeoff; import UI/energy improvements are not measured battery claims.
+- Native and simulator results will be recorded in BUILD-HISTORY.md after validation. No release publication.
+
 ## Unreleased — GPX imports, recovery and optional diagnostics
 
 - Read GPX files off the main thread with bounded reads, cancellation and namespace-aware XML parsing. Review tracks, routes or waypoints before applying; choose separated sections or explicitly connect gaps. Imports never start movement.

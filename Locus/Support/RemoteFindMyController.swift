@@ -34,7 +34,7 @@ final class RemoteFindMyController: ObservableObject {
     @Published var alerts: Bool {
         didSet {
             UserDefaults.standard.set(alerts, forKey: "locus.remoteFindMy.alerts")
-            if !alerts { cancelDeadline() }
+            if !alerts { cancelDeadline(); clearDeliveredAlerts() }
             else if monitoring { scheduleDeadline() }
         }
     }
@@ -239,7 +239,7 @@ final class RemoteFindMyController: ObservableObject {
         return dates.filter { $0 > now }.min()
     }
     private func clearDeliveredAlerts() {
-        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [notificationID])
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [notificationID, deadlineID, "shift.life360.checks"])
     }
     func stop() {
         guard RemoteCheckLifecyclePolicy.needsTeardown(
