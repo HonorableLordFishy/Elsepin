@@ -5,6 +5,7 @@ import SwiftUI
 struct MapPinAdjustmentGesture: UIGestureRecognizerRepresentable {
     var enabled: Bool
     var pin: CLLocationCoordinate2D?
+    var savedSymbolSize: Double? = nil
     var onBegan: () -> Void
     var onMoved: (CLLocationCoordinate2D) -> Void
     var onEnded: (CLLocationCoordinate2D?, Bool) -> Void
@@ -101,8 +102,7 @@ struct MapPinAdjustmentGesture: UIGestureRecognizerRepresentable {
             guard parent.enabled, gestureRecognizer.numberOfTouches == 1,
                   let pin = parent.pin, let anchor = projected(pin),
                   let finger = pointer(gestureRecognizer) else { return false }
-            // MapKit marker artwork sits above its coordinate (the pointed tip).
-            return CGRect(x: anchor.x - 28, y: anchor.y - 64, width: 56, height: 80).contains(finger)
+            return MapPinHitArea.bounds(anchor: anchor, savedSymbolSize: parent.savedSymbolSize).contains(finger)
         }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
             other is UIPinchGestureRecognizer || other is UIRotationGestureRecognizer

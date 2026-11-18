@@ -36,10 +36,27 @@ final class PairOnDeviceService: ObservableObject {
     private var activityVisibilityTask: Task<Void, Never>?
     private var pinNotificationIdentifier = "locus.pairing.pin.\(UUID().uuidString)"
     private var pinNotificationActive = false
-    private var backgroundTask = UIBackgroundTaskIdentifier.invalid
-    private let keepAlive = PairingKeepAlive()
-    private let audioKeepAlive = SilentAudioKeepAlive()
+    private let keepAlive = PairingKeepAliveResources()
     private let advertiser = PairableHostAdvertiser()
+
+    deinit {
+        restartTask?.cancel()
+        activityVisibilityTask?.cancel()
+        // Deinitialization is not guaranteed to run on the main actor. Capture
+        // only the resources, never the disappearing service itself.
+        let box = callbackBox, resources = keepAlive, advertiser = advertiser
+        let owner = activityOwner, identifier = pinNotificationIdentifier
+        Task { @MainActor in
+            box?.cancel()
+            box?.owner = nil
+            advertiser.stop()
+            resources.stop()
+            if let owner { SessionActivityController.shared.endPairing(owner: owner) }
+            let center = UNUserNotificationCenter.current()
+            center.removePendingNotificationRequests(withIdentifiers: [identifier])
+            center.removeDeliveredNotifications(withIdentifiers: [identifier])
+        }
+    }
 
     var isBusy: Bool {
         switch phase {
@@ -277,22 +294,13 @@ final class PairOnDeviceService: ObservableObject {
     }
 
     private func beginKeepAlive() {
-        UIApplication.shared.isIdleTimerDisabled = true
-        keepAlive.start()
-        audioKeepAlive.start()
-        guard backgroundTask == .invalid else { return }
-        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "locus.pairable-host") { [weak self] in
+        keepAlive.start { [weak self] in
             self?.handleFailure("Pairing ran out of background time. Return to Elsepin and try again. Your saved pairing has not changed.")
         }
     }
 
     private func endKeepAlive() {
-        UIApplication.shared.isIdleTimerDisabled = false
         keepAlive.stop()
-        audioKeepAlive.stop()
-        guard backgroundTask != .invalid else { return }
-        UIApplication.shared.endBackgroundTask(backgroundTask)
-        backgroundTask = .invalid
     }
 
     private func requestNotificationPermission() {
@@ -402,28 +410,6 @@ final class PairOnDeviceService: ObservableObject {
 
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: outputPath)
         DispatchQueue.main.async { box.owner?.handleSuccess(box) }
-    }
-}
-
-private final class PairingKeepAlive: NSObject, CLLocationManagerDelegate {
-    private let manager = CLLocationManager()
-
-    override init() {
-        super.init()
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
-        manager.pausesLocationUpdatesAutomatically = false
-        manager.allowsBackgroundLocationUpdates = true
-        manager.showsBackgroundLocationIndicator = true
-    }
-
-    func start() {
-        manager.requestAlwaysAuthorization()
-        manager.startUpdatingLocation()
-    }
-
-    func stop() {
-        manager.stopUpdatingLocation()
     }
 }
 

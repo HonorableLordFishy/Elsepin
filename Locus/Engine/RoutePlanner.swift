@@ -408,7 +408,7 @@ final class RoutePlanner: ObservableObject {
             if let range = RouteLegEditing.range(to: target, stops: route.stops, length: route.track.length),
                // Playback intentionally advances at a boundary. Reopening needs
                // the incoming section instead, without playback's epsilon.
-               let section = route.travelSections.last(where: { $0.startMetres < range.upperBound }) {
+               let section = RouteTravelSection.incoming(in: route.travelSections, endingAt: range.upperBound) {
                 choices[target] = RouteLegChoice(mode: section.mode, speedMPH: section.speedMPH)
             }
         }
@@ -532,7 +532,7 @@ final class RoutePlanner: ObservableObject {
         for target in targets where choices[target] == nil {
             if let route = selectedRoute,
                let range = RouteLegEditing.range(to: target, stops: route.stops, length: route.track.length),
-               let section = RouteTravelSection.current(in: route.travelSections, at: range.lowerBound) {
+               let section = RouteTravelSection.incoming(in: route.travelSections, endingAt: range.upperBound) {
                 choices[target] = RouteLegChoice(mode: section.mode, speedMPH: section.speedMPH)
             } else { choices[target] = fallback }
         }

@@ -138,6 +138,27 @@ private final class ValidationRouteDriver: ObservableObject {
             check(requests.last?.choices[id] == choice, "Swap lost a reopened leg's mode or speed", failures: &failures)
         }
 
+        // Add a pause inside a split incoming leg. This new stop has no explicit
+        // choice yet; editing a different leg must backfill its trailing mode.
+        var split = mixed
+        split.travelSections = [
+            .init(id: UUID(), startMetres: 0, endMetres: length / 8, mode: .walk, speedMPH: 3),
+            .init(id: UUID(), startMetres: length / 8, endMetres: length / 3, mode: .run, speedMPH: 7)
+        ] + Array((mixed.travelSections ?? []).dropFirst())
+        planner.useSaved(split)
+        planner.addPathStop(name: "Split pause", fraction: 0.25, wait: 20)
+        if let pause = planner.waypoints.first(where: { $0.name == "Split pause" }),
+           let geometry = planner.selectedRoute?.track.points {
+            check(planner.sectionChoices[pause.id] == nil, "Split-pause regression did not exercise missing choice", failures: &failures)
+            let beforeRequests = requests.count
+            planner.setSectionChoice(.init(mode: .eBike, speedMPH: 18), for: RouteLegChoice.destinationID,
+                                     defaultMode: .walk, pathChoice: .keepCurrent)
+            check(planner.sectionChoices[pause.id] == RouteLegChoice(mode: .run, speedMPH: 7),
+                  "Editing another leg backfilled the split pause with its first fragment", failures: &failures)
+            check(planner.selectedRoute?.track.points == geometry && requests.count == beforeRequests,
+                  "Choice backfill changed geometry or requested new directions", failures: &failures)
+        } else { failures.append("Split pause fixture missing") }
+
         planner.useSaved(trip)
         planner.addPathStop(name: "Added pause", fraction: 0.5, wait: 45)
         check(planner.waypoints.count == stops.count + 1 && planner.waypoints.contains { $0.name == "Added pause" && $0.waitSeconds == 45 },

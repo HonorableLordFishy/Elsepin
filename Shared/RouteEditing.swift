@@ -34,6 +34,12 @@ struct RouteTravelSection: Identifiable, Codable, Equatable {
         guard metres.isFinite else { return nil }
         return sections.first { metres < $0.endMetres - 0.001 } ?? sections.last
     }
+    /// Editors describe the incoming fragment of a leg, not the fragment that
+    /// playback will enter after crossing its endpoint.
+    static func incoming(in sections: [Self], endingAt metres: Double) -> Self? {
+        guard metres.isFinite, metres > 0 else { return nil }
+        return sections.last { $0.startMetres < metres }
+    }
     static func remainingSeconds(_ sections: [Self], from metres: Double,
                                  overrides: [UUID: Double] = [:]) -> Double {
         sections.reduce(0) { total, section in

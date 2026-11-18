@@ -13,6 +13,9 @@ successful packages separately from failed attempts and simulator/device evidenc
 
 - Preserve saved-route editing identity and unchanged long stored paths.
 - Keep each incoming leg's movement mode and speed when reopening or reversing a saved route.
+- Keep split-leg settings consistent when another leg is edited after adding a pause.
+- Release pairing resources if its screen/service disappears; old cleanup cannot stop a newer attempt.
+- Match saved-pin hold areas to centered symbols and the selected pin size.
 - Repair pairing cleanup, pin import metadata, and next-route jump timers.
 - Remember map style; isolate demo widgets and improve large-text actions.
 - Repair interrupted log tails and first-use encrypted push delivery.

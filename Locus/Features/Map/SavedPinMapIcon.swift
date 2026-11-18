@@ -20,7 +20,8 @@ struct SavedPinMapIcon: View {
             }
                 .font(.system(size: pinSize, weight: .medium, design: .rounded))
                 .foregroundStyle(pin.tint.swatch)
-                .frame(width: max(44, pinSize + 8), height: max(44, pinSize + 8))
+                .frame(width: MapPinHitArea.savedIconSide(symbolSize: pinSize),
+                       height: MapPinHitArea.savedIconSide(symbolSize: pinSize))
                 .contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityLabel(pin.displayName)
             .accessibilityHint(preparesLocation ? "Shows the name and selects this pin. Tap Teleport to move." : "Shows or hides the name without changing your route.")

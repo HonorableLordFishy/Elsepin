@@ -1,5 +1,42 @@
 # Elsepin current handoff
 
+## Gemini follow-up fixes — 17 November 2026 (local, no build)
+
+Owner deferred GitHub login and requested fixing confirmed findings only, without
+building. A one-time sign-in reminder is scheduled for 19:00 America/Los_Angeles.
+No repository visibility changes, pushes, CI runs, IPA builds or releases in this pass.
+
+Reviewed the follow-up report in attachment `911578ec-5af7-4478-9b29-d849017d1dfe`.
+Confirmed and corrected:
+- `setSectionChoice` backfilled a missing split-leg choice from its first fragment,
+  while reopening used its incoming fragment. Both now share the incoming lookup.
+  Added three portable regression tests and a production-planner simulator fixture
+  that adds a pause to a split leg, edits another leg, and checks settings/geometry.
+- PairOnDeviceService had no lifetime cleanup if its screen's reset was skipped.
+  Deinit now schedules main-actor cleanup without capturing the dying service,
+  cancels the native callback box/discovery and its own notification/activity.
+  PairingKeepAliveResources stops its predecessor before acquiring global audio,
+  idle-timer and background resources; repeated/late cleanup is a no-op. It restores
+  the prior idle-timer value. Production pairing protocol and location engine stay intact.
+- Selected saved-pin hold bounds used pointed-marker geometry. Centered symbols now
+  share their actual size with hit testing; native markers retain the existing bounds.
+  Added four portable geometry tests. Context-menu gesture arbitration still needs UI evidence.
+
+Not confirmed as code defects: Live Activity stale-date redraw timing, mismatched
+app/extension entitlements from sideloaders, and fast scrolling in Recently Deleted.
+The latter replaces (does not accumulate) measured global frames on every preference
+update and uses that same space for the gesture. No speculative behavior changes made.
+
+Validation: 24 Python script/resource tests passed; diff whitespace check passed.
+New Swift cases and the new simulator fixture are authored but NOT executed. Windows
+has no Swift/Xcode runner, and the owner expressly said not to build. Earlier 582-test
+and simulator evidence below predates these changes and does not validate this patch.
+Next authorized native validation must compile app/extension, run the added cases,
+and check pairing owner destruction plus rapid stop/restart (including late cleanup),
+native background-task release, bottom/large pin holds vs context menus, long-list
+selection while scrolling, ActivityKit expiry on a locked phone and actual signed
+widget App Group access. Do not claim simulator fixtures prove physical spoofing.
+
 ## Old-address redirect removed; public source requested — 17 November 2026
 
 The owner clarified that source should be public under HonorableLordFishy for
