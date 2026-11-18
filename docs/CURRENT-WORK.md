@@ -1,3 +1,15 @@
+# Current update - 18 November 2026
+
+Authorized: validate/fix interactions, push, build IPA and replace only the old Elsepin IPA. Do not publish. Source remains private under HonorableLordFishy; old N3moStudio placeholder untouched.
+
+Run 44362835127 at 57e9819 passed 589 Swift tests and all three focused iPhone 17/iOS 27.2 UI checks: continuous pin cutoff/rotation, lower-edge pin hold without sending a location, and Recently Deleted sweep after fast scrolling/cancelling delete confirmation. Screenshots inspected. Earlier broad run 44218493934 passed the other 17 UI cases and production app/extension compilation. An Apple _UIGravityWellEffectAnchorView warning remains in the simulator log; no crash and all assertions pass. Simulator evidence does not prove physical spoofing, power usage or signed App Group behavior.
+
+Fixes: local map projection and flat-map rotated-rect fallback; centered saved-symbol hit bounds and native hold arbitration; suppress a trailing tap that reset the adjusted preview; keep selection pan on the stable List rather than recycled cells. Traces are simulator-only. Build 90 at 146d3e6 is packaging in run 44367209048; project.yml is authoritative, XcodeGen regenerates the native project in CI.
+
+Gemini ZIP at Downloads/Elsepin-review-source-2026-11-18.zip is snapshot 9c71594 and predates the final gesture fixes. Preserve it as the reviewed snapshot. Its unbounded GPX import and always-running diagnostic monitors were verified as follow-up candidates, not added to this build. Its dx:42 claim confuses whole-row and circle coordinates; XML name text does not require quote escaping. No bulk application of Gemini's patch.
+
+---
+
 # Elsepin current handoff
 
 ## Gemini follow-up fixes — 17 November 2026 (local, no build)

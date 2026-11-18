@@ -9,6 +9,15 @@ Earlier entries describe their original development checkpoints. A later build m
 supersede a pending check or an intermediate behavior. The build history records
 successful packages separately from failed attempts and simulator/device evidence.
 
+## Build 90 - private test candidate (18 November 2026)
+
+- Fix continuous saved-pin visibility measurement during zoom and rotation.
+- Let a lower-edge hold adjust a saved-pin preview without a trailing tap resetting it.
+- Keep Recently Deleted drag selection alive during list-cell updates; retain text scrolling.
+- Include the reviewed route-leg and pairing cleanup fixes below; preserve historical entries.
+- Pass three focused simulator interaction checks (44362835127), with screenshots inspected. Earlier broad validation passed 17 other UI cases and 589 Swift tests. Physical pairing/spoofing and energy use remain device-only checks.
+- No release publication authorized.
+
 ## Unreleased — reviewed fixes (17 November 2026)
 
 - Preserve saved-route editing identity and unchanged long stored paths.
