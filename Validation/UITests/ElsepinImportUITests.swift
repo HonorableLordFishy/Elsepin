@@ -71,7 +71,7 @@ final class ElsepinImportUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Recovery discarded after reload"].waitForExistence(timeout:5))
     }
     func testNarrowLargeTextDarkImportControlsRemainReachable() {
-        launch(["--narrow","--large-text","--dark","--accessibility-fallback"])
+        launch(["--narrow","--large-text","--dark"])
         app.buttons["Open GPX"].tap()
         let apply = app.buttons["gpx.apply"]
         XCTAssertTrue(apply.waitForExistence(timeout:10))
