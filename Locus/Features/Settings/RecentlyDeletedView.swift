@@ -45,6 +45,11 @@ struct RecentlyDeletedView: View {
             } footer: { Text(selecting ? "Drag down the circles to select several items. Kept for 30 days." : "Kept for 30 days.") }
         }
         .onPreferenceChange(DeletedSelectionFrames.self) { rowFrames = $0 }
+        .overlay(alignment: .top) {
+#if ELSEPIN_UI_TESTING
+            ValidationGestureTraceView()
+#endif
+        }
         .onChange(of: sweepActive) { _, active in if !active { sweep = nil } }
         .onDisappear { sweep = nil; rowFrames = [:] }
         .shiftScreen().loggedNavigationTitle("Recently Deleted").navigationBarTitleDisplayMode(.inline)
@@ -137,6 +142,9 @@ struct RecentlyDeletedView: View {
                 let available = Set(items.map(\.id))
                 guard let target = SelectionRowHitTest.target(y: value.location.y,
                     frames: rowFrames.filter { available.contains($0.key) }) else { return }
+#if ELSEPIN_UI_TESTING
+                ValidationGestureTrace.record("drag y=\(value.location.y) rows=\(rowFrames.count) anchor=\(items.firstIndex(where: { $0.id == anchor }) ?? -1) target=\(items.firstIndex(where: { $0.id == target }) ?? -1) bounds=\(String(describing: rowFrames[anchor]))")
+#endif
                 if let ids = sweep?.selection(through: target), ids != selection.ids { selection.ids = ids }
             }
             .onEnded { _ in sweep = nil }

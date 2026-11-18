@@ -247,6 +247,7 @@ struct MapHomeView: View {
 #if ELSEPIN_UI_TESTING
             .overlay(alignment: .topLeading) {
                 if ValidationFixture.scenario == "pin-adjustment" {
+                    ValidationGestureTraceView()
                     VStack {
                         Text(session.pin.map { "\($0.latitude),\($0.longitude)" } ?? "none")
                             .accessibilityIdentifier("validation.adjustedPin")

@@ -4,6 +4,21 @@
 import SwiftUI
 import UIKit
 
+enum ValidationGestureTrace {
+    static func record(_ value: String) {
+        let previous = UserDefaults.standard.string(forKey: "validation.gestureTrace") ?? ""
+        UserDefaults.standard.set(String((previous + " | " + value).suffix(1800)), forKey: "validation.gestureTrace")
+    }
+}
+
+struct ValidationGestureTraceView: View {
+    @AppStorage("validation.gestureTrace") private var trace = "No gesture events"
+    var body: some View {
+        Text(trace).font(.system(size: 8)).lineLimit(8)
+            .accessibilityIdentifier("validation.gestureTrace").allowsHitTesting(false)
+    }
+}
+
 /// Records the production map's actual filtered pins. Counters advance only in
 /// its continuous callback, never in its settled callback or synthetic engine.
 @MainActor final class ValidationPinVisibilityProbe: ObservableObject {

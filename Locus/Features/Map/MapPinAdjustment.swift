@@ -30,6 +30,9 @@ struct MapPinAdjustmentGesture: UIGestureRecognizerRepresentable {
         if hold.isEnabled != enabled { hold.isEnabled = enabled }
     }
     func handleUIGestureRecognizerAction(_ hold: UILongPressGestureRecognizer, context: Context) {
+#if ELSEPIN_UI_TESTING
+        ValidationGestureTrace.record("hold state \(hold.state.rawValue)")
+#endif
         let coordinator = context.coordinator
         if hold.numberOfTouches > 1 {
             coordinator.finish(cancelled: true, hold: hold)
@@ -93,21 +96,36 @@ struct MapPinAdjustmentGesture: UIGestureRecognizerRepresentable {
             var candidate = touch.view
             var touchedControl = false
             var insideAnnotation = false
+#if ELSEPIN_UI_TESTING
+            var ancestry: [String] = []
+#endif
             while let view = candidate {
+#if ELSEPIN_UI_TESTING
+                ancestry.append(String(describing: type(of: view)))
+#endif
                 if view is UIControl { touchedControl = true }
                 if view is MKAnnotationView { insideAnnotation = true }
                 if let nativeMap = view as? MKMapView { map = nativeMap; break }
                 candidate = view.superview
             }
+#if ELSEPIN_UI_TESTING
+            ValidationGestureTrace.record("receive \(ancestry.joined(separator: ">")) map=\(map != nil) control=\(touchedControl) annotation=\(insideAnnotation)")
+#endif
             // Saved symbols are buttons hosted inside map annotations. They
             // must allow the selected-pin hold, while map controls stay excluded.
             if touchedControl && !insideAnnotation { map = nil; return false }
             return map?.window != nil
         }
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+#if ELSEPIN_UI_TESTING
+            ValidationGestureTrace.record("begin? enabled=\(parent.enabled) touches=\(gestureRecognizer.numberOfTouches) pin=\(parent.pin != nil)")
+#endif
             guard parent.enabled, gestureRecognizer.numberOfTouches == 1,
                   let pin = parent.pin, let anchor = projected(pin),
                   let finger = pointer(gestureRecognizer) else { return false }
+#if ELSEPIN_UI_TESTING
+            ValidationGestureTrace.record("anchor=\(anchor) finger=\(finger) saved=\(String(describing: parent.savedSymbolSize))")
+#endif
             return MapPinHitArea.bounds(anchor: anchor, savedSymbolSize: parent.savedSymbolSize).contains(finger)
         }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
