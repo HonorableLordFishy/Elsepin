@@ -191,6 +191,9 @@ private struct DeletedSelectionPanGesture: UIGestureRecognizerRepresentable {
     }
     func updateUIGestureRecognizer(_ recognizer: UIPanGestureRecognizer, context: Context) {}
     func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
+#if ELSEPIN_UI_TESTING
+        ValidationGestureTrace.record("pan state \(recognizer.state.rawValue)")
+#endif
         switch recognizer.state {
         case .began, .changed: onChanged(recognizer.location(in: nil))
         case .ended, .cancelled, .failed: onEnded()
@@ -198,6 +201,9 @@ private struct DeletedSelectionPanGesture: UIGestureRecognizerRepresentable {
         }
     }
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            !(other is UIPanGestureRecognizer)
+        }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
             other is UIPanGestureRecognizer
         }

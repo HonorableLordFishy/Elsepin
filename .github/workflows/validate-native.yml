@@ -226,5 +226,7 @@ jobs:
         if: always()
         with:
           name: simulator-validation-evidence
-          path: .build/simulator-evidence
+          path: |
+            .build/simulator-evidence
+            !.build/simulator-evidence/UI.xcresult/**
           retention-days: 7

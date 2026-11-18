@@ -129,7 +129,9 @@ struct MapPinAdjustmentGesture: UIGestureRecognizerRepresentable {
             return MapPinHitArea.bounds(anchor: anchor, savedSymbolSize: parent.savedSymbolSize).contains(finger)
         }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-            other is UIPinchGestureRecognizer || other is UIRotationGestureRecognizer
+            // SwiftUI's button/annotation recognizers begin before a hold.
+            // They must not prevent it; the hold still excludes map panning.
+            !(other is UIPanGestureRecognizer)
         }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
             // The selected pin's shorter hold gets first refusal. If the touch
