@@ -284,7 +284,7 @@ struct MapHomeView: View {
 
     private func updateSavedPinViewport(_ context: MapCameraUpdateContext, proxy: MapProxy) {
         savedPinViewport.update(rect: context.rect, size: mapSize) {
-            proxy.convert($0, from: .named("routeMap"))
+            proxy.convert($0, from: .local)
         }
     }
 
@@ -364,7 +364,7 @@ struct MapHomeView: View {
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
             mapSize = size
             if let rect = savedPinViewport.rect {
-                savedPinViewport.update(rect: rect, size: size) { proxy.convert($0, from: .named("routeMap")) }
+                savedPinViewport.update(rect: rect, size: size) { proxy.convert($0, from: .local) }
                 refreshSavedPins(session.savedPins)
             }
         }
