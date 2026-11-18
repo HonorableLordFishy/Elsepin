@@ -1,5 +1,20 @@
 # Elsepin build history
 
+## Private build 90 delivered - 18 November 2026
+
+Run `44367209048` built source `146d3e6` successfully. App and extension are
+2.6.1 build 90, linked against SDK 27.1. 589 Swift regressions and the workflow
+Python/helper checks passed. Verified the original downloaded IPA, identities,
+versions, icons/resources and absence of simulator test probes. Delivered
+`Elsepin 2.6.1 build 90.ipa` to the requested folder and removed only build 89.
+Source remains private; no release or website publication.
+
+Focused simulator run `44362835127` passed all three final gesture/visibility
+checks; screenshots inspected. Earlier broad-run evidence covers 17 other UI
+cases. Physical pairing, movement, Stop/clear, signed widgets and battery remain
+phone checks; no claim of measured energy savings.
+
+
 ## Official 2.6.1 (89) published - 16 November 2026
 
 The owner explicitly requested publication and private source. Published release
