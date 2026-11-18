@@ -99,12 +99,10 @@ struct RecentlyDeletedView: View {
         HStack(spacing: 4) {
             // Only this gutter claims a drag. Text and trailing whitespace keep
             // native List scrolling; taps remain ordinary accessible buttons.
-            Button { selection.toggle(item.id) } label: {
-                Image(systemName: selection.ids.contains(item.id) ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(selection.ids.contains(item.id) ? LocusTheme.accent : .secondary)
-                    .frame(width: 44, height: 52).contentShape(Rectangle())
-            }
-            .gesture(selectionDrag(from: item.id))
+            DeletedSelectionCircle(selected: selection.ids.contains(item.id),
+                tint: UIColor(LocusTheme.accent), onTap: { selection.toggle(item.id) },
+                gesture: selectionDrag(from: item.id))
+                .frame(width: 44, height: 52)
             Button { selection.toggle(item.id) } label: {
                 itemLabel(item).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                     .contentShape(Rectangle())
@@ -178,29 +176,51 @@ struct RecentlyDeletedView: View {
 
 /// Give the circle gutter first refusal over List's native scrolling pan.
 /// Drags on the text remain ordinary scrolling; taps still use the Button.
-private struct DeletedSelectionPanGesture: UIGestureRecognizerRepresentable {
+private struct DeletedSelectionPanGesture {
     var onChanged: (CGPoint) -> Void
     var onEnded: () -> Void
-    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
-    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
-        let pan = UIPanGestureRecognizer()
+}
+
+private struct DeletedSelectionCircle: UIViewRepresentable {
+    var selected: Bool
+    var tint: UIColor
+    var onTap: () -> Void
+    var gesture: DeletedSelectionPanGesture
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+    func makeUIView(context: Context) -> UIButton {
+        let button = UIButton(type: .custom)
+        button.addTarget(context.coordinator, action: #selector(Coordinator.tap), for: .touchUpInside)
+        let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pan(_:)))
         pan.maximumNumberOfTouches = 1
         pan.cancelsTouchesInView = true
         pan.delegate = context.coordinator
-        return pan
+        button.addGestureRecognizer(pan)
+        return button
     }
-    func updateUIGestureRecognizer(_ recognizer: UIPanGestureRecognizer, context: Context) {}
-    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
+    func updateUIView(_ button: UIButton, context: Context) {
+        context.coordinator.parent = self
+        button.setImage(UIImage(systemName: selected ? "checkmark.circle.fill" : "circle",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 20)), for: .normal)
+        button.tintColor = selected ? tint : .secondaryLabel
+        button.isAccessibilityElement = false // The whole row exposes its selection action.
+    }
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var parent: DeletedSelectionCircle
+        init(parent: DeletedSelectionCircle) { self.parent = parent }
+        @objc func tap() { parent.onTap() }
+        @objc func pan(_ recognizer: UIPanGestureRecognizer) {
 #if ELSEPIN_UI_TESTING
         ValidationGestureTrace.record("pan state \(recognizer.state.rawValue)")
 #endif
         switch recognizer.state {
-        case .began, .changed: onChanged(recognizer.location(in: nil))
-        case .ended, .cancelled, .failed: onEnded()
+        case .began, .changed: parent.gesture.onChanged(recognizer.location(in: nil))
+        case .ended:
+            parent.gesture.onChanged(recognizer.location(in: nil))
+            parent.gesture.onEnded()
+        case .cancelled, .failed: parent.gesture.onEnded()
         default: break
         }
-    }
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
             !(other is UIPanGestureRecognizer)
         }

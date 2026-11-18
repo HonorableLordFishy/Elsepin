@@ -21,6 +21,7 @@ struct MapHomeView: View {
     @State private var showSearch = false
     @State private var showRouteSearch = false
     @State private var selectedSavedPin: String?
+    @State private var lastPinAdjustmentEnd = -Double.infinity
     @State private var thermallyLimited = ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue
     @State private var savedPinViewport = SavedPinMapViewport()
     @Namespace private var mapScope
@@ -126,6 +127,10 @@ struct MapHomeView: View {
                 var transaction = Transaction(); transaction.disablesAnimations = true
                 withTransaction(transaction) { adjustedPin = coordinate }
             }, onEnded: { coordinate, cancelled in
+                lastPinAdjustmentEnd = ProcessInfo.processInfo.systemUptime
+#if ELSEPIN_UI_TESTING
+                ValidationGestureTrace.record("commit \(String(describing: coordinate)) allowed=\(canAdjustPin) cancelled=\(cancelled)")
+#endif
                 // This edits only a preview. No location command is sent here.
                 if !cancelled, canAdjustPin, let coordinate { session.selectPin(coordinate) }
                 adjustedPin = nil
@@ -152,6 +157,10 @@ struct MapHomeView: View {
                         pinSize: preferences.mapPinSize,
                         labelBackground: ShiftPalette.color(.surface, style: preferences.visualStyle),
                         preparesLocation: canPlacePin) {
+                        // The annotation's SwiftUI button can deliver its tap
+                        // after the native hold finishes. Do not reselect the old
+                        // saved coordinate over the newly adjusted preview.
+                        guard ProcessInfo.processInfo.systemUptime - lastPinAdjustmentEnd > 0.3 else { return }
                         let action = MapPinPlacement.savedPinAction(hasJourney: session.journey != nil,
                             hasPreparedRoute: planner.preparedRoute != nil, drawing: planner.isDrawing, adjusting: pinAdjusting)
                         guard action != .ignore else { return }
