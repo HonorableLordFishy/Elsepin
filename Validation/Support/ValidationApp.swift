@@ -37,7 +37,7 @@ enum ValidationFixture {
         UserDefaults.standard.set(false, forKey: "locus.connectionAlerts")
         if scenario == "deleted-selection" {
             for index in (1...40).reversed() {
-                _ = RecentlyDeletedStore.shared.keep(.place(SavedPlace(name: String(format: "Test deleted pin %02d", index),
+                _ = RecentlyDeletedStore.shared.keep(.place(BackupPlace(name: String(format: "Test deleted pin %02d", index),
                     latitude: points[1].latitude, longitude: points[1].longitude)))
             }
         }
