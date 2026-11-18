@@ -1,3 +1,24 @@
+# Current update - build 92 packaging requested, 18 November 2026
+
+Owner requested confirmed review fixes, simulator validation then IPA replacement;
+no publication. Owner has 3% usage left and may stop while remote build runs.
+Validation run 44404889551 at 70291df passed 634 Swift tests, 27 resource checks,
+helpers, production app/extension compile and seven UI scenarios on iPhone 17/iOS27.2.
+Zero UI failures/skips/runtime warnings. Large GPX saved and reopened with all
+supplied vertices retained. Recovery limit/export cases passed. Screenshots inspected.
+Evidence: .build/artifacts/build92-validation/{device,simulator}.
+
+482e350 subsequently extends identical stale-alert cleanup to Life360 and alert
+disabling, and avoids decoding ignored CDATA into strings. No UI layout changes;
+final IPA workflow reruns portable tests/native compile. project.yml advances to 92.
+Pending: wait for build-ipa workflow, download original raw IPA (gh run download
+extracts raw IPA; use authenticated artifact archive_download_url instead), verify
+version/identity/resources/digest/ZIP and replace only previous Elsepin IPA in
+C:/Users/naith/Desktop/ipa/My Projects (N3mo Studio). Keep evidence elsewhere.
+Source remains private. No release publication. Native spoofing/battery remain
+physical-device checks. Recovery copies are not silently capped or truncated.
+
+---
 # Current update - private build 91 delivered, 18 November 2026
 
 Owner subsequently authorized IPA packaging and asked about existing update checks.
