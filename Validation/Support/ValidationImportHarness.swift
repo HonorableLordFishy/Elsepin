@@ -40,6 +40,10 @@ struct ValidationImportHarness: View {
                 }
             }) {
                 GPXImportReviewView(model:model) { pending = $0 }
+                    .environment(\.dynamicTypeSize, ValidationFixture.largeText ? .accessibility5 : .large)
+                    .frame(maxWidth: ProcessInfo.processInfo.arguments.contains("--narrow") ? 320 : .infinity)
+                    .environment(\.accessibilityReduceMotion, ValidationFixture.fallback)
+                    .environment(\.accessibilityReduceTransparency, ValidationFixture.fallback)
             }
         }
     }
