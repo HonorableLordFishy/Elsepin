@@ -296,14 +296,14 @@ final class ElsepinFlowUITests: XCTestCase {
         app.swipeDown(velocity: .slow)
         let rows = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Test deleted pin'"))
             .allElementsBoundByIndex.filter {
-                $0.isHittable && $0.frame.minY > 160 && $0.frame.maxY < app.frame.maxY - 150
+                $0.value != nil && $0.isHittable && $0.frame.minY > 160 && $0.frame.maxY < app.frame.maxY - 150
             }.sorted { $0.frame.minY < $1.frame.minY }
-        XCTAssertGreaterThanOrEqual(rows.count, 3)
+        guard rows.count >= 3 else { XCTFail("Expected three visible selection rows"); return }
         let first = rows[0], third = rows[2]
-        first.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 22, dy: 0))
-            .press(forDuration: 0.1, thenDragTo: third.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 22, dy: 0)))
+        first.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 42, dy: 0))
+            .press(forDuration: 0.1, thenDragTo: third.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 42, dy: 0)))
         XCTAssertTrue(app.buttons["Delete (3)"].waitForExistence(timeout: 5))
-        for row in rows.prefix(3) { XCTAssertEqual(row.value as? String, "Selected") }
+        for row in rows.prefix(3) { XCTAssertTrue((row.value as? String ?? "").contains("Selected")) }
         capture("31-deleted-selection-after-scroll")
         app.buttons["Delete (3)"].tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))

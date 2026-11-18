@@ -91,11 +91,17 @@ struct MapPinAdjustmentGesture: UIGestureRecognizerRepresentable {
             }
             map = nil
             var candidate = touch.view
+            var touchedControl = false
+            var insideAnnotation = false
             while let view = candidate {
-                if view is UIControl { return false }
+                if view is UIControl { touchedControl = true }
+                if view is MKAnnotationView { insideAnnotation = true }
                 if let nativeMap = view as? MKMapView { map = nativeMap; break }
                 candidate = view.superview
             }
+            // Saved symbols are buttons hosted inside map annotations. They
+            // must allow the selected-pin hold, while map controls stay excluded.
+            if touchedControl && !insideAnnotation { map = nil; return false }
             return map?.window != nil
         }
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
