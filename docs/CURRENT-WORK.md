@@ -1,3 +1,14 @@
+# Current update - GPX/recovery integration, 18 November 2026
+
+Authorized: correct the reviewed ZIP, preserve features, validate in Simulator before merging locally. No IPA or publication. Source remains private. Validation branch: codex/gpx-recovery-validation-20261118.
+
+Corrected GPX cancellation/stale results, structural XML parsing, multi-path/waypoint import review and explicit segment joining; preserved repeated unreadable saved-place copies, durable discard and recovery export; gated diagnostic monitors without losing background logging and reduced idle notification cleanup. Production location engine, build 90 gesture fixes, settings file/paste imports and historical changelog are preserved.
+
+Validated production source 15b5bfc in private run 44386371938: 625 Swift tests, 27 resource tests, helper job, production app/extension compilation and five native simulator scenarios passed. Screenshots inspected. An initial largest-text fixture did not propagate its settings into the sheet; fixed and rechecked in run 44392831262 at 25f7a3c (one passing layout recheck, 625 Swift tests). Intermediate run 44387926237 failed only on invalid test-only accessibility environment overrides, removed before the passing follow-up. Production source is unchanged after 15b5bfc.
+
+See GPX-RECOVERY-VALIDATION.md for changes, limitations and run links; local logs/screenshots are under .build/review-validation. Merge this validated branch locally only; do not package or publish until requested. Current delivered IPA remains build 90. Phone-only Files-provider access, physical spoofing/Stop, signing and battery claims remain untested here.
+
+---
 # Current update - 18 November 2026
 
 Authorized: validate/fix interactions, push, build IPA and replace only the old Elsepin IPA. Do not publish. Source remains private under HonorableLordFishy; old N3moStudio placeholder untouched.
@@ -1572,3 +1583,4 @@ Swift syntax checks passed for the three affected files and diff checks passed.
 No native Swift tests/compiler or phone gesture validation run yet; no build,
 push or release. Next device check: drag down/up across circles before and after
 scrolling, reverse direction, release/restart and confirm Delete count matches.
+
