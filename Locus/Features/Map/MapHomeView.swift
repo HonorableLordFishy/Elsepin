@@ -110,12 +110,12 @@ struct MapHomeView: View {
         session.savedPins.first { RoutePoint($0.coordinate).distance(to: RoutePoint(coordinate)) <= 5 }
     }
 
-    private func pinAdjustmentGesture() -> MapPinAdjustmentGesture {
+    private func pinAdjustmentGesture(onSavedSymbol: Bool = false) -> MapPinAdjustmentGesture {
         // Use the same visibility/distance rule as the selected marker below.
         let usesSavedSymbol = preferences.showSavedPinsOnMap && session.pin.map { coordinate in
             visibleSavedPins.contains { RoutePoint($0.coordinate).distance(to: RoutePoint(coordinate)) < 1 }
         } == true
-        return MapPinAdjustmentGesture(enabled: canAdjustPin, pin: session.pin,
+        return MapPinAdjustmentGesture(enabled: canAdjustPin && usesSavedSymbol == onSavedSymbol, pin: session.pin,
             savedSymbolSize: usesSavedSymbol ? preferences.mapPinSize : nil,
             onBegan: {
                 pinAdjustmentCamera = sketchViewport.camera?.copy() as? MKMapCamera
@@ -169,6 +169,7 @@ struct MapHomeView: View {
                             pinEditor = PinDraft(place: pin, center: pin.coordinate)
                         }
                     }
+                    .gesture(pinAdjustmentGesture(onSavedSymbol: true))
                 }.annotationTitles(.hidden)
             }
         }

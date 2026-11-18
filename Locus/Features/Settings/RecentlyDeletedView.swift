@@ -12,7 +12,6 @@ struct RecentlyDeletedView: View {
     @State private var messageTitle = "Couldn't restore"
     @State private var rowFrames: [UUID: CGRect] = [:]
     @State private var sweep: DeletedItemsSelectionSweep?
-    @GestureState private var sweepActive = false
     private var visibleItems: [DeletedLibraryItem] { bin.items.filter { $0.isRetained(at: Date()) } }
     var body: some View {
         List {
@@ -50,7 +49,6 @@ struct RecentlyDeletedView: View {
             ValidationGestureTraceView()
 #endif
         }
-        .onChange(of: sweepActive) { _, active in if !active { sweep = nil } }
         .onDisappear { sweep = nil; rowFrames = [:] }
         .shiftScreen().loggedNavigationTitle("Recently Deleted").navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -106,7 +104,7 @@ struct RecentlyDeletedView: View {
                     .foregroundStyle(selection.ids.contains(item.id) ? LocusTheme.accent : .secondary)
                     .frame(width: 44, height: 52).contentShape(Rectangle())
             }
-            .highPriorityGesture(selectionDrag(from: item.id))
+            .gesture(selectionDrag(from: item.id))
             Button { selection.toggle(item.id) } label: {
                 itemLabel(item).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                     .contentShape(Rectangle())
@@ -126,13 +124,11 @@ struct RecentlyDeletedView: View {
         .accessibilityAction { selection.toggle(item.id) }
     }
 
-    private func selectionDrag(from anchor: UUID) -> some Gesture {
+    private func selectionDrag(from anchor: UUID) -> DeletedSelectionPanGesture {
         // List cells have separate hosting roots. Match the gesture and row
         // geometry in global space, not a named space across those roots.
-        DragGesture(minimumDistance: 8, coordinateSpace: .global)
-            .updating($sweepActive) { _, active, _ in active = true }
-            .onChanged { value in
-                guard selecting, deleting == nil, value.location.y.isFinite else { return }
+        DeletedSelectionPanGesture(onChanged: { point in
+                guard selecting, deleting == nil, point.y.isFinite else { return }
                 let items = visibleItems
                 if sweep == nil {
                     sweep = DeletedItemsSelectionSweep(anchor: anchor, orderedIDs: items.map(\.id), selectedIDs: selection.ids)
@@ -140,14 +136,13 @@ struct RecentlyDeletedView: View {
                 // Row bounds handle variable heights; nearest edges bridge gaps.
                 // The immutable ordered range also covers rows skipped by touch events.
                 let available = Set(items.map(\.id))
-                guard let target = SelectionRowHitTest.target(y: value.location.y,
+                guard let target = SelectionRowHitTest.target(y: point.y,
                     frames: rowFrames.filter { available.contains($0.key) }) else { return }
 #if ELSEPIN_UI_TESTING
-                ValidationGestureTrace.record("drag y=\(value.location.y) rows=\(rowFrames.count) anchor=\(items.firstIndex(where: { $0.id == anchor }) ?? -1) target=\(items.firstIndex(where: { $0.id == target }) ?? -1) bounds=\(String(describing: rowFrames[anchor]))")
+                ValidationGestureTrace.record("drag y=\(point.y) rows=\(rowFrames.count) anchor=\(items.firstIndex(where: { $0.id == anchor }) ?? -1) target=\(items.firstIndex(where: { $0.id == target }) ?? -1) bounds=\(String(describing: rowFrames[anchor]))")
 #endif
                 if let ids = sweep?.selection(through: target), ids != selection.ids { selection.ids = ids }
-            }
-            .onEnded { _ in sweep = nil }
+            }, onEnded: { sweep = nil })
     }
 
     private func itemLabel(_ item: DeletedLibraryItem) -> some View {
@@ -178,6 +173,34 @@ struct RecentlyDeletedView: View {
     private enum RestoreError: LocalizedError {
         case exists
         var errorDescription: String? { "An item with this identity is already saved. Keep it, or delete it before restoring the older version." }
+    }
+}
+
+/// Give the circle gutter first refusal over List's native scrolling pan.
+/// Drags on the text remain ordinary scrolling; taps still use the Button.
+private struct DeletedSelectionPanGesture: UIGestureRecognizerRepresentable {
+    var onChanged: (CGPoint) -> Void
+    var onEnded: () -> Void
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
+        pan.maximumNumberOfTouches = 1
+        pan.cancelsTouchesInView = true
+        pan.delegate = context.coordinator
+        return pan
+    }
+    func updateUIGestureRecognizer(_ recognizer: UIPanGestureRecognizer, context: Context) {}
+    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        switch recognizer.state {
+        case .began, .changed: onChanged(recognizer.location(in: nil))
+        case .ended, .cancelled, .failed: onEnded()
+        default: break
+        }
+    }
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+            other is UIPanGestureRecognizer
+        }
     }
 }
 

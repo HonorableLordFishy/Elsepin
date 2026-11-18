@@ -131,6 +131,11 @@ struct MapPinAdjustmentGesture: UIGestureRecognizerRepresentable {
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
             other is UIPinchGestureRecognizer || other is UIRotationGestureRecognizer
         }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+            // The selected pin's shorter hold gets first refusal. If the touch
+            // is outside its bounds, the ordinary context-menu hold can proceed.
+            other is UILongPressGestureRecognizer
+        }
     }
 }
 
