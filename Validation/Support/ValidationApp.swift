@@ -35,6 +35,12 @@ enum ValidationFixture {
         try? FileManager.default.removeItem(at: support.appendingPathComponent("Locus"))
         UserDefaults.standard.set(false, forKey: "locus.liveActivities")
         UserDefaults.standard.set(false, forKey: "locus.connectionAlerts")
+        if scenario == "deleted-selection" {
+            for index in (1...40).reversed() {
+                _ = RecentlyDeletedStore.shared.keep(.place(SavedPlace(name: String(format: "Test deleted pin %02d", index),
+                    latitude: points[1].latitude, longitude: points[1].longitude)))
+            }
+        }
         if scenario != "empty" {
             SavedPlace.save([SavedPlace(name: longName, latitude: points[1].latitude,
                 longitude: points[1].longitude, favorite: true)], key: "locus.favorites")
@@ -68,6 +74,7 @@ private struct ValidationHost: View {
         Group {
             if ValidationFixture.scenario == "route-editing" { ValidationRouteHarness() }
             else if ValidationFixture.scenario == "backup-settings" { ValidationBackupHarness() }
+            else if ValidationFixture.scenario == "deleted-selection" { NavigationStack { RecentlyDeletedView() } }
             else { RootView(incomingShortcut: $shortcut, incomingSessionDetails: $details) }
         }
             .modifier(AppearancePresentation())
@@ -113,6 +120,11 @@ private struct ValidationHost: View {
                 }
                 if !sessionScenario && !ValidationFixture.scenario.hasPrefix("home-") {
                     session.selectPin(ValidationFixture.points[0], name: "Test garden entrance")
+                }
+                if ValidationFixture.scenario == "pin-adjustment" {
+                    preferences.mapPinSize = 48
+                    preferences.mapPinVisibilityMiles = 20
+                    session.selectPin(ValidationFixture.points[1], name: ValidationFixture.longName)
                 }
                 if ValidationFixture.scenario == "search" { showSearch = true }
             }

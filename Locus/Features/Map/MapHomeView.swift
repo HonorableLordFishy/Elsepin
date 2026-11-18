@@ -246,6 +246,16 @@ struct MapHomeView: View {
             }
 #if ELSEPIN_UI_TESTING
             .overlay(alignment: .topLeading) {
+                if ValidationFixture.scenario == "pin-adjustment" {
+                    VStack {
+                        Text(session.pin.map { "\($0.latitude),\($0.longitude)" } ?? "none")
+                            .accessibilityIdentifier("validation.adjustedPin")
+                        Text(session.simulated == nil ? "No location sent" : "Location sent")
+                            .accessibilityIdentifier("validation.pinCommand")
+                    }.font(.caption).padding(.top, 280).allowsHitTesting(false)
+                }
+            }
+            .overlay(alignment: .topLeading) {
                 if ValidationFixture.scenario == "map-pins" {
                     ValidationPinVisibilityControls(probe: pinVisibilityProbe) { action in
                         followMovement = false

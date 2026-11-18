@@ -147,6 +147,8 @@ jobs:
             done
           elif [[ "$UI_FOCUS" == pins ]]; then
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testSavedPinsCrossCutoffDuringPinchAndStayVisibleWhenRotated")
+            test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testDeletedSelectionAfterLongListScroll")
+            test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testSavedPinLowerEdgeHoldOnlyMovesPreview")
           elif [[ "$UI_FOCUS" == routes ]]; then
             for test_name in testUsualSpeedsApplyToNewRoutesAndPersist testSavedLegModeAndCustomSpeedsSurviveReopening testRecalculateSavedRouteRetainsStopsAndSavesNewSpeed; do
               test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$test_name")

@@ -289,6 +289,40 @@ final class ElsepinFlowUITests: XCTestCase {
                                     "\(id) must clear the solid navigation bar")
         }
     }
+    func testDeletedSelectionAfterLongListScroll() {
+        launch("deleted-selection", narrow: false)
+        app.buttons["Select"].tap()
+        for _ in 0..<3 { app.swipeUp(velocity: .fast) }
+        app.swipeDown(velocity: .slow)
+        let rows = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Test deleted pin'"))
+            .allElementsBoundByIndex.filter {
+                $0.isHittable && $0.frame.minY > 160 && $0.frame.maxY < app.frame.maxY - 150
+            }.sorted { $0.frame.minY < $1.frame.minY }
+        XCTAssertGreaterThanOrEqual(rows.count, 3)
+        let first = rows[0], third = rows[2]
+        first.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 22, dy: 0))
+            .press(forDuration: 0.1, thenDragTo: third.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 22, dy: 0)))
+        XCTAssertTrue(app.buttons["Delete (3)"].waitForExistence(timeout: 5))
+        for row in rows.prefix(3) { XCTAssertEqual(row.value as? String, "Selected") }
+        capture("31-deleted-selection-after-scroll")
+        app.buttons["Delete (3)"].tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
+        app.alerts.firstMatch.buttons["Cancel"].tap()
+        XCTAssertTrue(first.exists)
+    }
+    func testSavedPinLowerEdgeHoldOnlyMovesPreview() {
+        launch("pin-adjustment", narrow: false)
+        let pin = app.buttons["Test botanical garden walking route beside the riverside observatory and community orchard"]
+        XCTAssertTrue(pin.waitForExistence(timeout: 12))
+        let coordinate = app.staticTexts["validation.adjustedPin"]
+        let before = coordinate.label
+        let bottom = pin.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+        bottom.press(forDuration: 0.35, thenDragTo: bottom.withOffset(CGVector(dx: 65, dy: -35)))
+        let moved = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in coordinate.label != before }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 5), .completed)
+        XCTAssertEqual(app.staticTexts["validation.pinCommand"].label, "No location sent")
+        capture("32-pin-lower-edge-adjustment")
+    }
     func testIdleTraySitsAboveSolidNavigation() {
         checkIdleTray(solid: true)
     }
