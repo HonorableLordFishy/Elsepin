@@ -1,5 +1,26 @@
 # Elsepin build history
 
+## Private build 91 delivered - 18 November 2026
+
+Private run `44395217550` built `bdb190081d1fe5d030e6b7f09916ac3b78002f1a` successfully.
+625 Swift tests (including stable update checks), resource and helper checks passed;
+app/extension compiled and packaged as 2.6.1 (91). Downloaded the original artifact,
+verified archive integrity, identities, versions, arm64 binaries, icons/resources and
+artifact digest before replacing only build 90 in the requested IPA folder.
+Earlier GPX/recovery simulator evidence is in GPX-RECOVERY-VALIDATION.md; this
+metadata-only build retains that validated production implementation.
+
+The previous build 90 contains the correct public Elsepin-Releases update endpoint;
+its update-check implementation is unchanged. Authenticated live metadata returns
+stable v2.6.1. The anonymous check on this workstation hit GitHub's IP rate limit,
+so successful anonymous retrieval is not claimed. Existing stable 2.6.1 installs
+require a newer version tag (for example v2.6.2), not just build 91, to show an update.
+Checks run on foreground/settings entry at most daily, or manually, with server
+backoff respected. They link to downloads; installation is not automatic.
+
+Source remains private. No release published. Physical spoofing, signing and battery
+remain device-only checks.
+
 ## Private build 90 delivered - 18 November 2026
 
 Run `44367209048` built source `146d3e6` successfully. App and extension are

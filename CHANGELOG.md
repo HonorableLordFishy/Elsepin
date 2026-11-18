@@ -15,7 +15,7 @@ successful packages separately from failed attempts and simulator/device evidenc
 - Keep unreadable saved-place originals, including later damaged copies. Export recovery bytes, restore readable copies or explicitly discard them without deleting readable saved pins. Surface recovery in the Library and Import & export.
 - Stop diagnostic network monitors when recording is off, while preserving background observations when recording is enabled. Ignore stale callbacks and avoid repeated idle remote-notification cleanup.
 - Correct GPX Files registration; preserve settings file import/export and copy/paste. Existing build 90 map gestures and production location engine are unchanged.
-- Added cancellation, stale-result, XML, recovery, lifecycle and native import UI regression coverage. Validation evidence will be recorded after the Mac run; no IPA or release is part of this change.
+- Added cancellation, stale-result, XML, recovery, lifecycle and native import UI regression coverage. Validated with 625 Swift tests, 27 resource checks, helper tests and five simulator scenarios plus a narrow-screen/large-text recheck. Included in the requested private test build 91; no release publication.
 
 ## Build 90 - private test candidate (18 November 2026)
 

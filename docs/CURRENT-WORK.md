@@ -1,3 +1,14 @@
+# Current update - private build 91 delivered, 18 November 2026
+
+Owner subsequently authorized IPA packaging and asked about existing update checks.
+Built source bdb1900 in private run 44395217550; 625 Swift tests and workflow checks
+passed. Verified original IPA and delivered Elsepin 2.6.1 build 91.ipa to the usual
+folder, replacing only build 90. No release published; source verified private.
+Build history records update-check behavior and anonymous rate-limit limitation.
+The production version remains 2.6.1; a future stable release must increment it for
+existing 2.6.1 users to receive the newer-version notice.
+
+---
 # Current update - GPX/recovery integration, 18 November 2026
 
 Authorized: correct the reviewed ZIP, preserve features, validate in Simulator before merging locally. No IPA or publication. Source remains private. Validation branch: codex/gpx-recovery-validation-20261118.
