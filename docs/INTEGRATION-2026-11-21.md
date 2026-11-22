@@ -52,6 +52,38 @@ compilation and UI checks require GitHub's Mac runner. Simulator adapters use
 disposable data and cannot verify LocalDevVPN, physical movement, other apps'
 locations, Wi-Fi handoff, battery, or sideloaded entitlements.
 
-Incoming CI claims are not substituted for integration evidence. Record the
-exact final source/run, test results, screenshots and IPA delivery below when
-completed. Until then, this document records work in progress only.
+Incoming CI claims are not substituted for integration evidence.
+
+## Integration evidence
+
+- Private run `44984720688`, source `10c79ba`: 640 Swift regressions passed;
+  production app and extension compiled; 27 of 28 simulator scenarios passed.
+  The route-search test found an inherited map accessibility label masking the
+  full-screen button's own label. Fixed in `0b18713`. The Files scenario passed
+  on retry after a simulator DocumentsApp termination error.
+- Run `44985294242`, source `580f6e6`: 644 Swift regressions passed, including
+  version/build metadata cases; production app and extension compiled. Its route
+  UI test still encountered the accessibility label fixed in the next revision.
+- Run `44985879023`, source `0b18713`: settings export, file selection, selective
+  import, relaunch, repeat import and paste passed again. Route search reached
+  the two distinct place actions; the test expected a Cancel button, but the
+  native popover uses outside-tap dismissal. The test now checks that dismissal
+  and unchanged travel. Native parent/child duplicate accessibility nodes are
+  resolved to a single visible action. No production cancellation behavior was
+  removed to make the test pass.
+- Inspected screenshots: narrow/max-text route details and reachable Pause/Stop;
+  dark accessibility fallback and Resume/Stop; repeated backup import with no
+  duplicate changes; route-search choice with separate Add stop and Save pin.
+  Broad-run evidence contains one system `_UIGravityWellEffectAnchorView` warning;
+  focused review evidence has no runtime warnings. No visible layout failure was
+  demonstrated by that warning; it is not claimed resolved.
+- Anonymous stable-release metadata returned HTTP 200 with version 2.6.1, build
+  89. Same-version installed builds 91 and 93 must not offer that older build.
+  Higher known build numbers are handled by portable regression tests. Release
+  metadata was read only, not changed.
+
+Final route rerun and IPA delivery remain pending. Raw evidence is under the
+ignored `.build/integration-20261121/` directory. Physical checks still needed:
+disconnect Wi-Fi during a working LocalDevVPN session, send a genuinely new
+location, then Stop/clear and confirm the result in another app; reconnect after
+an actual command failure. Simulator fixtures cannot establish those outcomes.

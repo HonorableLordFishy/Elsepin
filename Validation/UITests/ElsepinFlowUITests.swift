@@ -410,6 +410,26 @@ final class ElsepinFlowUITests: XCTestCase {
         let confirm = app.buttons["Hold location and add stop"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["session.stop"].exists, "The live route must remain active until explicit confirmation")
+        // Dismiss the final confirmation too, then open and close a fresh search.
+        // The abandoned stop must not make the old confirmation appear again.
+        if app.buttons["Cancel"].exists { app.buttons["Cancel"].tap() }
+        else { search.tap() }
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["session.pause"].exists)
+        search.tap()
+        XCTAssertTrue(app.navigationBars["Along your route"].waitForExistence(timeout: 10))
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.navigationBars["Along your route"].waitForNonExistence(timeout: 5))
+        XCTAssertFalse(confirm.waitForExistence(timeout: 2), "A new search must not reuse the cancelled stop")
+        XCTAssertTrue(app.buttons["session.pause"].exists)
+        search.tap()
+        XCTAssertTrue(expand.waitForExistence(timeout: 10))
+        expand.tap()
+        XCTAssertTrue(center.waitForExistence(timeout: 10))
+        center.tap()
+        app.buttons["Choose action"].tap()
+        app.buttons["routeSearch.addStop"].firstMatch.tap()
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10))
         confirm.tap()
         XCTAssertTrue(app.navigationBars["Plan a route"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["Dropped pin"].waitForExistence(timeout: 20),

@@ -1,6 +1,7 @@
 # Elsepin project guide
 
 - Version/build policy: every newly packaged code revision gets a new monotonically increasing `CURRENT_PROJECT_VERSION`, even before physical-phone acceptance. An exact-source retry may keep its candidate number. Keep app and extension values aligned in `project.yml`, and record source/run evidence. Official release notes must carry matching `Build N` and `<!-- elsepin-build: N -->` metadata from the verified IPA. Do not publish merely to update this metadata.
+- Cost preference: use a smaller available model for bounded metadata, documentation and test-support tasks when delegation saves work. Preserve technical meaning when humanizing copy. The lead remains responsible for integration and evidence; do not switch provider billing or expose credentials to save tokens.
 
 - Source origin is now `HonorableLordFishy/Elsepin`. The old `N3moStudio/Elsepin` is an empty private placeholder that prevents redirects; never push source there. Read CURRENT-WORK.md for current visibility authorization and the pending owner-only visibility change.
 - Read [current work](docs/CURRENT-WORK.md) when starting a workstream and [chat workflow](docs/CHAT-WORKFLOW.md) for handoffs or optional external supporting analysis.

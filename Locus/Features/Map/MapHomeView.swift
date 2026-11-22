@@ -678,7 +678,12 @@ struct MapHomeView: View {
                         .accessibilityIdentifier("map.primaryControls")
                     HStack(spacing: 8) {
                         if session.journey != nil {
-                            Button { showRouteSearch = true } label: {
+                            Button {
+                                // An outside-tap cancellation of the native confirmation
+                                // must not leave an old stop queued for the next search.
+                                pendingBrowseStop = nil
+                                showRouteSearch = true
+                            } label: {
                                 Image(systemName: "magnifyingglass").font(.system(size: 20)).frame(width: 46, height: 46)
                             }.buttonStyle(.plain).locusGlass(.interactive, in: Circle())
                                 .accessibilityLabel("Search along route")
