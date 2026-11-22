@@ -385,6 +385,7 @@ final class ElsepinFlowUITests: XCTestCase {
         app.buttons["Choose action"].tap()
         XCTAssertTrue(app.buttons["routeSearch.addStop"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["routeSearch.savePin"].exists)
+        capture("38-route-search-place-actions")
         XCTAssertTrue(app.buttons["session.stop"].exists, "Choosing an action must not stop travel before confirmation")
         app.buttons["Cancel"].tap()
         XCTAssertTrue(app.navigationBars["Along your route"].waitForExistence(timeout: 10))
@@ -402,6 +403,7 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Plan a route"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["Dropped pin"].waitForExistence(timeout: 20),
                       "The confirmed place must appear in the planner draft")
+        capture("39-route-search-added-stop")
         XCTAssertFalse(app.buttons["session.pause"].exists, "Opening the planner must not automatically resume movement")
         app.buttons["Cancel"].tap()
         XCTAssertTrue(app.staticTexts["Where do you want to go?"].waitForExistence(timeout: 10))

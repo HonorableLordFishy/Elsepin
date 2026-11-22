@@ -7,7 +7,7 @@ struct AppUpdateNotice: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .top, spacing: 8) {
-                Label("Elsepin \(release.version) is available", systemImage: "arrow.down.circle")
+                Label("Elsepin \(release.displayVersion) is available", systemImage: "arrow.down.circle")
                     .font(.headline).fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .accessibilityAddTraits(.isHeader)
@@ -51,7 +51,7 @@ struct AppUpdateStatusSection: View {
             }
             if let release = updates.availableUpdate {
                 Link(destination: release.url) {
-                    Label("Elsepin \(release.version) release details", systemImage: "arrow.up.right")
+                    Label("Elsepin \(release.displayVersion) release details", systemImage: "arrow.up.right")
                         .fixedSize(horizontal: false, vertical: true).frame(minHeight: 44)
                 }
             } else {

@@ -90,7 +90,11 @@ final class ElsepinBackupUITests: XCTestCase {
         let review = app.navigationBars["Review import"]
         let open = app.navigationBars.buttons["Open"]
         func selectVisibleFile() -> Bool {
-            file.tap()
+            // In grid mode the cell centre falls on its filename, below the
+            // document thumbnail. Use the visible document target when present.
+            let thumbnail = file.images.firstMatch
+            if thumbnail.exists && thumbnail.isHittable { thumbnail.tap() }
+            else { file.tap() }
             // Some Files builds deliver the selection immediately. Others first
             // select the row and add an asynchronously enabled Open button.
             if review.waitForExistence(timeout: 3) { return true }

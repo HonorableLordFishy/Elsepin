@@ -8,14 +8,14 @@ final class StableReleaseUpdatesTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
     private let endpoint = URL(string: "https://api.github.com/repos/N3moStudio/Elsepin-Releases/releases/latest")!
 
-    private func release(_ tag: String = "v2.6.0", id: Int64 = 1) -> StableRelease {
-        StableRelease(id: id, tag: tag, url: URL(string: "https://github.com/N3moStudio/Elsepin-Releases/releases/tag/\(tag)")!)
+    private func release(_ tag: String = "v2.6.0", id: Int64 = 1, build: Int? = nil) -> StableRelease {
+        StableRelease(id: id, tag: tag, url: URL(string: "https://github.com/N3moStudio/Elsepin-Releases/releases/tag/\(tag)")!, build: build)
     }
     private func payload(tag: String = "v2.6.0", id: Int = 1, draft: Bool = false, prerelease: Bool = false,
-                         url: String? = nil, published: Any = "2026-10-24T10:00:00Z") -> Data {
+                          url: String? = nil, published: Any = "2026-10-24T10:00:00Z", body: Any = NSNull()) -> Data {
         try! JSONSerialization.data(withJSONObject: ["id": id, "tag_name": tag,
             "html_url": url ?? "https://github.com/N3moStudio/Elsepin-Releases/releases/tag/\(tag)",
-            "draft": draft, "prerelease": prerelease, "published_at": published])
+            "draft": draft, "prerelease": prerelease, "published_at": published, "body": body])
     }
     private func response(_ code: Int = 200, headers: [String: String] = [:]) -> HTTPURLResponse {
         HTTPURLResponse(url: endpoint, statusCode: code, httpVersion: "HTTP/1.1", headerFields: headers)!
@@ -64,14 +64,46 @@ final class StableReleaseUpdatesTests: XCTestCase {
         XCTAssertEqual(checker.state.retryAfter, now.addingTimeInterval(60))
     }
 
-    func testOnlyStrictlyNewerOfficialVersionsProduceAnUpdate() {
+    func testVersionAndBuildDetermineWhetherOfficialReleaseIsNewer() {
         XCTAssertTrue(release().isUpdate(for: "2.5.4"))
         XCTAssertFalse(release().isUpdate(for: "2.6.0"))
+        XCTAssertFalse(release(build: 89).isUpdate(for: "2.6.0", installedBuild: "91"))
+        XCTAssertFalse(release(build: 91).isUpdate(for: "2.6.0", installedBuild: "91"))
+        XCTAssertTrue(release(build: 92).isUpdate(for: "2.6.0", installedBuild: "91"))
+        XCTAssertFalse(release(build: 92).isUpdate(for: "2.6.0", installedBuild: nil))
+        XCTAssertFalse(release(build: 92).isUpdate(for: "2.6.0", installedBuild: "prerelease"))
+        XCTAssertFalse(release(build: 92).isUpdate(for: "2.6.0", installedBuild: "+91"))
         XCTAssertFalse(release().isUpdate(for: "2.6"))
         XCTAssertFalse(release().isUpdate(for: "V2.6.0"))
         XCTAssertFalse(release("v2.4.4").isUpdate(for: "2.5.4"))
         XCTAssertFalse(release().isUpdate(for: "broken"))
         XCTAssertFalse(release().isUpdate(for: ""))
+    }
+
+    @MainActor func testReleaseBuildUsesExplicitMarkerOrLegacyFirstLine() async {
+        for (body, expected) in [("<!-- elsepin-build: 93 -->", 93),
+                                 ("Build 89 · 16 November 2026\nNotes 123", 89),
+                                 ("Build 93", 93)] {
+            let (defaults, name) = storage(); defer { defaults.removePersistentDomain(forName: name) }
+            let result = (payload(body: body), response())
+            let checker = StableReleaseChecker(defaults: defaults) { _ in result }
+            await checker.checkIfDue(at: now)
+            XCTAssertEqual(checker.state.release?.build, expected)
+        }
+    }
+
+    @MainActor func testInvalidConflictingOrUnrelatedNumbersDoNotBecomeBuilds() async {
+        for body in ["<!-- elsepin-build: 93 -->\n<!-- elsepin-build: 94 -->",
+                     "Build 89 · 16 November 2026\n<!-- elsepin-build: 93 -->",
+                     "<!-- elsepin-build: nope -->", "Released 93 on 16 November 2026",
+                     "\nBuild nope · 16 November 2026", "Build · 16 November 2026",
+                     "Build  · 16 November 2026", "Asset Elsepin-2.6.1-93.ipa"] {
+            let (defaults, name) = storage(); defer { defaults.removePersistentDomain(forName: name) }
+            let result = (payload(body: body), response())
+            let checker = StableReleaseChecker(defaults: defaults) { _ in result }
+            await checker.checkIfDue(at: now)
+            XCTAssertNil(checker.state.release?.build, body)
+        }
     }
 
     /// Regression: a prerelease build whose marketing version already equals the
@@ -222,6 +254,25 @@ final class StableReleaseUpdatesTests: XCTestCase {
         XCTAssertNil(restarted.state.update(for: "2.5.4", at: now))
         await restarted.checkIfDue(at: now.addingTimeInterval(86_400))
         XCTAssertEqual(restarted.state.update(for: "2.5.4", at: now.addingTimeInterval(86_400))?.tag, "v2.7.0")
+    }
+
+    func testDismissedBuildDoesNotHideNewerBuildOfSameVersion() {
+        var state = ReleaseUpdateState(lastChecked: now, release: release(build: 93))
+        state.dismissedTag = "v2.6.0"
+        state.dismissedBuild = 93
+        XCTAssertNil(state.update(for: "2.6.0", installedBuild: "91", at: now))
+        state.release = release(build: 94)
+        XCTAssertEqual(state.update(for: "2.6.0", installedBuild: "91", at: now)?.build, 94)
+    }
+
+    func testLegacyCachedReleaseAndDismissalDecodeWithoutBuildFields() throws {
+        let json = """
+        {"lastChecked":721692800,"release":{"id":1,"tag":"v2.6.0","url":"https://github.com/N3moStudio/Elsepin-Releases/releases/tag/v2.6.0"},"dismissedTag":"v2.6.0","lastCheckFailed":false}
+        """
+        let state = try JSONDecoder().decode(ReleaseUpdateState.self, from: Data(json.utf8))
+        XCTAssertNil(state.release?.build)
+        XCTAssertNil(state.dismissedBuild)
+        XCTAssertNil(state.update(for: "2.5.4", installedBuild: "91", at: state.lastChecked!))
     }
 
     func testCachedNoticeExpiresAndInstalledUpdateHidesIt() {

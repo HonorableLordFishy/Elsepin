@@ -13,7 +13,7 @@ successful packages separately from failed attempts and simulator/device evidenc
 
 - Keep a matching live developer connection for native location writes and Stop when the bootstrap network changes. Fresh connections still require a successful probe and handshake; native command failures remain visible. Physical Wi-Fi handoff remains a phone check.
 - Separate adding a stop from saving a pin during route search. Keep the route visible when choosing a search area and fit its full path initially. Include both endpoints when sampling very long routes, with explicit area search for gaps.
-- Suppress update notices for the same installed marketing version, including prerelease installs. Retain newer-version notices, trusted release links and bounded cache/backoff behavior.
+- Compare versions and build numbers so equal or older packages do not trigger an update notice. A higher known build within the same version can be offered; unknown or conflicting build metadata is never guessed. Retain trusted release links and bounded cache/backoff behavior.
 - Synchronize simulator Files selection with delayed Open controls and stage the actual current-run settings export. Preserve file and paste imports, all existing recovery data and historical changelog entries.
 - Validation and package results are pending; this entry is not a release announcement.
 

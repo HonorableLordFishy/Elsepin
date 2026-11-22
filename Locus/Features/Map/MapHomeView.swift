@@ -30,6 +30,7 @@ struct MapHomeView: View {
     @State private var pendingBrowsePin: PinDraft?
     @State private var pendingBrowseStop: (place: RoutePlace, alongRoute: Bool)?
     @State private var pendingRouteEdit: SavedTrip?
+    @State private var showBrowseStopConfirmation = false
     @State private var pinEditor: PinDraft?
     @State private var pendingDestination: RoutePlace?
     @State private var pendingSavedTrip: SavedTrip?
@@ -585,6 +586,7 @@ struct MapHomeView: View {
         }
         .sheet(isPresented: $showRouteSearch, onDismiss: {
             if let draft = pendingBrowsePin { pendingBrowsePin = nil; pinEditor = draft }
+            else if pendingBrowseStop != nil { showBrowseStopConfirmation = true }
         }) {
             if let route = session.activeRoute {
                 NavigationStack {
@@ -601,9 +603,7 @@ struct MapHomeView: View {
                 }
             }
         }
-        .confirmationDialog("Hold location and edit this route?", isPresented: Binding(
-            get: { pendingBrowseStop != nil && pendingRouteEdit == nil },
-            set: { if !$0 && pendingRouteEdit == nil { pendingBrowseStop = nil } }), titleVisibility: .visible) {
+        .confirmationDialog("Hold location and edit this route?", isPresented: $showBrowseStopConfirmation, titleVisibility: .visible) {
                 Button("Hold location and add stop") { beginBrowseStopEdit() }
                 Button("Cancel", role: .cancel) { pendingBrowseStop = nil }
             } message: {
@@ -640,7 +640,7 @@ struct MapHomeView: View {
 
     private func beginBrowseStopEdit() {
         guard pendingBrowseStop != nil, pendingRouteEdit == nil,
-              let route = session.activeRoute, !session.isBusy else { pendingBrowseStop = nil; return }
+              let route = session.activeRoute, route.stops.count < 8, !session.isBusy else { pendingBrowseStop = nil; return }
         pendingRouteEdit = route.savedTrip(name: route.name, mode: session.travelMode,
             speed: session.speedMPH(for: session.travelMode), smooth: session.currentSmoothMovement,
             arrival: session.arrivalChoice)

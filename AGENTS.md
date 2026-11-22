@@ -1,5 +1,7 @@
 # Elsepin project guide
 
+- Version/build policy: every newly packaged code revision gets a new monotonically increasing `CURRENT_PROJECT_VERSION`, even before physical-phone acceptance. An exact-source retry may keep its candidate number. Keep app and extension values aligned in `project.yml`, and record source/run evidence. Official release notes must carry matching `Build N` and `<!-- elsepin-build: N -->` metadata from the verified IPA. Do not publish merely to update this metadata.
+
 - Source origin is now `HonorableLordFishy/Elsepin`. The old `N3moStudio/Elsepin` is an empty private placeholder that prevents redirects; never push source there. Read CURRENT-WORK.md for current visibility authorization and the pending owner-only visibility change.
 - Read [current work](docs/CURRENT-WORK.md) when starting a workstream and [chat workflow](docs/CHAT-WORKFLOW.md) for handoffs or optional external supporting analysis.
 - App sources remain under `Locus/`, extension under `LocusActivity/`, portable rules/tests under `Shared/` and `Tests/`. The visible product is Elsepin; do not blindly rename compatibility identifiers. Helpers are in `Companion/` and `CloudFindMy/`; website is in `website/`.

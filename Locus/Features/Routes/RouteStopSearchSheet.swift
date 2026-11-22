@@ -106,13 +106,16 @@ struct RouteStopSearchSheet: View {
             set: { if !$0 { pendingBrowsePlace = nil } }), titleVisibility: .visible) {
                 Button("Add stop to route") { applyBrowseChoice(savePin: false) }
                     .accessibilityIdentifier("routeSearch.addStop")
+                    .disabled(route.stops.count >= 8)
                 if onSavePin != nil {
                     Button("Save pin") { applyBrowseChoice(savePin: true) }
                         .accessibilityIdentifier("routeSearch.savePin")
                 }
                 Button("Cancel", role: .cancel) { pendingBrowsePlace = nil }
             } message: {
-                Text("Adding a stop asks before ending travel to edit. Saving a pin leaves the route unchanged.")
+                Text(route.stops.count >= 8
+                     ? "This route already has eight stops. Remove one in the planner before adding another. You can still save this pin."
+                     : "Adding a stop asks before ending travel to edit. Saving a pin leaves the route unchanged.")
             }
     }
 

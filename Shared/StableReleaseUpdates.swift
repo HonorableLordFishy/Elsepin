@@ -23,7 +23,12 @@ struct StableRelease: Codable, Equatable, Sendable {
     let id: Int64
     let tag: String
     let url: URL
+    let build: Int?
+    init(id: Int64, tag: String, url: URL, build: Int? = nil) {
+        self.id = id; self.tag = tag; self.url = url; self.build = build
+    }
     var version: String { tag.first == "v" || tag.first == "V" ? String(tag.dropFirst()) : tag }
+    var displayVersion: String { build.map { "\(version) (build \($0))" } ?? version }
     var isValid: Bool {
         guard id > 0, ReleaseVersion(tag) != nil,
               let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
@@ -32,14 +37,13 @@ struct StableRelease: Codable, Equatable, Sendable {
               parts.query == nil, parts.fragment == nil else { return false }
         return parts.path == "/N3moStudio/Elsepin-Releases/releases/tag/\(tag)"
     }
-    func isUpdate(for installed: String) -> Bool {
+    func isUpdate(for installed: String, installedBuild: String? = nil) -> Bool {
         guard isValid, let current = ReleaseVersion(installed), let candidate = ReleaseVersion(tag) else { return false }
-        // Only a strictly newer official version is an update. The release channel
-        // is deliberately not consulted here: an equal version used to be offered
-        // on the prerelease channel, and reinstalling that same version could never
-        // clear the notice.
-        // Equality (including prerelease equality) is considered up‑to‑date.
-        return candidate > current
+        if candidate != current { return candidate > current }
+        guard let build, build > 0, let installedBuild, !installedBuild.isEmpty,
+              installedBuild.utf8.allSatisfy({ (48...57).contains($0) }),
+              let currentBuild = Int(installedBuild), currentBuild > 0 else { return false }
+        return build > currentBuild
     }
 }
 
@@ -50,11 +54,53 @@ private struct GitHubStableRelease: Decodable {
     let draft: Bool
     let prerelease: Bool
     let published_at: String?
+    let body: String?
     var stable: StableRelease? {
         guard !draft, !prerelease, let published_at,
               ISO8601DateFormatter().date(from: published_at) != nil else { return nil }
-        let value = StableRelease(id: id, tag: tag_name, url: html_url)
+        let value = StableRelease(id: id, tag: tag_name, url: html_url,
+                                  build: Self.releaseBuild(from: body))
         return value.isValid ? value : nil
+    }
+
+    private static func releaseBuild(from body: String?) -> Int? {
+        guard let body else { return nil }
+        let lines = body.components(separatedBy: .newlines).map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let first = lines.first(where: { !$0.isEmpty })
+        let legacy: Int?
+        if let first, first.hasPrefix("Build") {
+            let remainder = String(first.dropFirst(5))
+            guard remainder.hasPrefix(" ") else { return nil }
+            let valueAndDescription = String(remainder.dropFirst())
+            let pieces = valueAndDescription.components(separatedBy: " · ")
+            guard (1...2).contains(pieces.count), !pieces[0].isEmpty,
+                  pieces[0].utf8.allSatisfy({ (48...57).contains($0) }),
+                  pieces.count == 1 || !pieces[1].isEmpty,
+                  let value = Int(pieces[0]), value > 0 else { return nil }
+            legacy = value
+        } else {
+            legacy = nil
+        }
+        let markerPrefix = "<!-- elsepin-build:"
+        let markerLines = lines.filter { $0.contains(markerPrefix) }
+        if !markerLines.isEmpty {
+            var values: [Int] = []
+            for line in markerLines {
+                guard line.hasPrefix(markerPrefix), line.hasSuffix("-->"),
+                      line.dropFirst(markerPrefix.count).dropLast(3).first == " " else { return nil }
+                let text = String(line.dropFirst(markerPrefix.count).dropLast(3))
+                    .trimmingCharacters(in: .whitespaces)
+                guard !text.isEmpty, text.utf8.allSatisfy({ (48...57).contains($0) }),
+                      let value = Int(text), value > 0 else { return nil }
+                values.append(value)
+            }
+            guard let first = values.first, values.allSatisfy({ $0 == first }) else { return nil }
+            if let legacy, legacy != first { return nil }
+            return first
+        }
+        return legacy
     }
 }
 
@@ -67,6 +113,7 @@ struct ReleaseUpdateState: Codable, Equatable {
     var release: StableRelease?
     var etag: String?
     var dismissedTag: String?
+    var dismissedBuild: Int?
 
     /// Reserve the daily attempt before awaiting the network, including failures.
     /// Clock rollback rebases the wait without causing extra requests on each launch.
@@ -84,12 +131,19 @@ struct ReleaseUpdateState: Codable, Equatable {
         return true
     }
 
-    func update(for installed: String, at now: Date, includeDismissed: Bool = false) -> StableRelease? {
+    func update(for installed: String, installedBuild: String? = nil, at now: Date, includeDismissed: Bool = false) -> StableRelease? {
         guard let release, let lastChecked,
               (0...(7 * Self.interval)).contains(now.timeIntervalSince(lastChecked)),
-              includeDismissed || dismissedTag != release.tag,
-              release.isUpdate(for: installed) else { return nil }
+              includeDismissed || !isDismissed(release),
+              release.isUpdate(for: installed, installedBuild: installedBuild) else { return nil }
         return release
+    }
+
+    private func isDismissed(_ release: StableRelease) -> Bool {
+        guard dismissedTag == release.tag else { return false }
+        // A pre-build-aware cached dismissal keeps its original tag-wide meaning.
+        guard let dismissedBuild else { return true }
+        return dismissedBuild == release.build
     }
 }
 
@@ -114,6 +168,7 @@ final class StableReleaseChecker {
 
     func dismiss(_ release: StableRelease) {
         state.dismissedTag = release.tag
+        state.dismissedBuild = release.build
         save()
     }
 
