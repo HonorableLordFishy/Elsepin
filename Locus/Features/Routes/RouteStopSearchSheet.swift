@@ -129,13 +129,14 @@ struct RouteStopSearchSheet: View {
         .mapStyle(.standard(elevation: .flat)).mapControlVisibility(.hidden)
         .onMapCameraChange(frequency: .onEnd) { visibleRegion = $0.region }
         .frame(height: 200).clipShape(RoundedRectangle(cornerRadius: 16))
+        .accessibilityLabel("Planned route and matching stops. The same places are listed below.")
         .overlay(alignment: .bottomTrailing) {
             Button { searchFocused = false; fullMap = true } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .frame(width: 44, height: 44).locusGlass(.regular, in: Circle())
             }.buttonStyle(.plain).padding(8).accessibilityLabel("Choose stop on full-screen map")
+                .accessibilityIdentifier("routeSearch.fullMap")
         }
-        .accessibilityLabel("Planned route and matching stops. The same places are listed below.")
     }
 
     private func resultRow(_ result: RouteStopSearchModel.Result) -> some View {

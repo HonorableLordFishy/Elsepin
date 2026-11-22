@@ -376,8 +376,9 @@ final class ElsepinFlowUITests: XCTestCase {
         let search = app.buttons["map.routeSearch"]
         XCTAssertTrue(search.waitForExistence(timeout: 10))
         search.tap()
-        let expand = app.buttons["Choose stop on full-screen map"]
+        let expand = app.buttons["routeSearch.fullMap"]
         XCTAssertTrue(expand.waitForExistence(timeout: 10))
+        XCTAssertEqual(expand.label, "Choose stop on full-screen map")
         expand.tap()
         let center = app.buttons["Map center"]
         XCTAssertTrue(center.waitForExistence(timeout: 10))
