@@ -1,6 +1,6 @@
 # Elsepin changelog
 
-Updated through **16 November 2026**, including official build 89.
+Updated through **21 November 2026**, including private test build 93 and official build 89.
 **Public release: [2.6.1 (89)](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/v2.6.1).**
 
 [What's new in 2.6.1](docs/CHANGES-SINCE-2.6.0.md) · [Build history](docs/BUILD-HISTORY.md) · [Setup](SETUP.md)
@@ -15,7 +15,8 @@ successful packages separately from failed attempts and simulator/device evidenc
 - Separate adding a stop from saving a pin during route search. Keep the route visible when choosing a search area and fit its full path initially. Include both endpoints when sampling very long routes, with explicit area search for gaps.
 - Compare versions and build numbers so equal or older packages do not trigger an update notice. A higher known build within the same version can be offered; unknown or conflicting build metadata is never guessed. Retain trusted release links and bounded cache/backoff behavior.
 - Synchronize simulator Files selection with delayed Open controls and stage the actual current-run settings export. Preserve file and paste imports, all existing recovery data and historical changelog entries.
-- Validation and package results are pending; this entry is not a release announcement.
+- Clear a cancelled route-edit choice before a fresh search, so it cannot reappear later.
+- Validated with 644 Swift regressions, broad and focused simulator checks, and native app/extension compilation. Build 93 was verified and delivered privately; see the build history. Wi-Fi handoff and real Stop/clear remain phone checks. This entry is not a release announcement.
 
 ## Build 92 - review follow-up (18 November 2026)
 

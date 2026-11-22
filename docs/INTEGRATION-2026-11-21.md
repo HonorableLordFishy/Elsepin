@@ -82,8 +82,30 @@ Incoming CI claims are not substituted for integration evidence.
   Higher known build numbers are handled by portable regression tests. Release
   metadata was read only, not changed.
 
-Final route rerun and IPA delivery remain pending. Raw evidence is under the
-ignored `.build/integration-20261121/` directory. Physical checks still needed:
+- Run `44986552814`, source `4963db9`: the complete route-search choice, native
+  cancellation, confirmation, added planner stop and non-resuming exit passed.
+- Final run `44986984508`, source `3a9b214`: 644 Swift regressions and the expanded
+  route-search UI scenario passed without retries or runtime warnings. It also
+  cancels the final edit confirmation, opens/closes a fresh search, verifies no
+  old choice reappears, then completes the confirmed edit. Inspected the final
+  planner screenshot showing the added stop and existing route. Production
+  source changes since the broad run are bounded by these focused checks; this
+  is not a claim that every scenario ran again on the final revision.
+
+IPA job `44987373797` successfully packaged exact source
+`3a9b2140ef0abb205a043b27a9b7b5267958053a`. The build passed 644 Swift tests,
+27 package/resource tests, 20 Companion tests (one Windows-only case skipped),
+and 106 cloud helper tests. Production app and extension compiled without
+compiler warnings and both contain version 2.6.1, build 93, linked SDK 27.1.
+Downloaded the original artifact and verified integrity, artifact identity,
+bundle identities, both versions, device binaries, 13 icon choices and resources.
+Copied the verified IPA to the usual delivery folder, verified that copy, then
+removed only the previous Elsepin build 91 there. Other projects and backups are
+untouched. No release was published and no repository visibility was changed.
+Primary Elsepin remains private; the external CI repository remains public.
+
+Raw evidence is under the ignored `.build/integration-20261121/` directory.
+Physical checks still needed:
 disconnect Wi-Fi during a working LocalDevVPN session, send a genuinely new
 location, then Stop/clear and confirm the result in another app; reconnect after
 an actual command failure. Simulator fixtures cannot establish those outcomes.

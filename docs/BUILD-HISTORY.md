@@ -1,5 +1,33 @@
 # Elsepin build history
 
+## Private build 93 delivered - 21 November 2026
+
+Private run `44987373797` built source
+`3a9b2140ef0abb205a043b27a9b7b5267958053a` as 2.6.1 (93), app and Live Activity
+extension, linked SDK 27.1. Passed 644 Swift tests, 27 package/resource checks,
+20 Companion tests with one Windows-only skip, and 106 cloud helper tests.
+Production compilation completed without compiler warnings.
+
+Broad simulator run `44984720688` passed 27 of 28 scenarios. Fixed the remaining
+route-control accessibility issue; final route scenario `44986984508` passed,
+including cancellation/reopening, confirmation, added stop and no automatic
+movement restart. Backup export/file import/selective apply/relaunch/reimport/
+paste passed in `44985879023`. Screenshots inspected; these separate runs cover
+the changes but do not claim a complete final-revision UI-suite rerun. See
+[integration evidence](INTEGRATION-2026-11-21.md), including earlier failures and
+the system UI warning that was not demonstrated to break layout.
+
+Verified the original downloaded artifact, ZIP integrity, both identities and
+versions, device binaries, icons and resources. Delivered `Elsepin 2.6.1 build
+93.ipa` to the requested folder and removed only the older Elsepin build 91 there.
+Original backups remain untouched. Main source stays private; the separate
+external `elsepin-ci-validation` repo remains public. No release was published.
+
+This candidate adds build-aware update comparisons; the build-91 notes below
+describe the older version-only behavior. The official endpoint currently
+reports 2.6.1 (89), which must not be offered to installed build 93. Phone checks
+remain necessary for Wi-Fi handoff, new native writes, Stop/clear and reconnect.
+
 ## Private build 91 delivered - 18 November 2026
 
 Private run `44395217550` built `bdb190081d1fe5d030e6b7f09916ac3b78002f1a` successfully.

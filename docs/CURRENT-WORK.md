@@ -7,8 +7,13 @@ changes. Original backups remain untouched; see INTEGRATION-2026-11-21.md.
 The original build 92 job 44406256063 succeeded, but its package was not delivered
 in that interrupted turn. External CI also created a different build 92, so this
 integration uses build 93. Private source was verified before work began.
-Pending: finish source review, validate on GitHub Mac, inspect evidence, then
-package/verify and replace only the old Elsepin IPA in the requested folder.
+Completed: reviewed and integrated the incoming changes; final simulator route
+scenario passed in 44986984508 after broad and backup checks. Private IPA job
+44987373797 built source 3a9b214 as 2.6.1 (93), with 644 Swift regressions passing.
+Verified the original package and delivered Elsepin 2.6.1 build 93.ipa to the usual
+folder, replacing only build 91. Details and physical-device boundaries are in
+INTEGRATION-2026-11-21.md. No release published; primary source remains private.
+The separate existing elsepin-ci-validation repository remains public.
 
 ---
 # Current update - build 92 packaging requested, 18 November 2026
