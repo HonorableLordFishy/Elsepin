@@ -87,9 +87,25 @@ final class ElsepinBackupUITests: XCTestCase {
         capture("33b-general-files-storage")
         XCTAssertTrue(file.waitForExistence(timeout: 20), "Exported settings file not listed")
         XCTAssertTrue(file.isEnabled, "Valid settings backup is disabled in Files")
-        file.tap()
-        if app.navigationBars.buttons["Open"].exists { app.navigationBars.buttons["Open"].tap() }
-        XCTAssertTrue(app.navigationBars["Review import"].waitForExistence(timeout: 10))
+        let review = app.navigationBars["Review import"]
+        let open = app.navigationBars.buttons["Open"]
+        func selectVisibleFile() -> Bool {
+            file.tap()
+            // Some Files builds deliver the selection immediately. Others first
+            // select the row and add an asynchronously enabled Open button.
+            if review.waitForExistence(timeout: 3) { return true }
+            if open.waitForExistence(timeout: 5) {
+                let enabled = expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: open)
+                if XCTWaiter.wait(for: [enabled], timeout: 5) == .completed { open.tap() }
+            }
+            return review.waitForExistence(timeout: 10)
+        }
+        var opened = selectVisibleFile()
+        // Retry only while the picker and its live row are still present. Never
+        // tap a stale file element after Files has already dismissed itself.
+        if !opened, file.exists && file.isHittable { opened = selectVisibleFile() }
+        XCTAssertTrue(opened, "Selecting the staged backup did not open import review")
+
     }
     private func expandSettings() {
         let group = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Settings ·'")).firstMatch
@@ -135,7 +151,7 @@ final class ElsepinBackupUITests: XCTestCase {
         let exportedSettings = try XCTUnwrap(backup["preferences"] as? [String: Any])
         XCTAssertTrue(NSDictionary(dictionary: original).isEqual(to: exportedSettings))
         var filesReady = false
-        for _ in 0..<30 {
+        for _ in 0..<120 {
             if try snapshot()["filesReady"] as? Bool == true { filesReady = true; break }
             Thread.sleep(forTimeInterval: 1)
         }

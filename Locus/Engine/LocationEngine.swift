@@ -83,8 +83,7 @@ enum LocationEngine {
     private static var handshake: OpaquePointer?
     private static var remoteServer: OpaquePointer?
     private static var locationSimulation: OpaquePointer?
-    private static var probeEndpoint: String?
-    private static var probeCheckedAt: TimeInterval?
+    private static var connectedContext: DeveloperSessionContext?
 
     private static let ok: Int32 = 0
     private static let invalidIP: Int32 = 1
@@ -182,15 +181,9 @@ enum LocationEngine {
                     explicit: Bool = false, checkInterval: TimeInterval = 10) async -> Result<Void, LocationEngineError> {
         await withCheckedContinuation { continuation in
             queue.async {
-                // A successful TCP connect does not validate a cached DVT
-                // service after a VPN change. Explicit actions must handshake
-                // again; continuous playback retains its working connection.
-                if explicit { cleanup() }
-                guard validateTunnel(deviceIP, explicit: explicit, interval: checkInterval) else {
-                    continuation.resume(returning: .failure(.tunnelUnreachable)); return
+                let result = runCommand(pairingPath: pairingPath, deviceIP: deviceIP, explicit: explicit) {
+                    setLocked(latitude: latitude, longitude: longitude)
                 }
-                let code = setLocked(latitude: latitude, longitude: longitude, pairingPath: pairingPath, deviceIP: deviceIP)
-                let result: Result<Void, LocationEngineError> = code == ok ? .success(()) : .failure(.from(code: code))
                 continuation.resume(returning: result)
             }
         }
@@ -211,15 +204,9 @@ enum LocationEngine {
                     DeveloperLogStore.shared.record("clear_not_needed", ["reason": "no_native_write_attempt"])
                     continuation.resume(returning: .success(())); return
                 }
-                cleanup() // Stop must not trust a stale cached service either.
-                guard validateTunnel(deviceIP, explicit: true) else {
-                    continuation.resume(returning: .failure(.tunnelUnreachable)); return
+                let result = runCommand(pairingPath: pairingPath, deviceIP: deviceIP, explicit: true) {
+                    clearLocked()
                 }
-                // Reopen the service after a failure so Stop can still clear a
-                // simulation. Clearing must not set a new coordinate first.
-                let connectionCode = connectLocked(pairingPath: pairingPath, deviceIP: deviceIP)
-                let code = connectionCode == ok ? clearLocked() : connectionCode
-                let result: Result<Void, LocationEngineError> = code == ok ? .success(()) : .failure(.from(code: code))
                 continuation.resume(returning: result)
             }
         }
@@ -243,8 +230,7 @@ enum LocationEngine {
     }
 
     private static func cleanup() {
-        probeCheckedAt = nil
-        probeEndpoint = nil
+        connectedContext = nil
         if let locationSimulation {
             location_simulation_free(locationSimulation)
             self.locationSimulation = nil
@@ -263,32 +249,41 @@ enum LocationEngine {
         }
     }
 
-    /// Invalidate only the liveness hint; don't tear down a working route connection.
-    static func invalidateProbe() {
-        queue.async {
-            probeCheckedAt = nil
-            probeEndpoint = nil
-        }
-    }
+    /// Foreground transitions no longer invalidate a probe cache. A fresh
+    /// service always probes, and a live service must answer the next command.
+    static func invalidateProbe() {}
 
-    private static func validateTunnel(_ ip: String, explicit: Bool, interval: TimeInterval = 10) -> Bool {
+    private static func validateTunnel(_ ip: String, explicit: Bool) -> Bool {
         let now = ProcessInfo.processInfo.systemUptime
-        guard ConnectionProbePolicy.needsProbe(explicit: explicit, endpoint: ip,
-            previousEndpoint: probeEndpoint, checkedAt: probeCheckedAt, now: now, interval: interval) else { return true }
         let reachable = DeveloperTunnelProbe.reaches(ip)
         DeveloperLogStore.shared.record("developer_endpoint_check", ["reachable": String(reachable),
             "explicit": String(explicit), "duration_ms": String(Int((ProcessInfo.processInfo.systemUptime - now) * 1000))])
-        if reachable { probeEndpoint = ip; probeCheckedAt = ProcessInfo.processInfo.systemUptime }
-        else { cleanup() }
         return reachable
     }
 
-    private static func setLocked(latitude: Double, longitude: Double, pairingPath: String, deviceIP: String) -> Int32 {
-        guard SessionLifetime.shared.acceptsCommands else { return terminating }
-        let code = connectLocked(pairingPath: pairingPath, deviceIP: deviceIP)
-        guard code == ok, let locationSimulation else { return code == ok ? simulationCreate : code }
-        // A termination request can arrive while opening the connection.
-        guard SessionLifetime.shared.acceptsCommands else { return terminating }
+    private static func runCommand(pairingPath: String, deviceIP: String, explicit: Bool,
+                                   perform: () -> Int32) -> Result<Void, LocationEngineError> {
+        guard SessionLifetime.shared.acceptsCommands else { return .failure(.notActive) }
+        let requested = DeveloperSessionContext(endpoint: deviceIP, pairingPath: pairingPath)
+        let connected = locationSimulation == nil ? nil : connectedContext
+        return DeveloperSessionCommand.run(requested: requested, connected: connected, discard: cleanup, open: {
+            guard let requested else { return .failure(.pairingRead) }
+            guard validateTunnel(deviceIP, explicit: explicit) else { return .failure(.tunnelUnreachable) }
+            let code = connectLocked(context: requested)
+            return code == ok ? .success(()) : .failure(.from(code: code))
+        }, perform: {
+            // A termination request can arrive during a fresh handshake. Let
+            // the queued termination task clear the handle in that case.
+            guard SessionLifetime.shared.acceptsCommands else { return .failure(.notActive) }
+            let code = perform()
+            // Native acceptance is evidence for this command. It does not
+            // confirm the location shown by another app.
+            return code == ok ? .success(()) : .failure(.from(code: code))
+        })
+    }
+
+    private static func setLocked(latitude: Double, longitude: Double) -> Int32 {
+        guard let locationSimulation else { return simulationCreate }
         // Persist immediately before the first operation that can change the
         // device. An exit during mere connection setup creates no false warning.
         guard SessionLifetime.shared.locationMayRemain() else {
@@ -305,8 +300,9 @@ enum LocationEngine {
         return ok
     }
 
-    private static func connectLocked(pairingPath: String, deviceIP: String) -> Int32 {
-        if locationSimulation != nil { return ok }
+    private static func connectLocked(context: DeveloperSessionContext) -> Int32 {
+        let pairingPath = context.pairingPath
+        let deviceIP = context.endpoint
         let started = ProcessInfo.processInfo.systemUptime
         DeveloperLogStore.shared.record("engine_opening_new_connection")
         var address = sockaddr_in()
@@ -323,6 +319,9 @@ enum LocationEngine {
         }
         guard let pairingHandle else { return pairingRead }
         defer { rp_pairing_file_free(pairingHandle) }
+        guard DeveloperSessionContext(endpoint: deviceIP, pairingPath: pairingPath) == context else {
+            return pairingRead
+        }
 
         let providerError = withUnsafePointer(to: &address) { pointer in
             pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
@@ -359,6 +358,11 @@ enum LocationEngine {
         }
         // location_simulation_new consumes/owns remote server lifecycle alongside handle
         remoteServer = nil
+        guard locationSimulation != nil else {
+            cleanup()
+            return simulationCreate
+        }
+        connectedContext = context
 
         DeveloperLogStore.shared.record("engine_handshake_completed", [
             "duration_ms": String(Int((ProcessInfo.processInfo.systemUptime - started) * 1000))])

@@ -64,12 +64,32 @@ final class StableReleaseUpdatesTests: XCTestCase {
         XCTAssertEqual(checker.state.retryAfter, now.addingTimeInterval(60))
     }
 
-    func testOnlyNewerOfficialVersionsOrSameVersionBetaPromotion() {
-        XCTAssertTrue(release().isUpdate(for: "2.5.4", isPrerelease: false))
-        XCTAssertFalse(release().isUpdate(for: "2.6.0", isPrerelease: false))
-        XCTAssertTrue(release().isUpdate(for: "2.6.0", isPrerelease: true))
-        XCTAssertFalse(release("v2.4.4").isUpdate(for: "2.5.4", isPrerelease: true))
-        XCTAssertFalse(release().isUpdate(for: "broken", isPrerelease: true))
+    func testOnlyStrictlyNewerOfficialVersionsProduceAnUpdate() {
+        XCTAssertTrue(release().isUpdate(for: "2.5.4"))
+        XCTAssertFalse(release().isUpdate(for: "2.6.0"))
+        XCTAssertFalse(release().isUpdate(for: "2.6"))
+        XCTAssertFalse(release().isUpdate(for: "V2.6.0"))
+        XCTAssertFalse(release("v2.4.4").isUpdate(for: "2.5.4"))
+        XCTAssertFalse(release().isUpdate(for: "broken"))
+        XCTAssertFalse(release().isUpdate(for: ""))
+    }
+
+    /// Regression: a prerelease build whose marketing version already equals the
+    /// newest official tag used to be offered an update that reinstalling the same
+    /// version could never clear.
+    func testEqualInstalledVersionNeverProducesANotice() {
+        let state = ReleaseUpdateState(lastAttempt: now, lastChecked: now, release: release("v2.6.0"))
+        XCTAssertNil(state.update(for: "2.6.0", at: now))
+        XCTAssertNil(state.update(for: "2.6.0", at: now, includeDismissed: true))
+        XCTAssertNil(state.update(for: "2.6", at: now))
+        XCTAssertNil(state.update(for: "2.6.0.0", at: now))
+        XCTAssertNil(state.update(for: "2.6.0-beta", at: now))
+    }
+
+    func testNewerVersionStillProducesANotice() {
+        let state = ReleaseUpdateState(lastAttempt: now, lastChecked: now, release: release("v2.6.1"))
+        XCTAssertEqual(state.update(for: "2.6.0", at: now)?.tag, "v2.6.1")
+        XCTAssertEqual(state.update(for: "2.5.9", at: now)?.tag, "v2.6.1")
     }
 
     func testReleaseLinksAreRestrictedToTheExactRepositoryAndTag() {
@@ -97,7 +117,7 @@ final class StableReleaseUpdatesTests: XCTestCase {
         var count = await stub.count; XCTAssertEqual(count, 1)
         await restarted.checkIfDue(at: now.addingTimeInterval(86_400))
         count = await stub.count; XCTAssertEqual(count, 2)
-        XCTAssertNotNil(restarted.state.update(for: "2.5.4", isPrerelease: false, at: now.addingTimeInterval(86_400)))
+        XCTAssertNotNil(restarted.state.update(for: "2.5.4", at: now.addingTimeInterval(86_400)))
     }
 
     @MainActor func testOfflineAttemptDoesNotRetryOnEveryOpen() async {
@@ -156,8 +176,8 @@ final class StableReleaseUpdatesTests: XCTestCase {
         XCTAssertEqual(requests[0].timeoutInterval, 10)
         XCTAssertEqual(requests[0].url, endpoint)
         XCTAssertEqual(checker.state.release, release())
-        XCTAssertNil(checker.state.update(for: "2.5.4", isPrerelease: false, at: now.addingTimeInterval(86_400)))
-        XCTAssertNotNil(checker.state.update(for: "2.5.4", isPrerelease: false, at: now.addingTimeInterval(86_400), includeDismissed: true))
+        XCTAssertNil(checker.state.update(for: "2.5.4", at: now.addingTimeInterval(86_400)))
+        XCTAssertNotNil(checker.state.update(for: "2.5.4", at: now.addingTimeInterval(86_400), includeDismissed: true))
     }
 
     @MainActor func testUnexpectedNotModifiedIsNotSuccessfulCheck() async {
@@ -178,7 +198,7 @@ final class StableReleaseUpdatesTests: XCTestCase {
             let checker = StableReleaseChecker(defaults: defaults) { _ in (data, response) }
             await checker.checkIfDue(at: now)
             XCTAssertNil(checker.state.release)
-            XCTAssertNil(checker.state.update(for: "2.5.4", isPrerelease: true, at: now))
+            XCTAssertNil(checker.state.update(for: "2.5.4", at: now))
         }
     }
 
@@ -199,17 +219,17 @@ final class StableReleaseUpdatesTests: XCTestCase {
         let checker = StableReleaseChecker(defaults: defaults, fetch: { try await stub.send($0) })
         await checker.checkIfDue(at: now); checker.dismiss(release())
         let restarted = StableReleaseChecker(defaults: defaults, fetch: { try await stub.send($0) })
-        XCTAssertNil(restarted.state.update(for: "2.5.4", isPrerelease: false, at: now))
+        XCTAssertNil(restarted.state.update(for: "2.5.4", at: now))
         await restarted.checkIfDue(at: now.addingTimeInterval(86_400))
-        XCTAssertEqual(restarted.state.update(for: "2.5.4", isPrerelease: false, at: now.addingTimeInterval(86_400))?.tag, "v2.7.0")
+        XCTAssertEqual(restarted.state.update(for: "2.5.4", at: now.addingTimeInterval(86_400))?.tag, "v2.7.0")
     }
 
     func testCachedNoticeExpiresAndInstalledUpdateHidesIt() {
         var state = ReleaseUpdateState(); state.lastChecked = now; state.release = release()
-        XCTAssertNotNil(state.update(for: "2.5.4", isPrerelease: false, at: now))
-        XCTAssertNil(state.update(for: "2.6.0", isPrerelease: false, at: now))
-        XCTAssertNil(state.update(for: "2.5.4", isPrerelease: false, at: now.addingTimeInterval(7 * 86_400 + 1)))
-        XCTAssertNil(state.update(for: "2.5.4", isPrerelease: false, at: now.addingTimeInterval(-1)))
+        XCTAssertNotNil(state.update(for: "2.5.4", at: now))
+        XCTAssertNil(state.update(for: "2.6.0", at: now))
+        XCTAssertNil(state.update(for: "2.5.4", at: now.addingTimeInterval(7 * 86_400 + 1)))
+        XCTAssertNil(state.update(for: "2.5.4", at: now.addingTimeInterval(-1)))
     }
 
     func testClockRollbackDoesNotRepeatedlyCheckOrWaitForYears() {

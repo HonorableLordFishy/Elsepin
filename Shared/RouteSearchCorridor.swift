@@ -15,10 +15,12 @@ struct RouteSearchCorridor {
     let index: RouteSnapIndex
     let width: Double
 
-    init(track: RouteTrack, width: Double = 1_500) {
+    /// `width` is the corridor half-width in metres. The default is deliberately
+    /// generous so along-route category searches are not sparse; callers can narrow it.
+    init(track: RouteTrack, width: Double = 5_000) {
         self.track = track
         index = RouteSnapIndex(track: track)
-        self.width = width.isFinite ? max(100, min(10_000, width)) : 1_500
+        self.width = width.isFinite ? max(100, min(20_000, width)) : 5_000
     }
 
     var samplesLongRoute: Bool { track.length / 4 + width * 2 > 200_000 }
@@ -27,8 +29,20 @@ struct RouteSearchCorridor {
         // At most four explicit requests per submitted search, not per keypress.
         let count = min(4, max(1, Int(ceil(min(track.length, 80_000) / 20_000))))
         let span = track.length / Double(count)
-        return (0..<count).map {
-            Region(center: track.point(at: (Double($0) + 0.5) * span), diameter: min(200_000, span + width * 2))
+        // Centre each region in its span so neighbours overlap by twice the corridor
+        // width. Bucket-start centres would leave the end of the route outside every
+        // region, silently dropping along-route results there.
+        if samplesLongRoute, count > 1 {
+            // Keep the provider request budget finite. Very long routes are sampled,
+            // but always include both endpoints; Map area provides explicit detail.
+            return (0..<count).map { sample in
+                Region(center: track.point(at: track.length * Double(sample) / Double(count - 1)),
+                       diameter: 200_000)
+            }
+        }
+        return (0..<count).map { bucket in
+            Region(center: track.point(at: (Double(bucket) + 0.5) * span),
+                   diameter: span + width * 2)
         }
     }
 

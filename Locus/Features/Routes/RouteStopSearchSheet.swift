@@ -7,27 +7,31 @@ struct RouteStopSearchSheet: View {
     let route: PlannedRoute
     let browsing: Bool
     let onChoose: (RoutePlace, Bool) -> Void
+    let onSavePin: ((RoutePlace) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: SpoofSession
     @StateObject private var model: RouteStopSearchModel
     @State private var selectedID: UUID?
     @State private var fullMap = false
     @State private var pendingMapPlace: RoutePlace?
+    @State private var pendingBrowsePlace: RoutePlace?
     @State private var visibleRegion: MKCoordinateRegion?
     @State private var resultPosition: MapCameraPosition = .automatic
     @FocusState private var searchFocused: Bool
 
-    init(route: PlannedRoute, browsing: Bool = false, onChoose: @escaping (RoutePlace, Bool) -> Void) {
+    init(route: PlannedRoute, browsing: Bool = false, onSavePin: ((RoutePlace) -> Void)? = nil,
+         onChoose: @escaping (RoutePlace, Bool) -> Void) {
         self.route = route
         self.browsing = browsing
         self.onChoose = onChoose
+        self.onSavePin = onSavePin
         _model = StateObject(wrappedValue: RouteStopSearchModel(track: route.track))
     }
 
     var body: some View {
         List {
             Section {
-                RouteStopSearchScopeControls(model: model, visibleRegion: visibleRegion) { region in
+                RouteStopSearchScopeControls(model: model, visibleRegion: visibleRegion, route: route) { region in
                     resultPosition = .region(region)
                 }
                 resultMap
@@ -77,7 +81,7 @@ struct RouteStopSearchSheet: View {
                 } header: {
                     Text(model.scope == .alongRoute ? "Along your route" : model.scope == .mapArea ? "In selected area" : "Search results")
                 } footer: {
-                    Text(browsing ? "Tap a result to name and save its pin. Your current route keeps going unchanged." : "Distance from the path isn't extra travel distance. Adding a stop recalculates your route preview.")
+                    Text(browsing ? "Choose Add stop to replan, or Save pin without changing the route. Your current route keeps going until you confirm editing." : "Distance from the path isn't extra travel distance. Adding a stop recalculates your route preview.")
                 }.shiftSettingsRows()
             }
         }
@@ -91,11 +95,25 @@ struct RouteStopSearchSheet: View {
         .onChange(of: model.scope) { _, _ in selectedID = nil }
         .onChange(of: model.query) { _, _ in selectedID = nil }
         .navigationDestination(isPresented: $fullMap) {
-            RouteStopMapPicker(route: route, model: model, browsing: browsing) { place in pendingMapPlace = place }
+            RouteStopMapPicker(route: route, model: model, browsing: browsing,
+                               allowsSavingPin: onSavePin != nil) { place in pendingMapPlace = place }
         }
         .onChange(of: fullMap) { _, shown in if !shown { applyMapChoice() } }
         .onAppear { applyMapChoice() }
         .onDisappear { searchFocused = false; model.cancel() }
+        .confirmationDialog("What would you like to do?", isPresented: Binding(
+            get: { pendingBrowsePlace != nil },
+            set: { if !$0 { pendingBrowsePlace = nil } }), titleVisibility: .visible) {
+                Button("Add stop to route") { applyBrowseChoice(savePin: false) }
+                    .accessibilityIdentifier("routeSearch.addStop")
+                if onSavePin != nil {
+                    Button("Save pin") { applyBrowseChoice(savePin: true) }
+                        .accessibilityIdentifier("routeSearch.savePin")
+                }
+                Button("Cancel", role: .cancel) { pendingBrowsePlace = nil }
+            } message: {
+                Text("Adding a stop asks before ending travel to edit. Saving a pin leaves the route unchanged.")
+            }
     }
 
     private var resultMap: some View {
@@ -133,10 +151,28 @@ struct RouteStopSearchSheet: View {
                 Spacer(minLength: 4)
                 Image(systemName: browsing ? "mappin.circle.fill" : "plus.circle.fill").foregroundStyle(LocusTheme.accent)
             }.frame(maxWidth: .infinity, minHeight: 52, alignment: .leading).contentShape(Rectangle())
-        }.buttonStyle(.borderless).accessibilityHint(browsing ? "Name and save this pin without changing your route" : "Add this stop to the route preview")
+        }.buttonStyle(.borderless).accessibilityHint(browsing ? "Choose Add stop or Save pin" : "Add this stop to the route preview")
     }
 
     private func choose(_ place: RoutePlace) {
+        if browsing, onSavePin != nil {
+            pendingBrowsePlace = place
+            return
+        }
+        finishChoice(place)
+    }
+
+    private func applyBrowseChoice(savePin: Bool) {
+        guard let place = pendingBrowsePlace else { return }
+        pendingBrowsePlace = nil
+        if savePin {
+            model.cancel()
+            onSavePin?(place)
+            dismiss()
+        } else { finishChoice(place) }
+    }
+
+    private func finishChoice(_ place: RoutePlace) {
         searchFocused = false
         DeveloperLogStore.shared.record("route_search_choice", ["screen": "Find a stop", "place": place.name,
             "latitude": String(place.coordinate.latitude), "longitude": String(place.coordinate.longitude)])
@@ -166,7 +202,8 @@ struct RouteStopMapSelection: View {
         self.route = route; self.onChoose = onChoose
         _model = StateObject(wrappedValue: RouteStopSearchModel(track: route.track))
     }
-    var body: some View { RouteStopMapPicker(route: route, model: model, browsing: true, onChoose: onChoose) }
+    var body: some View { RouteStopMapPicker(route: route, model: model, browsing: true,
+                                             allowsSavingPin: false, onChoose: onChoose) }
 }
 
 /// This map only selects a draft stop. Search and map panning never send location commands.
@@ -174,6 +211,7 @@ private struct RouteStopMapPicker: View {
     let route: PlannedRoute
     @ObservedObject var model: RouteStopSearchModel
     let browsing: Bool
+    let allowsSavingPin: Bool
     let onChoose: (RoutePlace) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var position: MapCameraPosition = .automatic
@@ -219,7 +257,7 @@ private struct RouteStopMapPicker: View {
                 RouteSearchField(query: $model.query, focused: $searchFocused, prompt: "Search places") {
                     searchFocused = false; pin = nil; model.search()
                 }
-                RouteStopSearchScopeControls(model: model, visibleRegion: visibleRegion) { region in
+                RouteStopSearchScopeControls(model: model, visibleRegion: visibleRegion, route: route) { region in
                     pin = nil; position = .region(region)
                 }
                     .padding(.horizontal, 12).padding(.bottom, 6)
@@ -236,7 +274,7 @@ private struct RouteStopMapPicker: View {
                         if let center { pin = RoutePlace(name: "Dropped pin", coordinate: center) }
                     }.font(.caption).frame(minHeight: 44)
                 }
-                Button(browsing ? "Use this pin" : "Add stop here") {
+                Button(browsing && allowsSavingPin ? "Choose action" : browsing ? "Use this place" : "Add stop here") {
                     guard let pin else { return }
                     model.cancel(); onChoose(pin); dismiss()
                 }.buttonStyle(ShiftActionStyle(compact: true)).disabled(pin == nil)
@@ -274,6 +312,7 @@ private struct RouteStopMapPicker: View {
 private struct RouteStopSearchScopeControls: View {
     @ObservedObject var model: RouteStopSearchModel
     var visibleRegion: MKCoordinateRegion?
+    var route: PlannedRoute?
     var onChooseArea: (MKCoordinateRegion) -> Void
     @State private var choosingArea = false
     var body: some View {
@@ -287,7 +326,8 @@ private struct RouteStopSearchScopeControls: View {
                 .buttonStyle(.borderless).font(.subheadline).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         }
         .sheet(isPresented: $choosingArea) {
-            PlaceSearchAreaPicker(initialRegion: model.searchArea ?? visibleRegion ?? model.defaultSearchArea) {
+            PlaceSearchAreaPicker(initialRegion: model.searchArea ?? visibleRegion ?? model.defaultSearchArea,
+                                  route: route, fitRouteInitially: model.searchArea == nil) {
                 model.chooseSearchArea($0)
                 onChooseArea($0)
             }
@@ -410,7 +450,7 @@ private final class RouteStopSearchModel: ObservableObject {
             activeSearch = nil; task = nil; isSearching = false
             if failures == regions.count { message = "Search couldn't connect. Try again when you're online." }
             else if failures > 0 { message = "Some areas couldn't be searched. These results may be incomplete; search again to retry." }
-            else if alongRoute && corridor.samplesLongRoute { message = "This long route is searched in four areas. Use Everywhere for places between them." }
+            else if alongRoute && corridor.samplesLongRoute { message = "This long route is sampled in four areas, including its start and destination. Choose Map area to search a specific section in detail." }
             else if found.isEmpty {
                 message = chosenArea != nil ? "No matches in this map area. Try another category or choose a larger area."
                     : alongRoute ? "No matches near this path. Try another category or search Everywhere." : "No matches. Try adding a city or a more specific address."

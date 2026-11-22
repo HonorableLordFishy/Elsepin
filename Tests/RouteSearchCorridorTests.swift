@@ -33,6 +33,10 @@ final class RouteSearchCorridorTests: XCTestCase {
         XCTAssertTrue(corridor.samplesLongRoute)
         XCTAssertEqual(corridor.regions.count, 4)
         XCTAssertTrue(corridor.regions.allSatisfy { $0.diameter <= 200_000 })
+        XCTAssertEqual(try XCTUnwrap(corridor.regions.first).center.distance(to: track.point(at: 0)), 0, accuracy: 1)
+        XCTAssertEqual(try XCTUnwrap(corridor.regions.last).center.distance(to: track.point(at: track.length)), 0, accuracy: 1)
+        XCTAssertGreaterThan(corridor.regions[0].center.distance(to: corridor.regions[1].center), 200_000,
+                             "Very long routes must be represented honestly as sampled, not exhaustive coverage")
     }
 
     func testDateLineResultsAndInsertionKeepExistingStopOrder() throws {
@@ -50,4 +54,5 @@ final class RouteSearchCorridorTests: XCTestCase {
         XCTAssertFalse(RouteSearchCorridor.isDuplicate(name: "Cafe", point: point, ofName: "Grocery", point: point))
         XCTAssertFalse(RouteSearchCorridor.isDuplicate(name: "Cafe", point: point, ofName: "Cafe", point: RoutePoint(latitude: 33.72, longitude: -117.8)))
     }
+
 }

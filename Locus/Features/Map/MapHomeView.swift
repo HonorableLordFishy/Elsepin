@@ -28,6 +28,8 @@ struct MapHomeView: View {
     @State private var visibleSavedPins: [SavedPlace] = []
     @State private var savedMapAreas: [SavedMapArea] = []
     @State private var pendingBrowsePin: PinDraft?
+    @State private var pendingBrowseStop: (place: RoutePlace, alongRoute: Bool)?
+    @State private var pendingRouteEdit: SavedTrip?
     @State private var pinEditor: PinDraft?
     @State private var pendingDestination: RoutePlace?
     @State private var pendingSavedTrip: SavedTrip?
@@ -586,16 +588,29 @@ struct MapHomeView: View {
         }) {
             if let route = session.activeRoute {
                 NavigationStack {
-                    RouteStopSearchSheet(route: route, browsing: true) { place, _ in
+                    RouteStopSearchSheet(route: route, browsing: true, onSavePin: { place in
                         let saved = session.savedPins.first { $0.id == "\(place.coordinate.latitude),\(place.coordinate.longitude)" }
                         let draft = PinDraft(place: saved, center: place.coordinate, selectedCoordinate: place.coordinate)
                         draft.name = saved?.name ?? place.name
                         // Present the editor after the route-search sheet has dismissed.
                         pendingBrowsePin = draft
+                    }) { place, alongRoute in
+                        pendingBrowseStop = (place, alongRoute)
                     }
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { showRouteSearch = false } } }
                 }
             }
+        }
+        .confirmationDialog("Hold location and edit this route?", isPresented: Binding(
+            get: { pendingBrowseStop != nil && pendingRouteEdit == nil },
+            set: { if !$0 && pendingRouteEdit == nil { pendingBrowseStop = nil } }), titleVisibility: .visible) {
+                Button("Hold location and add stop") { beginBrowseStopEdit() }
+                Button("Cancel", role: .cancel) { pendingBrowseStop = nil }
+            } message: {
+                Text("This ends travel and holds your last sent location. The stop is added to a full route preview, not inserted into live playback. Movement does not restart until you review and start again from the route's chosen start.")
+            }
+        .onChange(of: session.journey == nil) { _, stopped in
+            if stopped { finishBrowseStopEditIfReady() }
         }
         .sheet(isPresented: $showSearch, onDismiss: finishPlaceSearch) {
             RoutePlaceSearchSheet(title: "Where to?", onPreviewTeleport: { place in
@@ -621,6 +636,26 @@ struct MapHomeView: View {
             planner.plan(to: destination, defaultOrigin: session.defaultRouteOrigin, mode: session.travelMode)
             pendingDestination = nil
         }
+    }
+
+    private func beginBrowseStopEdit() {
+        guard pendingBrowseStop != nil, pendingRouteEdit == nil,
+              let route = session.activeRoute, !session.isBusy else { pendingBrowseStop = nil; return }
+        pendingRouteEdit = route.savedTrip(name: route.name, mode: session.travelMode,
+            speed: session.speedMPH(for: session.travelMode), smooth: session.currentSmoothMovement,
+            arrival: session.arrivalChoice)
+        session.stopRoute()
+        finishBrowseStopEditIfReady()
+    }
+
+    private func finishBrowseStopEditIfReady() {
+        guard session.journey == nil, let trip = pendingRouteEdit,
+              let choice = pendingBrowseStop else { return }
+        pendingRouteEdit = nil
+        pendingBrowseStop = nil
+        planner.useSaved(trip)
+        planner.addWaypoint(choice.place, mode: trip.mode, speedMPH: trip.speedMPH,
+                            insertAlongRoute: choice.alongRoute)
     }
 
     private var mapTools: some View {

@@ -32,9 +32,14 @@ struct StableRelease: Codable, Equatable, Sendable {
               parts.query == nil, parts.fragment == nil else { return false }
         return parts.path == "/N3moStudio/Elsepin-Releases/releases/tag/\(tag)"
     }
-    func isUpdate(for installed: String, isPrerelease: Bool) -> Bool {
+    func isUpdate(for installed: String) -> Bool {
         guard isValid, let current = ReleaseVersion(installed), let candidate = ReleaseVersion(tag) else { return false }
-        return candidate > current || (isPrerelease && candidate == current)
+        // Only a strictly newer official version is an update. The release channel
+        // is deliberately not consulted here: an equal version used to be offered
+        // on the prerelease channel, and reinstalling that same version could never
+        // clear the notice.
+        // Equality (including prerelease equality) is considered up‑to‑date.
+        return candidate > current
     }
 }
 
@@ -79,11 +84,11 @@ struct ReleaseUpdateState: Codable, Equatable {
         return true
     }
 
-    func update(for installed: String, isPrerelease: Bool, at now: Date, includeDismissed: Bool = false) -> StableRelease? {
+    func update(for installed: String, at now: Date, includeDismissed: Bool = false) -> StableRelease? {
         guard let release, let lastChecked,
               (0...(7 * Self.interval)).contains(now.timeIntervalSince(lastChecked)),
               includeDismissed || dismissedTag != release.tag,
-              release.isUpdate(for: installed, isPrerelease: isPrerelease) else { return nil }
+              release.isUpdate(for: installed) else { return nil }
         return release
     }
 }
@@ -160,6 +165,13 @@ final class StableReleaseChecker {
             }
             state.lastChecked = now
             state.lastCheckFailed = false
+            // One record per completed check. `notice` is a render-time computed
+            // property, so the decision itself must not write to disk.
+            DeveloperLogStore.shared.record("update_check_completed", [
+                "status": String(response.statusCode),
+                "release_tag": state.release?.tag ?? "none",
+                "has_etag": String(state.etag != nil)
+            ])
         } catch {
             guard generation == requestGeneration else { return }
             // Keep a bounded-age cached notice. Never turn an error into "up to date".

@@ -16,11 +16,17 @@ final class AppUpdateController: ObservableObject {
         state = checker.state
         installedVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
         isPrerelease = Bundle.main.object(forInfoDictionaryKey: "ShiftReleaseChannel") as? String == "prerelease"
+        DeveloperLogStore.shared.record("update_checker_init", [
+            "installed_version": installedVersion,
+            "is_prerelease": String(isPrerelease),
+            "state_last_checked": state.lastChecked?.ISO8601Format() ?? "nil",
+            "state_release_tag": state.release?.tag ?? "nil"
+        ])
     }
 
-    var notice: StableRelease? { state.update(for: installedVersion, isPrerelease: isPrerelease, at: Date()) }
+    var notice: StableRelease? { state.update(for: installedVersion, at: Date()) }
     var availableUpdate: StableRelease? {
-        state.update(for: installedVersion, isPrerelease: isPrerelease, at: Date(), includeDismissed: true)
+        state.update(for: installedVersion, at: Date(), includeDismissed: true)
     }
 
     func checkIfDue() async {

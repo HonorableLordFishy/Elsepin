@@ -110,10 +110,14 @@ final class ElsepinFlowUITests: XCTestCase {
     func testUsualSpeedsApplyToNewRoutesAndPersist() throws {
         launchRoutes()
         app.buttons["Usual speeds"].tap()
-        XCTAssertEqual(try setVisibleSpeed("Walk", position: 1), 6)
-        capture("24-settings-walk-six-mph")
+        // XCUITest's normalized slider drag stops short of the track ends, so this
+        // check uses a mid-range usual speed; RouteInteractionTests covers the bounds.
+        let walk = try setVisibleSpeed("Walk", position: 0.9)
+        XCTAssertGreaterThan(walk, 1)
+        XCTAssertLessThan(walk, 6)
+        capture("24-settings-walk-usual-speed")
         app.buttons["Done"].tap()
-        XCTAssertEqual(try savedSnapshot()["usualWalk"] as? Double, 6)
+        XCTAssertEqual(try XCTUnwrap(savedSnapshot()["usualWalk"] as? Double), walk, accuracy: 0.05)
         for action in ["New drawn route", "New planned route"] {
             app.buttons[action].tap()
             let save = app.buttons["Save route & preview"]
@@ -124,11 +128,11 @@ final class ElsepinFlowUITests: XCTestCase {
             save.tap()
             XCTAssertTrue(app.buttons["Read saved data"].waitForExistence(timeout: 5))
             let saved = try savedTrip()
-            XCTAssertEqual(saved["speedMPH"] as? Double, 6)
+            XCTAssertEqual(try XCTUnwrap(saved["speedMPH"] as? Double), walk, accuracy: 0.05)
             XCTAssertEqual(saved["mode"] as? String, "walk")
             app.buttons["Reopen last saved route"].tap()
             closeRoute()
-            XCTAssertEqual(try savedSnapshot()["draftSpeed"] as? Double, 6)
+            XCTAssertEqual(try XCTUnwrap(savedSnapshot()["draftSpeed"] as? Double), walk, accuracy: 0.05)
         }
         // A previously saved route must keep its assigned speed, not take 6.
         app.buttons["Open saved route"].tap()
@@ -314,12 +318,20 @@ final class ElsepinFlowUITests: XCTestCase {
         launch("pin-adjustment", narrow: false)
         let pin = app.buttons["Test botanical garden walking route beside the riverside observatory and community orchard"]
         XCTAssertTrue(pin.waitForExistence(timeout: 12))
+        XCTAssertTrue(pin.isHittable)
         let coordinate = app.staticTexts["validation.adjustedPin"]
         let before = coordinate.label
         let bottom = pin.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
-        bottom.press(forDuration: 0.35, thenDragTo: bottom.withOffset(CGVector(dx: 65, dy: -35)))
-        let moved = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in coordinate.label != before }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 5), .completed)
+        // A cold simulator can drop the first synthetic long press before the
+        // pin's gesture recognizer attaches. Hold the same lower edge again
+        // instead of loosening what this check is about.
+        var adjusted = false
+        for _ in 0..<3 where !adjusted {
+            bottom.press(forDuration: 0.35, thenDragTo: bottom.withOffset(CGVector(dx: 65, dy: -35)))
+            let moved = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in coordinate.label != before }, object: nil)
+            adjusted = XCTWaiter.wait(for: [moved], timeout: 6) == .completed
+        }
+        XCTAssertTrue(adjusted, "Holding the pin's lower edge must move only the preview")
         XCTAssertEqual(app.staticTexts["validation.pinCommand"].label, "No location sent")
         capture("32-pin-lower-edge-adjustment")
     }
@@ -357,6 +369,43 @@ final class ElsepinFlowUITests: XCTestCase {
         app.buttons["session.stop"].tap()
         XCTAssertTrue(app.staticTexts["Where do you want to go?"].waitForExistence(timeout: 10))
         capture("03-cleared-test-session")
+    }
+
+    func testRouteSearchSeparatesAddStopFromSavePin() {
+        launch("moving")
+        let search = app.buttons["map.routeSearch"]
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        search.tap()
+        let expand = app.buttons["Choose stop on full-screen map"]
+        XCTAssertTrue(expand.waitForExistence(timeout: 10))
+        expand.tap()
+        let center = app.buttons["Map center"]
+        XCTAssertTrue(center.waitForExistence(timeout: 10))
+        center.tap()
+        app.buttons["Choose action"].tap()
+        XCTAssertTrue(app.buttons["routeSearch.addStop"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["routeSearch.savePin"].exists)
+        XCTAssertTrue(app.buttons["session.stop"].exists, "Choosing an action must not stop travel before confirmation")
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(app.navigationBars["Along your route"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["session.stop"].exists, "Cancelling the place action must keep the active route")
+
+        expand.tap()
+        XCTAssertTrue(center.waitForExistence(timeout: 10))
+        center.tap()
+        app.buttons["Choose action"].tap()
+        app.buttons["routeSearch.addStop"].tap()
+        let confirm = app.buttons["Hold location and add stop"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["session.stop"].exists, "The live route must remain active until explicit confirmation")
+        confirm.tap()
+        XCTAssertTrue(app.navigationBars["Plan a route"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.staticTexts["Dropped pin"].waitForExistence(timeout: 20),
+                      "The confirmed place must appear in the planner draft")
+        XCTAssertFalse(app.buttons["session.pause"].exists, "Opening the planner must not automatically resume movement")
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(app.staticTexts["Where do you want to go?"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["session.pause"].exists, "Cancelling the planner must leave movement stopped")
     }
     func testLargestTextLongRouteAndWrappedControls() {
         launch("moving", large: true)

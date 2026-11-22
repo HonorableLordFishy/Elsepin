@@ -1,3 +1,16 @@
+# Current update - build 93 integration, 21 November 2026
+
+Working branch: codex/integration-20261121 in the original Git repository.
+Owner requested reviewing external working copies, correcting confirmed defects,
+simulator validation and an IPA replacement. No release publication or visibility
+changes. Original backups remain untouched; see INTEGRATION-2026-11-21.md.
+The original build 92 job 44406256063 succeeded, but its package was not delivered
+in that interrupted turn. External CI also created a different build 92, so this
+integration uses build 93. Private source was verified before work began.
+Pending: finish source review, validate on GitHub Mac, inspect evidence, then
+package/verify and replace only the old Elsepin IPA in the requested folder.
+
+---
 # Current update - build 92 packaging requested, 18 November 2026
 
 Owner requested confirmed review fixes, simulator validation then IPA replacement;
