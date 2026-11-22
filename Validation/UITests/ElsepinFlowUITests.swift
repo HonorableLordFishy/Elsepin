@@ -405,8 +405,9 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertTrue(center.waitForExistence(timeout: 10))
         center.tap()
         app.buttons["Choose action"].tap()
-        app.buttons["routeSearch.addStop"].tap()
-        let confirm = app.buttons["Hold location and add stop"]
+        // iOS may expose both the native popover action and its SwiftUI child.
+        app.buttons["routeSearch.addStop"].firstMatch.tap()
+        let confirm = app.buttons["Hold location and add stop"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["session.stop"].exists, "The live route must remain active until explicit confirmation")
         confirm.tap()
