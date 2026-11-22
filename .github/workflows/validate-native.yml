@@ -5,7 +5,7 @@ on:
       ui_focus:
         description: Run all validation, or a focused simulator recheck
         type: choice
-        options: [all, search, home, pins, routes, route-search, review-fixes, backups, imports, import-text]
+        options: [all, search, home, pins, routes, route-search, route-identity, review-fixes, backups, imports, import-text]
         default: all
       validate_device:
         description: Also run full regressions and compile the device app for a focused UI run
@@ -155,6 +155,10 @@ jobs:
             done
           elif [[ "$UI_FOCUS" == route-search ]]; then
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testRouteSearchSeparatesAddStopFromSavePin")
+          elif [[ "$UI_FOCUS" == route-identity ]]; then
+            for test_name in testRouteSearchUpdatesSavedIdentityAndMetadata testRouteSearchUpdatesSavedIdentityAtLibraryLimit testRouteSearchSavesUnsavedRouteAsOneNewTrip testRouteSearchSeparatesAddStopFromSavePin; do
+              test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$test_name")
+            done
           elif [[ "$UI_FOCUS" == review-fixes ]]; then
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testRouteSearchSeparatesAddStopFromSavePin")
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinBackupUITests")

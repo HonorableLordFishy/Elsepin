@@ -31,7 +31,7 @@ final class ElsepinFlowUITests: XCTestCase {
             let button = springboard.buttons[label]
             if button.exists { button.tap() }
         }
-        if ["moving", "paused", "connecting", "failed", "map-pins"].contains(scenario) {
+        if scenario.hasPrefix("route-identity-") || ["moving", "paused", "connecting", "failed", "map-pins"].contains(scenario) {
             let start = app.buttons["validation.start"]
             if !start.isEnabled, springboard.buttons["Allow"].waitForExistence(timeout: 5) {
                 springboard.buttons["Allow"].tap()
@@ -369,6 +369,76 @@ final class ElsepinFlowUITests: XCTestCase {
         app.buttons["session.stop"].tap()
         XCTAssertTrue(app.staticTexts["Where do you want to go?"].waitForExistence(timeout: 10))
         capture("03-cleared-test-session")
+    }
+
+    func testRouteSearchUpdatesSavedIdentityAndMetadata() throws {
+        try exerciseRouteSearchSave(scenario: "route-identity-saved", expectedCount: 1, saved: true)
+    }
+
+    func testRouteSearchUpdatesSavedIdentityAtLibraryLimit() throws {
+        try exerciseRouteSearchSave(scenario: "route-identity-full", expectedCount: 50, saved: true)
+    }
+
+    func testRouteSearchSavesUnsavedRouteAsOneNewTrip() throws {
+        try exerciseRouteSearchSave(scenario: "route-identity-unsaved", expectedCount: 1, saved: false)
+    }
+
+    private func routeLibrarySnapshot() throws -> [[String: Any]] {
+        app.buttons["validation.readRouteLibrary"].tap()
+        let text = app.staticTexts["validation.routeLibrarySnapshot"].label
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [[String: Any]])
+    }
+
+    private func exerciseRouteSearchSave(scenario: String, expectedCount: Int, saved: Bool) throws {
+        launch(scenario, narrow: false)
+        XCTAssertTrue(app.buttons["session.pause"].waitForExistence(timeout: 15))
+        let before = try routeLibrarySnapshot()
+        XCTAssertEqual(before.count, expectedCount)
+        let original = try XCTUnwrap(before.first { ($0["folder"] as? String) == "Route QA" })
+        let originalID = try XCTUnwrap(original["id"] as? String)
+        XCTAssertEqual(original["favorite"] as? Bool, true)
+        app.buttons["map.routeSearch"].tap()
+        let expand = app.buttons["routeSearch.fullMap"]
+        XCTAssertTrue(expand.waitForExistence(timeout: 10)); expand.tap()
+        let center = app.buttons["Map center"]
+        XCTAssertTrue(center.waitForExistence(timeout: 10)); center.tap()
+        app.buttons["Choose action"].tap()
+        let add = app.buttons["routeSearch.addStop"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 10)); add.tap()
+        let confirm = app.buttons["Hold location and add stop"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10)); confirm.tap()
+        XCTAssertTrue(app.navigationBars["Plan a route"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.staticTexts["Dropped pin"].waitForExistence(timeout: 20))
+        routeControl(app.buttons[saved ? "Save changes" : "Save route"]).tap()
+        XCTAssertTrue(app.alerts["Save trip"].waitForExistence(timeout: 5))
+        app.alerts["Save trip"].buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["Trip saved with its place names and stops."].waitForExistence(timeout: 10))
+        capture("40-" + scenario + "-saved")
+        app.navigationBars.buttons["Cancel"].tap()
+        XCTAssertTrue(app.buttons["validation.readRouteLibrary"].waitForExistence(timeout: 10))
+        let after = try routeLibrarySnapshot() // Fresh TripLibrary reads the persisted file.
+        XCTAssertEqual(after.count, expectedCount + (saved ? 0 : 1))
+        for previous in before {
+            let id = try XCTUnwrap(previous["id"] as? String)
+            let current = try XCTUnwrap(after.first { $0["id"] as? String == id })
+            if saved && id == originalID {
+                XCTAssertEqual(current["favorite"] as? Bool, true)
+                XCTAssertEqual(current["folder"] as? String, "Route QA")
+                XCTAssertEqual(current["name"] as? String, original["name"] as? String)
+                let stops = try XCTUnwrap(current["stops"] as? [[String: Any]])
+                XCTAssertEqual(stops.count, 1, "The original saved record must contain the added stop")
+                XCTAssertEqual(stops.first?["name"] as? String, "Dropped pin")
+            } else {
+                XCTAssertTrue(NSDictionary(dictionary: previous).isEqual(to: current),
+                              "Unrelated saved trips must remain unchanged")
+            }
+        }
+        if !saved {
+            let newTrips = after.filter { current in !before.contains { $0["id"] as? String == current["id"] as? String } }
+            XCTAssertEqual(newTrips.count, 1)
+            XCTAssertEqual((newTrips.first?["stops"] as? [[String: Any]])?.count, 1)
+        }
+        XCTAssertFalse(app.buttons["session.pause"].exists, "Saving must not restart travel")
     }
 
     func testRouteSearchSeparatesAddStopFromSavePin() {

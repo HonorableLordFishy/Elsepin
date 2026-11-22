@@ -10,6 +10,7 @@ enum ValidationFixture {
     static var largeText: Bool { ProcessInfo.processInfo.arguments.contains("--large-text") }
     static var dark: Bool { ProcessInfo.processInfo.arguments.contains("--dark") }
     static var fallback: Bool { ProcessInfo.processInfo.arguments.contains("--accessibility-fallback") }
+    static var routeIdentityScenario: Bool { scenario.hasPrefix("route-identity-") }
     static let longName = "Test botanical garden walking route beside the riverside observatory and community orchard"
     static let points = [CLLocationCoordinate2D(latitude: 40.768, longitude: -73.981),
                          CLLocationCoordinate2D(latitude: 40.770, longitude: -73.975),
@@ -48,6 +49,21 @@ enum ValidationFixture {
                 speed: 1.4, smooth: false, favorite: true)
         }
         if scenario == "import-review" { AppDataWorkspace.defaults.set(Data("corrupt disposable pins".utf8),forKey:"locus.favorites") }
+        if routeIdentityScenario {
+            let library = TripLibrary()
+            guard let saved = library.trips.first else { preconditionFailure("Missing disposable route") }
+            library.move(saved, folder: "Route QA")
+            if scenario == "route-identity-full" {
+                let fillers = (1...49).map { index in
+                    var trip = saved
+                    trip.id = UUID(); trip.name = "Untouched route \(index)"
+                    trip.favorite = index.isMultiple(of: 2); trip.folder = "Other routes"
+                    return trip
+                }
+                do { guard try library.merge(fillers) else { preconditionFailure("Could not seed routes") } }
+                catch { preconditionFailure("Invalid disposable routes: \(error)") }
+            }
+        }
     }
 }
 
@@ -70,7 +86,8 @@ private struct ValidationHost: View {
     @State private var started = false
     @State private var runSession = false
     @State private var permissionsReady = false
-    private var sessionScenario: Bool { ["moving", "paused", "connecting", "failed", "map-pins"].contains(ValidationFixture.scenario) }
+    @State private var routeLibrarySnapshot = ""
+    private var sessionScenario: Bool { ValidationFixture.routeIdentityScenario || ["moving", "paused", "connecting", "failed", "map-pins"].contains(ValidationFixture.scenario) }
     var body: some View {
         Group {
             if ValidationFixture.scenario == "route-editing" { ValidationRouteHarness() }
@@ -85,6 +102,17 @@ private struct ValidationHost: View {
                 VStack(spacing: 0) {
                 Text("SIMULATOR TEST DATA")
                     .accessibilityIdentifier("validation.banner")
+                if ValidationFixture.routeIdentityScenario {
+                    Button("Read route library") {
+                        let reloaded = TripLibrary()
+                        if let error = reloaded.error { routeLibrarySnapshot = "Library reload failed: \(error)" }
+                        else if let data = try? JSONEncoder().encode(reloaded.trips) {
+                            routeLibrarySnapshot = String(decoding: data, as: UTF8.self)
+                        }
+                    }.accessibilityIdentifier("validation.readRouteLibrary")
+                    Text(routeLibrarySnapshot).lineLimit(1)
+                        .accessibilityIdentifier("validation.routeLibrarySnapshot")
+                }
                 if ValidationFixture.scenario == "import-root" {
                     Button("Open validation GPX") {
                         let url = FileManager.default.temporaryDirectory.appendingPathComponent("root-flow.gpx")
@@ -139,7 +167,16 @@ private struct ValidationHost: View {
             }
             .task(id: runSession) {
                 guard runSession else { return }
-                    _ = session.followRoute(ValidationFixture.route, pairing: pairing, smoothing: false)
+                    if ValidationFixture.routeIdentityScenario,
+                       ValidationFixture.scenario != "route-identity-unsaved",
+                       let trip = library.trips.first(where: { $0.name == ValidationFixture.longName }),
+                       let route = trip.plannedRoute {
+                        if session.followRoute(route, pairing: pairing, smoothing: trip.smoothMovement) {
+                            session.rememberSavedTrip(trip.id, routeID: route.id)
+                        }
+                    } else {
+                        _ = session.followRoute(ValidationFixture.route, pairing: pairing, smoothing: false)
+                    }
                     if ValidationFixture.scenario == "paused" {
                         for _ in 0..<50 where session.effectivePhase != .active {
                             try? await Task.sleep(for: .milliseconds(100))

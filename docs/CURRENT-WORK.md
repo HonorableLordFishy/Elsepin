@@ -1,3 +1,15 @@
+# Current update - saved-route identity fix, 22 November 2026
+
+Owner authorized the duplicate-route fix, focused simulator validation and then
+an IPA only if validation and smaller-model review pass. No publication. Preserve
+favorite/folder metadata, unrelated routes and unsaved-route behavior. The narrow
+MapHome fix captures the original Library ID before stopping travel and restores
+it after loading the route snapshot. New simulator scenarios exercise real Save
+and reload persisted records at counts 1 and 50, plus unsaved-to-new-save behavior.
+Smaller-model review passed after correcting a test-only private-property access.
+App/extension candidate number is 94; CI validation and packaging remain pending.
+
+---
 # Current update - build 93 integration, 21 November 2026
 
 Working branch: codex/integration-20261121 in the original Git repository.

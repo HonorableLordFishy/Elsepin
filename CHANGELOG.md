@@ -9,6 +9,11 @@ Earlier entries describe their original development checkpoints. A later build m
 supersede a pending check or an intermediate behavior. The build history records
 successful packages separately from failed attempts and simulator/device evidence.
 
+## Build 94 - saved-route editing candidate (22 November 2026)
+
+- Adding a stop from Map search now keeps the original saved-route identity. Save changes updates that route while retaining its favorite status and folder; unsaved routes remain new saves.
+- Added native simulator checks for saved edits, a full 50-route Library, and unsaved routes. Each reloads the saved file and checks unrelated routes remain unchanged. Validation is pending; no release published.
+
 ## Build 93 - integration candidate (21 November 2026)
 
 - Keep a matching live developer connection for native location writes and Stop when the bootstrap network changes. Fresh connections still require a successful probe and handshake; native command failures remain visible. Physical Wi-Fi handoff remains a phone check.

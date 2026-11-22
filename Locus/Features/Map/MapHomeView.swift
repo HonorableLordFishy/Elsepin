@@ -30,6 +30,7 @@ struct MapHomeView: View {
     @State private var pendingBrowsePin: PinDraft?
     @State private var pendingBrowseStop: (place: RoutePlace, alongRoute: Bool)?
     @State private var pendingRouteEdit: SavedTrip?
+    @State private var pendingRouteEditID: UUID?
     @State private var showBrowseStopConfirmation = false
     @State private var pinEditor: PinDraft?
     @State private var pendingDestination: RoutePlace?
@@ -639,8 +640,14 @@ struct MapHomeView: View {
     }
 
     private func beginBrowseStopEdit() {
-        guard pendingBrowseStop != nil, pendingRouteEdit == nil,
-              let route = session.activeRoute, route.stops.count < 8, !session.isBusy else { pendingBrowseStop = nil; return }
+        guard pendingRouteEdit == nil else { return }
+        guard pendingBrowseStop != nil, let route = session.activeRoute,
+              route.stops.count < 8, !session.isBusy else {
+            pendingBrowseStop = nil
+            pendingRouteEditID = nil
+            return
+        }
+        pendingRouteEditID = session.activeSavedTripID
         pendingRouteEdit = route.savedTrip(name: route.name, mode: session.travelMode,
             speed: session.speedMPH(for: session.travelMode), smooth: session.currentSmoothMovement,
             arrival: session.arrivalChoice)
@@ -651,9 +658,12 @@ struct MapHomeView: View {
     private func finishBrowseStopEditIfReady() {
         guard session.journey == nil, let trip = pendingRouteEdit,
               let choice = pendingBrowseStop else { return }
+        let editingTripID = pendingRouteEditID
         pendingRouteEdit = nil
+        pendingRouteEditID = nil
         pendingBrowseStop = nil
         planner.useSaved(trip)
+        planner.editingTripID = editingTripID
         planner.addWaypoint(choice.place, mode: trip.mode, speedMPH: trip.speedMPH,
                             insertAlongRoute: choice.alongRoute)
     }
