@@ -1,5 +1,36 @@
 # Elsepin build history
 
+## Private build 94 delivered - 22 November 2026
+
+Source `b05010ce81dca4122c7533ebfbb8749e890787a8` fixes only the map-search
+saved-route handoff in production: preserve the original optional Library ID
+before stopping travel, then restore it after loading the planner snapshot.
+This keeps Save changes on the replacement path, preserving favorite and folder.
+Unsaved active routes retain nil editing identity and save as one new route.
+
+Private validation run `45050431793` passed 644 Swift regressions, helper/resource
+checks and production app/extension compilation with no compiler warnings. All
+four focused simulator cases passed on their first attempts with no runtime
+warnings: saved route replacement, replacement at the 50-trip limit, one new
+save for an unsaved route, and cancellation/reopen/add-stop flow. The save checks
+use native controls and then instantiate a fresh TripLibrary to read persisted
+records, asserting stable IDs, favorites, folders, names and untouched other
+routes. Inspected saved/full-library and unsaved-route screenshots. Disposable
+fixtures are isolated from the production app and cannot prove real spoofing.
+
+GPT-5.6 Sol at medium effort implemented the narrow fix; a separate same-model
+review caught a test-only private-property access, corrected before CI. Its
+bounded recheck passed. No unrelated recovery or update policy changes.
+
+Private IPA run `45051158518` packaged that same source as 2.6.1 (94), app and
+Live Activity extension, SDK 27.1. Passed 644 Swift tests, 27 resource checks,
+20 Companion tests (one Windows-only skip) and 106 cloud helper tests. Verified
+the original artifact, both versions/identities/device binaries, integrity,
+icons and resources, then verified the delivered copy. Replaced only build 93
+with `Elsepin 2.6.1 build 94.ipa` in the usual folder; other files unchanged.
+Source remains private. No release published or repository visibility changed.
+Evidence: `.build/route-identity-20261122/`.
+
 ## Private build 93 delivered - 21 November 2026
 
 Private run `44987373797` built source

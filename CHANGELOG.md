@@ -1,6 +1,6 @@
 # Elsepin changelog
 
-Updated through **21 November 2026**, including private test build 93 and official build 89.
+Updated through **22 November 2026**, including private test build 94 and official build 89.
 **Public release: [2.6.1 (89)](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/v2.6.1).**
 
 [What's new in 2.6.1](docs/CHANGES-SINCE-2.6.0.md) · [Build history](docs/BUILD-HISTORY.md) · [Setup](SETUP.md)
@@ -9,10 +9,10 @@ Earlier entries describe their original development checkpoints. A later build m
 supersede a pending check or an intermediate behavior. The build history records
 successful packages separately from failed attempts and simulator/device evidence.
 
-## Build 94 - saved-route editing candidate (22 November 2026)
+## Build 94 - saved-route editing fix (22 November 2026)
 
 - Adding a stop from Map search now keeps the original saved-route identity. Save changes updates that route while retaining its favorite status and folder; unsaved routes remain new saves.
-- Added native simulator checks for saved edits, a full 50-route Library, and unsaved routes. Each reloads the saved file and checks unrelated routes remain unchanged. Validation is pending; no release published.
+- Native simulator checks passed for saved edits, a full 50-route Library, unsaved routes and cancellation. They reload the saved file and verify that the original identity, favorite and folder survive, with unrelated routes unchanged. All 644 Swift regressions and app/extension compilation passed. Build 94 was verified and delivered privately; no release published.
 
 ## Build 93 - integration candidate (21 November 2026)
 

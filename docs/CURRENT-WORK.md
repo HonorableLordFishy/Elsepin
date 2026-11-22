@@ -7,7 +7,13 @@ MapHome fix captures the original Library ID before stopping travel and restores
 it after loading the route snapshot. New simulator scenarios exercise real Save
 and reload persisted records at counts 1 and 50, plus unsaved-to-new-save behavior.
 Smaller-model review passed after correcting a test-only private-property access.
-App/extension candidate number is 94; CI validation and packaging remain pending.
+Completed: private validation run 45050431793 passed all four focused simulator
+scenarios on their first attempts, 644 Swift regressions and production app/
+extension compilation. Screenshots inspected; no simulator runtime warnings.
+Private IPA run 45051158518 built exact source b05010c as 2.6.1 (94). The original
+artifact and delivered copy were verified before replacing only build 93 in the
+usual folder. Smaller-model review passed; no release or visibility changes.
+Evidence is in .build/route-identity-20261122 and BUILD-HISTORY.md.
 
 ---
 # Current update - build 93 integration, 21 November 2026
