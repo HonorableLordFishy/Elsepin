@@ -388,7 +388,16 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["routeSearch.savePin"].exists)
         capture("38-route-search-place-actions")
         XCTAssertTrue(app.buttons["session.stop"].exists, "Choosing an action must not stop travel before confirmation")
-        app.buttons["Cancel"].tap()
+        let cancelChoice = app.buttons["Cancel"]
+        if cancelChoice.exists {
+            cancelChoice.tap()
+        } else {
+            // Native popover confirmation dialogs dismiss by tapping outside;
+            // iOS does not always render their cancel action as a button.
+            app.navigationBars["Along your route"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(app.buttons["routeSearch.addStop"].waitForNonExistence(timeout: 5),
+                      "Dismissing the native dialog must cancel its pending choice")
         XCTAssertTrue(app.navigationBars["Along your route"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["session.stop"].exists, "Cancelling the place action must keep the active route")
 
