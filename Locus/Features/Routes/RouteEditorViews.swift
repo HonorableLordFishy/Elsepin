@@ -325,6 +325,11 @@ struct RouteSectionChoiceSheet: View {
                     Text("New directions").tag(RouteLegPathChoice.recalculate)
                 }.pickerStyle(.segmented)
             }
+            if pathChoice == .recalculate {
+                Text("Recalculates the whole route through your stops.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -352,7 +357,8 @@ struct RouteSectionChoiceSheet: View {
     private func save() {
         guard !didSave else { return }
         didSave = true
-        onSave(RouteLegChoice(mode: mode, speedMPH: mode.clampedSpeedMPH(speed)), needsPathChoice ? pathChoice : .keepCurrent)
+        let choice = RouteLegChoice(mode: mode, speedMPH: mode.clampedSpeedMPH(speed))
+        if choice != original { onSave(choice, needsPathChoice ? pathChoice : .keepCurrent) }
         dismiss()
     }
 }

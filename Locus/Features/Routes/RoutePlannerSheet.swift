@@ -42,7 +42,7 @@ struct RoutePlannerSheet: View {
     @State private var pendingEditID: UUID?
     @State private var editingSection: SectionEdit?
     @State private var pendingSectionChoice: (id: UUID, choice: RouteLegChoice, path: RouteLegPathChoice)?
-    @State private var pendingLiveSection: SectionEdit?
+    @State private var pendingLiveSection: TimelinePlace?
     @State private var pendingLivePlace: TimelinePlace?
     @State private var liveMovementExpanded = false
     @State private var editingStop: StopEdit?
@@ -287,9 +287,9 @@ struct RoutePlannerSheet: View {
         planner.useSaved(trip)
         planner.editingTripID = pendingEditID
         pendingEditID = nil
-        if let section = pendingLiveSection {
+        if let place = pendingLiveSection {
             pendingLiveSection = nil
-            editingSection = section
+            editTimelineLeg(to: place)
         } else if let place = pendingLivePlace {
             pendingLivePlace = nil
             editTimelinePlace(place)
@@ -451,11 +451,11 @@ struct RoutePlannerSheet: View {
         return HStack(spacing: 12) {
             Rectangle().fill(LocusTheme.accent.opacity(0.3)).frame(width: 2).frame(width: 28)
             Button {
-                if !hasJourney, let choice = choices.first {
-                    editingSection = SectionEdit(id: place.id, title: "To \(place.name)", choice: choice)
-                } else if hasJourney, let choice = choices.first {
-                    pendingLiveSection = SectionEdit(id: place.id, title: "To \(place.name)", choice: choice)
+                if hasJourney {
+                    pendingLiveSection = place
                     confirmLiveEdit = true
+                } else {
+                    editTimelineLeg(to: place)
                 }
             } label: {
                 HStack(spacing: 8) {
@@ -475,6 +475,11 @@ struct RoutePlannerSheet: View {
                 .accessibilityHint(hasJourney ? "Hold the current location before editing this leg" : "Change only this leg's mode and speed")
         }
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func editTimelineLeg(to place: TimelinePlace) {
+        let choice = planner.sectionChoice(for: place.id, defaultMode: planner.draftMode)
+        editingSection = SectionEdit(id: place.id, title: "To \(place.name)", choice: choice)
     }
 
     private func timelineLegChoices(to place: TimelinePlace, previousMetres: Double?) -> [RouteLegChoice] {

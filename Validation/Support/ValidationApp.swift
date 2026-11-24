@@ -182,7 +182,7 @@ private struct ValidationHost: View {
         Group {
             if ValidationFixture.scenario == "reset-review" { NavigationStack { List { AppResetSection() } } }
             else if ValidationFixture.scenario == "joystick-presets" { ValidationJoystickPresets() }
-            else if ValidationFixture.scenario == "route-editing" { ValidationRouteHarness() }
+            else if ["route-editing", "route-editing-mixed"].contains(ValidationFixture.scenario) { ValidationRouteHarness() }
             else if ValidationFixture.scenario == "import-review" { ValidationImportHarness() }
             else if ValidationFixture.scenario.hasPrefix("backup-") { ValidationBackupHarness() }
             else if ValidationFixture.scenario == "deleted-selection" { NavigationStack { RecentlyDeletedView() } }

@@ -43,6 +43,21 @@ private final class ValidationRouteDriver: ObservableObject {
         trip = route.savedTrip(name: "Test saved walk", mode: .walk, speed: 1.4, smooth: true, arrival: .stay)
     }
 
+    func savedTripWithMixedFirstLeg() -> SavedTrip {
+        var mixed = trip
+        let length = ValidationFixture.route.track.length
+        let boundaries = [0, length / 6, length / 3, length * 2 / 3, length]
+        let choices: [RouteLegChoice] = [
+            .init(mode: .walk, speedMPH: 1.4), .init(mode: .drive, speedMPH: 23),
+            .init(mode: .walk, speedMPH: 1.4), .init(mode: .walk, speedMPH: 1.4)
+        ]
+        mixed.travelSections = choices.enumerated().map { index, choice in
+            RouteTravelSection(id: UUID(), startMetres: boundaries[index], endMetres: boundaries[index + 1],
+                               mode: choice.mode, speedMPH: choice.speedMPH)
+        }
+        return mixed
+    }
+
     func waitForDirections() async {
         for _ in 0..<100 where planner.isLoading { try? await Task.sleep(for: .milliseconds(20)) }
     }
@@ -282,7 +297,8 @@ struct ValidationRouteHarness: View {
                 guard !started else { return }; started = true
                 preferences.speedUnit = .mph
                 await driver.exercise(session: session)
-                do { _ = try library.merge([driver.trip]) }
+                let seed = ValidationFixture.scenario == "route-editing-mixed" ? driver.savedTripWithMixedFirstLeg() : driver.trip
+                do { _ = try library.merge([seed]) }
                 catch { driver.report = "Could not seed disposable route: \(error)" }
                 lastID = driver.trip.id
                 refreshSnapshot()

@@ -520,6 +520,16 @@ final class RoutePlanner: ObservableObject {
         rebuild(mode: mode, preserving: previous)
     }
 
+    func sectionChoice(for id: UUID, defaultMode: TravelMode) -> RouteLegChoice {
+        if let choice = sectionChoices[id] { return choice }
+        if let route = selectedRoute,
+           let range = RouteLegEditing.range(to: id, stops: route.stops, length: route.track.length),
+           let section = RouteTravelSection.incoming(in: route.travelSections, endingAt: range.upperBound) {
+            return RouteLegChoice(mode: section.mode, speedMPH: section.speedMPH)
+        }
+        return RouteLegChoice(mode: defaultMode, speedMPH: defaultMode.clampedSpeedMPH(draftSpeedMPH))
+    }
+
     func setSectionChoice(_ choice: RouteLegChoice, for id: UUID, defaultMode: TravelMode,
                           pathChoice: RouteLegPathChoice = .recalculate) {
         guard !isLoading, choice.isValid else { return }
@@ -530,11 +540,7 @@ final class RoutePlanner: ObservableObject {
         let fallback = RouteLegChoice(mode: defaultMode, speedMPH: defaultMode.clampedSpeedMPH(draftSpeedMPH))
         var choices = sectionChoices
         for target in targets where choices[target] == nil {
-            if let route = selectedRoute,
-               let range = RouteLegEditing.range(to: target, stops: route.stops, length: route.track.length),
-               let section = RouteTravelSection.incoming(in: route.travelSections, endingAt: range.upperBound) {
-                choices[target] = RouteLegChoice(mode: section.mode, speedMPH: section.speedMPH)
-            } else { choices[target] = fallback }
+            choices[target] = sectionChoice(for: target, defaultMode: defaultMode)
         }
         let previous = choices[id] ?? fallback
         choices[id] = choice

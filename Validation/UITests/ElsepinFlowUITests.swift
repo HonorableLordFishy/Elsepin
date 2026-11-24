@@ -67,8 +67,8 @@ final class ElsepinFlowUITests: XCTestCase {
                       app.debugDescription)
     }
 
-    private func launchRoutes(large: Bool = false) {
-        launch("route-editing", large: large, narrow: false)
+    private func launchRoutes(large: Bool = false, mixedLeg: Bool = false) {
+        launch(mixedLeg ? "route-editing-mixed" : "route-editing", large: large, narrow: false)
         let report = app.staticTexts["validation.routeRules"]
         let passed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == 'Passed'"), object: report)
         XCTAssertEqual(XCTWaiter.wait(for: [passed], timeout: 20), .completed, report.label)
@@ -279,6 +279,39 @@ final class ElsepinFlowUITests: XCTestCase {
             XCTAssertEqual(newStop["name"] as? String, oldStop["name"] as? String)
             XCTAssertEqual(newStop["waitSeconds"] as? Double, oldStop["waitSeconds"] as? Double)
         }
+    }
+
+    func testMixedLegUsesIncomingSettingsAndUnchangedDonePreservesSections() throws {
+        launchRoutes(mixedLeg: true)
+        let snapshotBefore = try savedSnapshot()
+        let before = try XCTUnwrap(snapshotBefore["saved"] as? [String: Any])
+        let originalSections = try XCTUnwrap(before["travelSections"] as? [[String: Any]])
+        XCTAssertEqual(originalSections.map { $0["mode"] as? String }, ["walk", "drive", "walk", "walk"])
+        let requestsBefore = try XCTUnwrap(snapshotBefore["directionsRequests"] as? Int)
+
+        app.buttons["Open saved route"].tap()
+        let moveToCafe = app.buttons["Movement to Test cafe"]
+        routeControl(moveToCafe).tap()
+        XCTAssertTrue(app.buttons["Drive"].isSelected)
+        XCTAssertEqual(app.sliders["Drive speed in miles per hour"].value as? String, "23.0 mph")
+        app.buttons["Done"].tap()
+        saveRouteChanges()
+        closeRoute()
+        let unchanged = try savedSnapshot()
+        XCTAssertEqual(unchanged["directionsRequests"] as? Int, requestsBefore)
+        let saved = try XCTUnwrap(unchanged["saved"] as? [String: Any])
+        let savedSections = try XCTUnwrap(saved["travelSections"] as? [[String: Any]])
+        XCTAssertEqual(savedSections as NSArray, originalSections as NSArray)
+
+        app.buttons["Open saved route"].tap()
+        routeControl(moveToCafe).tap()
+        app.buttons["Walk"].tap()
+        XCTAssertTrue(app.staticTexts["Drive → Walk"].exists)
+        routeControl(app.buttons["New directions"]).tap()
+        app.buttons["Done"].tap()
+        saveRouteChanges()
+        closeRoute()
+        XCTAssertEqual(try savedSnapshot()["directionsRequests"] as? Int, requestsBefore + 1)
     }
 
     func testRecalculateSavedRouteRetainsStopsAndSavesNewSpeed() throws {
