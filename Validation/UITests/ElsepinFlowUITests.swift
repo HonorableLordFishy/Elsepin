@@ -223,11 +223,15 @@ final class ElsepinFlowUITests: XCTestCase {
 
         routeControl(drive).tap()
         XCTAssertTrue(routeControl(keepPath).isSelected)
+        XCTAssertFalse(app.segmentedControls.buttons["Keep path"].exists)
+        capture("leg-walk-to-drive-inline-largest-text")
         routeControl(newDirections).tap()
         XCTAssertTrue(newDirections.isSelected)
         XCTAssertGreaterThanOrEqual(keepPath.frame.height, 44)
         XCTAssertGreaterThanOrEqual(newDirections.frame.minY, keepPath.frame.maxY)
-        capture("leg-walk-to-drive-inline-largest-text")
+        let scopeNote = app.staticTexts["Recalculates the whole route through your stops."]
+        XCTAssertTrue(routeControl(scopeNote).isHittable)
+        capture("leg-walk-to-drive-inline-largest-text-scrolled")
 
         routeControl(walk).tap()
         XCTAssertTrue(newDirections.waitForNonExistence(timeout: 5))

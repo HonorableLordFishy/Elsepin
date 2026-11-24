@@ -274,6 +274,9 @@ struct ValidationRouteHarness: View {
                         .accessibilityIdentifier("validation.savedSnapshot")
                 }
             }
+            // Keep the test driver's controls reachable while applying the
+            // requested text size to the actual planner and its editors below.
+            .dynamicTypeSize(ValidationFixture.largeText ? .large : typeSize)
             .navigationTitle("Route validation")
         }
             .sheet(isPresented: $showSettings, onDismiss: refreshSnapshot) {
