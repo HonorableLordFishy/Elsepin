@@ -128,10 +128,10 @@ jobs:
           set -o pipefail
           swift test --filter 'Backup|LibraryMerge|ShiftAppearanceTests' 2>&1 | tee .build/simulator-evidence/backup-rules.log
       - name: Verify disposable simulator startup
-        timeout-minutes: 8
+        timeout-minutes: 15
         run: |
           python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "boot", os.environ["VALIDATION_SIMULATOR"]], check=True, timeout=180)'
-          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "bootstatus", os.environ["VALIDATION_SIMULATOR"], "-b"], check=True, timeout=240)'
+          python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "bootstatus", os.environ["VALIDATION_SIMULATOR"], "-b"], check=True, timeout=660)'
           # XCTest owns display/launch and captures app interaction screenshots.
           # A preliminary SpringBoard image is not an app validation requirement.
       - name: Run focused native UI checks
