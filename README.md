@@ -1,8 +1,8 @@
 # Elsepin
 
-Private development repository for Elsepin, the continuation of Shift.
+Development repository for Elsepin, the continuation of Shift.
 
-**Current private build on main is 2.6.1 (94).** Build 94 preserves a saved route’s identity when adding stops from map search. See the [build record](docs/BUILD-HISTORY.md) for the source revision and validation results.
+**Current test build on main is 2.6.1 (95).** Build 95 protects pairing codes, checks saved-trip data before exporting a backup, and keeps recovery and route edits tied to the selection you confirmed. The [build record](docs/BUILD-HISTORY.md) includes the source revision and simulator results.
 
 **Public release: [2.6.1 (89)](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/v2.6.1).** Build 89 uses the official update channel with build 88's features and fixes. Prism Jumpgate remains the primary icon; the app has eight themes and thirteen icon choices.
 
@@ -21,7 +21,7 @@ Bloom is the default. Appearance offers Solid or Liquid Glass and compact rounde
 
 ## Distribution boundaries
 
-Approved public downloads and help belong in [Elsepin-Releases](https://github.com/N3moStudio/Elsepin-Releases). This private repository contains implementation and validation work. No new IPA is published merely because source changes are pushed. The paid Veypax product uses its own private repository, versioning and plan policies.
+Approved official downloads and help belong in [Elsepin-Releases](https://github.com/N3moStudio/Elsepin-Releases). This repository contains development source, validation work and test-build artifacts. The paid Veypax product uses its own private repository, versioning and plan policies.
 
 ## Stop and reconnect
 

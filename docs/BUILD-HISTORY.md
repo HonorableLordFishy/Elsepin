@@ -1,5 +1,13 @@
 # Elsepin build history
 
+## Build 95 - 23 November 2026
+
+**2.6.1 (95)** was built from `de76461562523a5aee1b8b6317df446025372e72`. Independent higher-model review led to rechecking the saved-trip file at export time and checking the session generation throughout a route edit. The first native run exposed a nondeterministic test that used the new log recorder to create an old-format fixture. The passing revision seeds the historical record directly.
+
+[Native validation](https://github.com/HonorableLordFishy/Elsepin/actions/runs/45310693979) passed 654 Swift tests, 27 packaging/resource tests, 107 cloud tests and 20 Companion tests with one additional platform-specific skip. The production app and extension compiled. All 10 selected UI tests passed on iPhone 17 with iOS 27.2, with zero failures, skips or reported runtime warnings. Screenshots cover the blocked backup, the validated recovery preview and continued playback on the replacement route.
+
+[IPA packaging](https://github.com/HonorableLordFishy/Elsepin/actions/runs/45314684389) produced artifact `14885431128`, 19,431,334 bytes, SHA-256 `f8523323c87becd975afb8f6e09906a7f85c7658ed15820cdff0da5feda29183`. The delivered file matched that digest. Its app and extension both report 2.6.1 (95), both embedded helpers matched their source archives byte for byte, and all 13 icon choices passed the package check. If iOS suspends Elsepin, removal of a delivered pairing alert can wait until its next opportunity to run.
+
 ## Private build 94 delivered - 22 November 2026
 
 Source `b05010ce81dca4122c7533ebfbb8749e890787a8` fixes only the map-search

@@ -1,6 +1,6 @@
 # Elsepin changelog
 
-Updated through **22 November 2026**, including private test build 94 and official build 89.
+Updated through **23 November 2026**, including test build 95 and official build 89.
 **Public release: [2.6.1 (89)](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/v2.6.1).**
 
 [What's new in 2.6.1](docs/CHANGES-SINCE-2.6.0.md) · [Build history](docs/BUILD-HISTORY.md) · [Setup](SETUP.md)
@@ -8,6 +8,13 @@ Updated through **22 November 2026**, including private test build 94 and offici
 Earlier entries describe their original development checkpoints. A later build may
 supersede a pending check or an intermediate behavior. The build history records
 successful packages separately from failed attempts and simulator/device evidence.
+
+## Build 95 - pairing privacy, backups and route editing (23 November 2026)
+
+- Pairing notification logs keep delivery metadata. Diagnostic exports also redact PINs from earlier pairing notifications. PIN notification cleanup runs independently of Live Activities and checks for stale alerts when the app reopens.
+- Trip-inclusive exports read the saved-trip file before presenting Files. A read failure explains the problem and keeps settings-only export available.
+- Saved-place recovery restores the validated copy shown at confirmation. A route change dismisses an old Add stop confirmation and keeps the replacement route moving.
+- The bundled Nearby cloud helper rechecks the provider before sending each device a location alert.
 
 ## Build 94 - saved-route editing fix (22 November 2026)
 

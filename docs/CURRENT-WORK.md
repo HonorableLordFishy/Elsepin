@@ -1,3 +1,10 @@
+# Current update - build 95, 23 November 2026
+
+Build 95 includes the six reviewed fixes for pairing logs and notification expiry, Nearby disconnects, trip backup failures, route replacement during Add stop, and exact-copy recovery. Source `de76461562523a5aee1b8b6317df446025372e72` passed native validation and IPA packaging. See the [build history](BUILD-HISTORY.md) for the runs, counts and artifact digest.
+
+The owner authorized making `HonorableLordFishy/Elsepin` public after GitHub declined to start the private jobs. Build 95 is a development artifact. The official release remains build 89. Physical-iPhone notification delivery and installation after signing remain device checks. Existing hosted Nearby helpers receive the disconnect fix when their owners update them.
+
+---
 # Current update - saved-route identity fix, 22 November 2026
 
 Owner authorized the duplicate-route fix, focused simulator validation and then
