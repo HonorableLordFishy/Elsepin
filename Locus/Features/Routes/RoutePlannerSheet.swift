@@ -16,6 +16,7 @@ struct RoutePlannerSheet: View {
     @EnvironmentObject private var library: TripLibrary
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var searchEndpoint: Endpoint?
     @State private var stopSearchRoute: PlannedRoute?
     @State private var replacingStopID: UUID?
@@ -590,20 +591,22 @@ struct RoutePlannerSheet: View {
 
     private func routePreview(_ route: PlannedRoute?) -> some View {
         Section {
-            HStack {
-                Text(route == nil ? "Map" : "Route preview").font(.subheadline.weight(.semibold))
-                Spacer()
-                if !hasJourney {
-                    Button("Search this area") {
-                        endpointSearchArea = previewRegion
-                        searchEndpoint = planner.origin == nil ? .origin : .destination
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(route == nil ? "Map" : "Route preview")
+                        .font(.subheadline.weight(.semibold)).accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 8)
+                    if !hasJourney, !typeSize.isAccessibilitySize { searchPreviewArea }
+                    Button(previewDetail == nil ? "Fit route" : "Return to route detail",
+                           systemImage: previewDetail == nil ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left") {
+                        togglePreviewFit(route)
                     }
+                    .labelStyle(.iconOnly).font(.system(size: 20)).frame(width: 44, height: 44)
                 }
-                Button(previewDetail == nil ? "Fit route" : "Return to route detail",
-                       systemImage: previewDetail == nil ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left") {
-                    togglePreviewFit(route)
+                if typeSize.isAccessibilitySize {
+                    if !hasJourney { searchPreviewArea }
+                    if route != nil { practicePreviewButton }
                 }
-                    .labelStyle(.iconOnly).frame(width: 44, height: 44)
             }.buttonStyle(.borderless).padding(.horizontal, 12)
             Map(position: $previewPosition, interactionModes: [.pan, .zoom]) {
                 if let route, let previewLine, previewLine.id == route.id {
@@ -612,7 +615,7 @@ struct RoutePlannerSheet: View {
                 if let route {
                 ForEach(Array(route.stops.enumerated()), id: \.element.id) { index, stop in
                     Annotation(stop.name, coordinate: route.track.point(at: stop.metres).coordinate) {
-                        Text("\(index + 2)").font(.caption.weight(.bold)).foregroundStyle(LocusTheme.onAccent)
+                        Text("\(index + 2)").font(.system(size: 12, weight: .bold)).foregroundStyle(LocusTheme.onAccent)
                             .frame(width: 28, height: 28).background(LocusTheme.accent, in: Circle())
                             .overlay(Circle().stroke(.background, lineWidth: 2))
                             .accessibilityLabel("Stop \(index + 1), \(stop.name)")
@@ -641,23 +644,32 @@ struct RoutePlannerSheet: View {
                 }
             }
             .onChange(of: previewPosition.positionedByUser) { _, isUser in if isUser { previewDetail = nil } }
+            .accessibilityLabel("Simulated route preview")
             .overlay(alignment: .topTrailing) {
-                if route != nil {
-                Button { showPractice = true } label: {
-                    Label("Preview", systemImage: "play.fill").font(.caption.weight(.semibold))
-                        .padding(.horizontal, 12).frame(minHeight: 44).contentShape(Capsule())
-                }.buttonStyle(.plain).locusGlass(.regular, in: Capsule())
-                    .padding(10).accessibilityLabel("Preview without changing location")
-                }
+                if route != nil, !typeSize.isAccessibilitySize { practicePreviewButton.padding(10) }
             }
             .clipShape(RoundedRectangle(cornerRadius: 22))
-            .accessibilityLabel("Simulated route preview")
         }
         .listRowInsets(EdgeInsets())
         .listRowBackground(Color.clear)
         .onChange(of: route?.id, initial: true) { _, _ in resetPreviewFit(route) }
         .onChange(of: planner.origin.map { RoutePoint($0.coordinate) }) { _, _ in if route == nil { resetPreviewFit(nil) } }
         .onChange(of: planner.destination.map { RoutePoint($0.coordinate) }) { _, _ in if route == nil { resetPreviewFit(nil) } }
+    }
+
+    private var searchPreviewArea: some View {
+        Button("Search this area") {
+            endpointSearchArea = previewRegion
+            searchEndpoint = planner.origin == nil ? .origin : .destination
+        }
+    }
+
+    private var practicePreviewButton: some View {
+        Button { showPractice = true } label: {
+            Label("Preview", systemImage: "play.fill").font(.caption.weight(.semibold))
+                .padding(.horizontal, 12).frame(minHeight: 44).contentShape(Capsule())
+        }.buttonStyle(.plain).locusGlass(.regular, in: Capsule())
+            .accessibilityLabel("Preview without changing location")
     }
 
     private func resetPreviewFit(_ route: PlannedRoute?) {

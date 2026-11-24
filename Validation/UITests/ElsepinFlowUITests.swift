@@ -86,6 +86,16 @@ final class ElsepinFlowUITests: XCTestCase {
             // its center lies beneath the sticky Show route button.
             if element.exists && element.isHittable && element.frame.minY >= top && element.frame.maxY <= bottom { return element }
             let isAbove = element.exists && element.frame.minY < top
+            if app.launchArguments.contains("--large-text") {
+                // The fixed Show route footer can reach the usual swipe start.
+                // Stay in the exposed scroll band and outside the preview map.
+                let origin = app.coordinate(withNormalizedOffset: .zero)
+                let x = app.frame.width - 8
+                let upper = origin.withOffset(CGVector(dx: x, dy: top - app.frame.minY + 24))
+                let lower = origin.withOffset(CGVector(dx: x, dy: bottom - app.frame.minY - 12))
+                (isAbove ? upper : lower).press(forDuration: 0.05, thenDragTo: isAbove ? lower : upper)
+                continue
+            }
             // Start on the list below the map, not inside the pannable preview.
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: isAbove ? 0.35 : 0.77))
                 .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: isAbove ? 0.77 : 0.35)))
@@ -214,6 +224,11 @@ final class ElsepinFlowUITests: XCTestCase {
         launchRoutes(large: true)
         let requestsBefore = try XCTUnwrap(savedSnapshot()["directionsRequests"] as? Int)
         app.buttons["Open saved route"].tap()
+        let previewHeading = app.staticTexts["Route preview"]
+        let searchAroundPreview = app.buttons["Search this area"]
+        XCTAssertTrue(previewHeading.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(searchAroundPreview.frame.minY, previewHeading.frame.maxY)
+        capture("route-preview-largest-text")
         let moveToCafe = app.buttons["Movement to Test cafe"]
         routeControl(moveToCafe).tap()
         let drive = app.buttons["Drive"]

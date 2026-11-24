@@ -5,7 +5,7 @@ on:
       ui_focus:
         description: Run all validation, or a focused simulator recheck
         type: choice
-        options: [all, search, home, pins, routes, route-search, route-identity, review-fixes, backups, imports, import-text, phone-recheck]
+        options: [all, search, home, pins, routes, route-search, route-identity, review-fixes, backups, imports, import-text, phone-recheck, route-text]
         default: all
       validate_device:
         description: Also run full regressions and compile the device app for a focused UI run
@@ -146,6 +146,8 @@ jobs:
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests")
           elif [[ "$SIMULATOR_SUITE" == other ]]; then
             test_selection+=("-skip-testing:LocusValidationUITests/ElsepinFlowUITests")
+          elif [[ "$UI_FOCUS" == route-text ]]; then
+            test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testInlineLegPathChoiceResetsAndBackDiscardsAtLargestText")
           elif [[ "$UI_FOCUS" == phone-recheck ]]; then
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testSelectedCustomPinRefreshesItsSavedAndRecentAddresses")
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinBackupUITests/testSettingsExportFileSelectiveImportAndRelaunch")
