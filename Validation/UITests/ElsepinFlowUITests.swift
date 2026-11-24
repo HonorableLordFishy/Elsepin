@@ -243,7 +243,8 @@ final class ElsepinFlowUITests: XCTestCase {
         routeControl(newDirections).tap()
         XCTAssertTrue(newDirections.isSelected)
         XCTAssertGreaterThanOrEqual(keepPath.frame.height, 44)
-        XCTAssertGreaterThanOrEqual(newDirections.frame.minY, keepPath.frame.maxY)
+        // Adjacent rows can report their shared edge with different floating-point rounding.
+        XCTAssertGreaterThanOrEqual(newDirections.frame.minY + 0.001, keepPath.frame.maxY)
         let scopeNote = app.staticTexts["Recalculates the whole route through your stops."]
         XCTAssertTrue(routeControl(scopeNote).isHittable)
         capture("leg-walk-to-drive-inline-largest-text-scrolled")
