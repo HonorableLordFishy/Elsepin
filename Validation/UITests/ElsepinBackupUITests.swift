@@ -124,6 +124,64 @@ final class ElsepinBackupUITests: XCTestCase {
         app.buttons["Close backup test"].tap()
     }
 
+    func testUnreadableTripsBlockBothTripExportsButAllowSettings() throws {
+        app = XCUIApplication()
+        app.launchArguments = ["--elsepin-ui-test"]
+        app.launchEnvironment["ELSEPIN_TEST_SCENARIO"] = "backup-unreadable-trips"
+        app.launch()
+        XCTAssertTrue(app.buttons["Read settings and export"].waitForExistence(timeout: 20))
+        let error = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Backup couldn’t be exported because the saved-trip file couldn’t be read.")).firstMatch
+        let contents = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Backup contents'")).firstMatch
+        let nativePicker = app.navigationBars["FullDocumentManagerViewControllerNavigationBar"]
+        app.buttons["Import and export"].tap()
+
+        func assertExportBlocked(_ confirmation: String) {
+            visible(app.buttons["Export backup"]).tap()
+            app.buttons[confirmation].tap()
+            XCTAssertTrue(error.waitForExistence(timeout: 10))
+            XCTAssertFalse(nativePicker.waitForExistence(timeout: 2))
+        }
+        assertExportBlocked("Export everything")
+        visible(contents).tap()
+        app.buttons["Saved routes & areas"].tap()
+        assertExportBlocked("Export saved routes & areas")
+        capture("unreadable-trips-export-blocked")
+
+        app.buttons["Close backup test"].tap()
+        let after = try snapshot()
+        XCTAssertEqual(after["originalKept"] as? Bool, true)
+        XCTAssertNil(after["readableTripCount"])
+
+        prepareFilesProvider()
+        app.buttons["Import and export"].tap()
+        visible(contents).tap()
+        app.buttons["Settings"].tap()
+        visible(app.buttons["Export backup"]).tap()
+        app.buttons["Export settings"].tap()
+        XCTAssertTrue(nativePicker.waitForExistence(timeout: 25))
+        capture("unreadable-trips-settings-export-available")
+    }
+
+    func testCorruptionAfterLibraryOpenedBlocksTripExport() throws {
+        app = XCUIApplication()
+        app.launchArguments = ["--elsepin-ui-test"]
+        app.launchEnvironment["ELSEPIN_TEST_SCENARIO"] = "backup-late-trip-corruption"
+        app.launch()
+        let corrupt = app.buttons["Corrupt trips after opening library"]
+        XCTAssertTrue(corrupt.waitForExistence(timeout: 20))
+        corrupt.tap()
+        XCTAssertEqual(try snapshot()["originalKept"] as? Bool, true)
+
+        app.buttons["Import and export"].tap()
+        visible(app.buttons["Export backup"]).tap()
+        app.buttons["Export everything"].tap()
+        let error = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Backup couldn’t be exported because the saved-trip file couldn’t be read.")).firstMatch
+        XCTAssertTrue(error.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.navigationBars["FullDocumentManagerViewControllerNavigationBar"].exists)
+        app.buttons["Close backup test"].tap()
+        XCTAssertEqual(try snapshot()["originalKept"] as? Bool, true)
+    }
+
     func testSettingsExportFileSelectiveImportAndRelaunch() throws {
         app = XCUIApplication()
         app.launchArguments = ["--elsepin-ui-test"]
@@ -132,6 +190,7 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Read settings and export"].waitForExistence(timeout: 20))
         prepareFilesProvider()
         let baseline = try snapshot()
+        XCTAssertEqual(baseline["readableTripCount"] as? Int, 1)
         let original = try settings(baseline)
         app.buttons["Import and export"].tap()
         visible(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Backup contents'")).firstMatch).tap()

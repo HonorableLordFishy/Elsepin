@@ -48,18 +48,18 @@ struct SavedPlaceRecoveryView: View {
                 Button("Export saved-place recovery copies") {
                     if let data = session.savedPinRecoveryExport { document.data = data; exporting = true }
                 }.accessibilityIdentifier("recovery.export")
-                if let places = session.savedPinRecovery {
-                    placeRows(places)
-                    Button("Restore saved places") { confirmation = .restoreSaved }
+                if let copy = session.savedPinRecovery {
+                    placeRows(copy.places)
+                    Button("Restore saved places") { confirmation = .restoreSaved(copy) }
                         .frame(minHeight: 44)
                     Button("Discard saved-place recovery copy", role: .destructive) {
-                        confirmation = .discardSaved
+                        confirmation = .discardSaved(AppDataWorkspace.shared.context.generation)
                     }.frame(minHeight: 44)
                 } else {
-                    Text("The preserved saved-place copy could not be read. The current library is unchanged.")
+                    Text("No saved-place recovery copy can be restored within the library limits. You can export the original data.")
                         .font(.footnote).foregroundStyle(.secondary)
                     Button("Discard unreadable recovery copy", role: .destructive) {
-                        confirmation = .discardSaved
+                        confirmation = .discardSaved(AppDataWorkspace.shared.context.generation)
                     }.frame(minHeight: 44)
                 }
             } header: {
@@ -76,23 +76,27 @@ struct SavedPlaceRecoveryView: View {
                 Button("Export recent-location recovery copies") {
                     if let data = session.recentPinRecoveryExport { document.data = data; exporting = true }
                 }
-                if let places = session.recentPinRecovery {
-                    placeRows(places)
+                if let copy = session.recentPinRecovery {
+                    placeRows(copy.places)
                     if session.preferences.saveRecentLocations {
-                        Button("Restore recent locations") { confirmation = .restoreRecent }
+                        if copy.places.isEmpty {
+                            Text("No entries in this copy meet your current history limits.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
+                        Button("Restore recent locations") { confirmation = .restoreRecent(copy) }
                             .frame(minHeight: 44)
                     } else {
                         Text("Recent locations are turned off in Privacy, so restoring is unavailable. Turn that setting on first if you want to keep them.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     Button("Discard recent-location recovery copy", role: .destructive) {
-                        confirmation = .discardRecent
+                        confirmation = .discardRecent(AppDataWorkspace.shared.context.generation)
                     }.frame(minHeight: 44)
                 } else {
                     Text("The preserved recent-location copy could not be read. Current recent locations are unchanged.")
                         .font(.footnote).foregroundStyle(.secondary)
                     Button("Discard unreadable recovery copy", role: .destructive) {
-                        confirmation = .discardRecent
+                        confirmation = .discardRecent(AppDataWorkspace.shared.context.generation)
                     }.frame(minHeight: 44)
                 }
             } header: {
@@ -116,27 +120,29 @@ struct SavedPlaceRecoveryView: View {
 
     private func perform(_ action: RecoveryAction) {
         switch action {
-        case .restoreSaved:
-            message = session.restoreSavedPinRecovery()
+        case .restoreSaved(let copy):
+            message = session.restoreSavedPinRecovery(copy)
                 ? "Saved places restored from the recovery copy."
-                : "Couldn't restore this copy within the saved-place limits. Export it to keep all entries. The current library is unchanged."
-        case .restoreRecent:
-            message = session.restoreRecentPinRecovery()
+                : "Couldn’t restore the selected copy. Review the available copies and try again."
+        case .restoreRecent(let copy):
+            message = session.restoreRecentPinRecovery(copy)
                 ? "Recent locations restored using your history limits. The full recovery copy is still available to export."
-                : "Couldn't restore the recent-location recovery copy. Current recent locations are unchanged."
-        case .discardSaved:
+                : "Couldn’t restore the selected copy. Review the available copies and your Privacy settings."
+        case .discardSaved(let workspace):
+            guard AppDataWorkspace.shared.context.generation == workspace else { return }
             session.discardSavedPinRecovery()
             message = "Saved-place recovery copy discarded. Your current library is unchanged."
-        case .discardRecent:
+        case .discardRecent(let workspace):
+            guard AppDataWorkspace.shared.context.generation == workspace else { return }
             session.discardRecentPinRecovery()
             message = "Recent-location recovery copy discarded. Current recent locations are unchanged."
         }
     }
 }
 
-private enum RecoveryAction: String, Identifiable {
-    case restoreSaved, restoreRecent, discardSaved, discardRecent
-    var id: String { rawValue }
+private enum RecoveryAction {
+    case restoreSaved(SavedPlace.Recovery), restoreRecent(SavedPlace.Recovery)
+    case discardSaved(UUID), discardRecent(UUID)
 
     var title: String {
         switch self {

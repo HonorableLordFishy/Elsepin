@@ -140,12 +140,16 @@ struct LibraryBackup: Codable {
 enum BackupError: LocalizedError {
     case invalid, tooLarge, capacity
     case overlappingArea(String)
+    case unreadableTrips, missingTrips, exportWorkspaceChanged
     var errorDescription: String? {
         switch self {
         case .invalid: return "This backup is damaged or uses a version Elsepin cannot read. Nothing was imported."
         case .tooLarge: return "This backup is too large. The limit is 32 MB."
         case .capacity: return "There isn't room for this backup. Elsepin supports 50 trips, 1,000 saved places, and 100 named areas. Nothing was imported."
         case .overlappingArea(let name): return NamedArea.overlapMessage(name) + " Uncheck the conflicting area and try again."
+        case .unreadableTrips: return "Backup couldn’t be exported because the saved-trip file couldn’t be read. The original file was kept. You can still export Settings."
+        case .missingTrips: return "Backup couldn’t be exported because the saved-trip file is missing. You can still export Settings."
+        case .exportWorkspaceChanged: return "The data workspace changed. Reopen Import & export and try again."
         }
     }
 }

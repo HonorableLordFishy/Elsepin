@@ -136,6 +136,8 @@ final class SpoofSession: ObservableObject {
     let activity = SessionActivityController.shared
     private var sessionID = UUID()
     private var epoch = 0
+    // A new command session can replay the same PlannedRoute value.
+    var commandGeneration: Int { epoch }
     private var sessionRequested = false
     private var requiresClear = false
     private var locationMayRemainBeforeAttempt = false
@@ -1904,25 +1906,25 @@ final class SpoofSession: ObservableObject {
         SavedPlace.save(savedPins, key: favoritesKey)
     }
 
-    var savedPinRecovery: [SavedPlace]? { SavedPlace.recovery(key: favoritesKey) }
-    var recentPinRecovery: [SavedPlace]? { SavedPlace.recovery(key: recentsKey) }
+    var savedPinRecovery: SavedPlace.Recovery? { SavedPlace.recovery(key: favoritesKey) }
+    var recentPinRecovery: SavedPlace.Recovery? { SavedPlace.recentRecovery(retention: preferences.recentHistoryRetention) }
     var savedPinRecoveryExport: Data? { SavedPlace.exportRecovery(key: favoritesKey) }
     var recentPinRecoveryExport: Data? { SavedPlace.exportRecovery(key: recentsKey) }
 
     @discardableResult
-    func restoreSavedPinRecovery() -> Bool {
-        guard let places = SavedPlace.restoreRecovery(key: favoritesKey) else { return false }
+    func restoreSavedPinRecovery(_ copy: SavedPlace.Recovery) -> Bool {
+        defer { refreshSavedPlaceRecoveryCounts() }
+        guard let places = SavedPlace.restoreRecovery(copy, key: favoritesKey) else { return false }
         savedPins = places
-        refreshSavedPlaceRecoveryCounts()
         return true
     }
 
     @discardableResult
-    func restoreRecentPinRecovery() -> Bool {
+    func restoreRecentPinRecovery(_ copy: SavedPlace.Recovery) -> Bool {
+        defer { refreshSavedPlaceRecoveryCounts() }
         guard preferences.saveRecentLocations else { return false }
-        guard let places = SavedPlace.restoreRecentRecovery(retention: preferences.recentHistoryRetention) else { return false }
+        guard let places = SavedPlace.restoreRecentRecovery(copy, retention: preferences.recentHistoryRetention) else { return false }
         recents = places
-        refreshSavedPlaceRecoveryCounts()
         return true
     }
 

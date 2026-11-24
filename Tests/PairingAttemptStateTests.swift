@@ -2,6 +2,27 @@ import XCTest
 @testable import SessionPresentation
 
 final class PairingAttemptStateTests: XCTestCase {
+    func testPINNotificationExpiresFiveMinutesAfterPosting() {
+        let start = ContinuousClock().now
+        let notification = PairingPINNotification(startedAt: start)
+        XCTAssertTrue(PairingPINNotification.matches(notification.identifier))
+        XCTAssertTrue(notification.canPresent(notification.identifier, at: start.advanced(by: .seconds(299))))
+        XCTAssertFalse(notification.canPresent(notification.identifier, at: start.advanced(by: .seconds(300))))
+        XCTAssertFalse(notification.canPresent(notification.identifier, at: start.advanced(by: .seconds(600))))
+    }
+
+    func testNewPINNotificationRejectsOldAndLegacyIdentifiers() {
+        let start = ContinuousClock().now
+        let old = PairingPINNotification(startedAt: start)
+        let new = PairingPINNotification(startedAt: start.advanced(by: .seconds(1)))
+        let oldDeadline = start.advanced(by: .seconds(300))
+        XCTAssertTrue(PairingPINNotification.matches("locus.pairing.pin"))
+        XCTAssertFalse(PairingPINNotification.matches("locus.pairing.pinpoint"))
+        XCTAssertFalse(new.canPresent(old.identifier, at: oldDeadline))
+        XCTAssertFalse(new.canPresent("locus.pairing.pin", at: oldDeadline))
+        XCTAssertTrue(new.canPresent(new.identifier, at: oldDeadline))
+    }
+
     func testCancelBeforeListenerArrivesWakesExactlyOnce() {
         var attempt = PairingAttemptState()
         XCTAssertNil(attempt.cancel())

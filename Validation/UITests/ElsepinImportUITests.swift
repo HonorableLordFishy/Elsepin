@@ -84,6 +84,24 @@ final class ElsepinImportUITests: XCTestCase {
         app.buttons["Check recovery persisted"].tap()
         XCTAssertTrue(app.staticTexts["Recovery discarded after reload"].waitForExistence(timeout:5))
     }
+    func testSavedPlaceRecoveryPreviewsAndRestoresValidatedCopy() {
+        launch(["--validated-recovery"])
+        app.buttons["Recovery copies"].tap()
+        let restore = app.buttons["Restore saved places"]
+        XCTAssertTrue(restore.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Validated recovery place"].exists)
+        XCTAssertFalse(app.staticTexts["Duplicate saved place"].exists)
+        capture("validated-recovery-place-preview")
+
+        restore.tap()
+        app.buttons["Restore"].tap()
+        XCTAssertTrue(app.staticTexts["Saved places restored from the recovery copy."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["recovery.export"].exists)
+        XCTAssertFalse(restore.exists)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["Check recovery persisted"].tap()
+        XCTAssertTrue(app.staticTexts["Validated place restored and other copy kept"].waitForExistence(timeout: 5))
+    }
     func testNarrowLargeTextDarkImportControlsRemainReachable() {
         launch(["--narrow","--large-text","--dark"])
         app.buttons["Open GPX"].tap()

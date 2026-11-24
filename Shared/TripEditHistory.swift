@@ -53,6 +53,26 @@ struct TripLibraryDocument: Codable, Equatable {
         return value
     }
 
+    static func read(from file: URL) throws -> Self? {
+        let metadata: URLResourceValues
+        do {
+            metadata = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        } catch let missing as CocoaError where missing.code == .fileReadNoSuchFile || missing.code == .fileNoSuchFile {
+            return nil
+        }
+        guard metadata.isRegularFile == true else { throw CocoaError(.fileReadCorruptFile) }
+        guard let size = metadata.fileSize, size <= maximumBytes else { throw CocoaError(.fileReadTooLarge) }
+        let handle = try FileHandle(forReadingFrom: file)
+        defer { try? handle.close() }
+        var data = Data()
+        while data.count <= maximumBytes {
+            let length = min(1_048_576, maximumBytes + 1 - data.count)
+            guard let chunk = try handle.read(upToCount: length), !chunk.isEmpty else { break }
+            data.append(chunk)
+        }
+        return try decode(data)
+    }
+
     func updating(to updated: [SavedTrip], reason: TripEditReason, now: Date = Date()) throws -> Self {
         guard isValid, now.timeIntervalSince1970.isFinite,
               updated.count <= 50, updated.allSatisfy(\.isValid), Set(updated.map(\.id)).count == updated.count else {

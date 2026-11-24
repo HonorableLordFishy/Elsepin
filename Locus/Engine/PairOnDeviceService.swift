@@ -34,8 +34,7 @@ final class PairOnDeviceService: ObservableObject {
     private var restartTask: Task<Void, Never>?
     private var activityOwner: UUID?
     private var activityVisibilityTask: Task<Void, Never>?
-    private var pinNotificationIdentifier = "locus.pairing.pin.\(UUID().uuidString)"
-    private var pinNotificationActive = false
+    private var pinNotificationIdentifier: String?
     private let keepAlive = PairingKeepAliveResources()
     private let advertiser = PairableHostAdvertiser()
 
@@ -52,9 +51,7 @@ final class PairOnDeviceService: ObservableObject {
             advertiser.stop()
             resources.stop()
             if let owner { SessionActivityController.shared.endPairing(owner: owner) }
-            let center = UNUserNotificationCenter.current()
-            center.removePendingNotificationRequests(withIdentifiers: [identifier])
-            center.removeDeliveredNotifications(withIdentifiers: [identifier])
+            if let identifier { PairingPINNotifications.shared.clear(identifier) }
         }
     }
 
@@ -98,7 +95,6 @@ final class PairOnDeviceService: ObservableObject {
         phase = .advertising
         pin = nil
         debugPort = nil
-        pinNotificationIdentifier = "locus.pairing.pin.\(UUID().uuidString)"
         // A distinct box per attempt prevents a late native callback from an old
         // attempt attaching itself to a new attempt after Cancel/Retry.
         let box = PairCallbackBox(pairingStore: pairingStore)
@@ -115,7 +111,7 @@ final class PairOnDeviceService: ObservableObject {
         }
 
         requestNotificationPermission()
-        beginKeepAlive()
+        beginKeepAlive(for: box)
 
         _ = pairingStore.pairingURL
         try? FileManager.default.createDirectory(
@@ -211,7 +207,7 @@ final class PairOnDeviceService: ObservableObject {
         pin = value
         phase = .awaitingPIN(value)
         updateActivity(stage: .code, code: value)
-        postPINNotification(value)
+        pinNotificationIdentifier = PairingPINNotifications.shared.post(value)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
@@ -274,7 +270,6 @@ final class PairOnDeviceService: ObservableObject {
             catch { return }
             guard let self, self.activityOwner == owner else { return }
             self.finishActivity()
-            self.clearPINNotification()
         }
     }
 
@@ -286,16 +281,14 @@ final class PairOnDeviceService: ObservableObject {
     }
 
     private func clearPINNotification() {
-        pinNotificationActive = false
-        let center = UNUserNotificationCenter.current()
-        let identifiers = [pinNotificationIdentifier, "locus.pairing.pin"]
-        center.removePendingNotificationRequests(withIdentifiers: identifiers)
-        center.removeDeliveredNotifications(withIdentifiers: identifiers)
+        if let identifier = pinNotificationIdentifier { PairingPINNotifications.shared.clear(identifier) }
+        pinNotificationIdentifier = nil
     }
 
-    private func beginKeepAlive() {
-        keepAlive.start { [weak self] in
-            self?.handleFailure("Pairing ran out of background time. Return to Elsepin and try again. Your saved pairing has not changed.")
+    private func beginKeepAlive(for box: PairCallbackBox) {
+        keepAlive.start { [weak self, weak box] in
+            guard let self, let box, self.callbackBox === box else { return }
+            self.handleFailure("Pairing ran out of background time. Return to Elsepin and try again. Your saved pairing has not changed.")
         }
     }
 
@@ -305,32 +298,6 @@ final class PairOnDeviceService: ObservableObject {
 
     private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-    }
-
-    private func postPINNotification(_ pin: String) {
-        pinNotificationActive = true
-        let identifier = pinNotificationIdentifier
-        let content = UNMutableNotificationContent()
-        content.title = "Elsepin pairing code"
-        content.body = pin
-        content.sound = .default
-        if #available(iOS 15.0, *) {
-            content.interruptionLevel = .timeSensitive
-        }
-        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request) { [weak self] _ in
-            // Notification submission is asynchronous too. A late completion
-            // must not leave a cancelled code behind or clear a newer attempt.
-            Task { @MainActor in
-                guard let self, self.isBusy, self.pinNotificationActive,
-                      self.pinNotificationIdentifier == identifier else {
-                    let center = UNUserNotificationCenter.current()
-                    center.removePendingNotificationRequests(withIdentifiers: [identifier])
-                    center.removeDeliveredNotifications(withIdentifiers: [identifier])
-                    return
-                }
-            }
-        }
     }
 
     private static func postPlainNotification(title: String, body: String) {

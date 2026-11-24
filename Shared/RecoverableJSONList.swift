@@ -20,6 +20,13 @@ struct RecoverableJSONList<Element: Codable> {
         case unreadable
     }
 
+    struct RecoveryCopy {
+        fileprivate let source: Data
+        fileprivate let key: String
+        fileprivate let store: PersistedDataStore
+        let values: [Element]
+    }
+
     let key: String
     let recoveryKey: String
     private let store: PersistedDataStore
@@ -67,37 +74,43 @@ struct RecoverableJSONList<Element: Codable> {
     }
 
     func recovery() -> [Element]? {
-        if let primary = store.data(forKey: recoveryKey), let values = try? decoder.decode([Element].self, from: primary) { return values }
-        for copy in recoveryCopies {
-            if let values = try? decoder.decode([Element].self, from: copy) { return values }
+        recoveryCopy()?.values
+    }
+
+    func recoveryCopy(prepare: ([Element]) -> [Element]? = { $0 }) -> RecoveryCopy? {
+        for source in recoveryCopies {
+            guard let decoded = try? decoder.decode([Element].self, from: source),
+                  let values = prepare(decoded) else { continue }
+            return RecoveryCopy(source: source, key: key, store: store, values: values)
         }
         return nil
     }
 
-    /// Consume only the restored copy. Other originals remain exportable.
-    /// A filtered restore retains its original, so limits never discard data.
     func restoreRecovery(keepingOriginal: Bool = false,
                          prepare: ([Element]) -> [Element]? = { $0 }) -> [Element]? {
-        for copy in recoveryCopies {
-            guard let decoded = try? decoder.decode([Element].self, from: copy),
-                  let values = prepare(decoded) else { continue }
-            guard save(values) else { return nil }
-            if !keepingOriginal {
-                let remaining = recoveryCopies.filter { $0 != copy }
-                // Prepare the complete replacement before changing any keys.
-                guard let history = try? encoder.encode(Array(remaining.dropFirst())) else { return values }
-                if let first = remaining.first {
-                    store.set(first, forKey: recoveryKey)
-                    if remaining.count > 1 { store.set(history, forKey: historyKey) }
-                    else { store.removeObject(forKey: historyKey) }
-                } else {
-                    store.removeObject(forKey: recoveryKey)
-                    store.removeObject(forKey: historyKey)
-                }
+        guard let copy = recoveryCopy(prepare: prepare) else { return nil }
+        return restoreRecovery(copy, keepingOriginal: keepingOriginal)
+    }
+
+    /// Apply the exact preview while it still exists in its original archive.
+    /// Consume only that copy. A filtered restore keeps its full source.
+    func restoreRecovery(_ copy: RecoveryCopy, keepingOriginal: Bool = false) -> [Element]? {
+        guard copy.store === store, copy.key == key, recoveryCopies.contains(copy.source),
+              save(copy.values) else { return nil }
+        if !keepingOriginal {
+            // Read again after saving, which may have preserved an unreadable live original.
+            let remaining = recoveryCopies.filter { $0 != copy.source }
+            guard let history = try? encoder.encode(Array(remaining.dropFirst())) else { return copy.values }
+            if let first = remaining.first {
+                store.set(first, forKey: recoveryKey)
+                if remaining.count > 1 { store.set(history, forKey: historyKey) }
+                else { store.removeObject(forKey: historyKey) }
+            } else {
+                store.removeObject(forKey: recoveryKey)
+                store.removeObject(forKey: historyKey)
             }
-            return values
         }
-        return nil
+        return copy.values
     }
 
     func discardRecovery() {

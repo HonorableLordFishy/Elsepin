@@ -21,11 +21,16 @@ struct ValidationBackupHarness: View {
 
     private func refresh() {
         do {
+            let reloaded = TripLibrary()
             var result: [String: Any] = [
                 "settings": try JSONSerialization.jsonObject(with: JSONEncoder().encode(session.backupPreferences)),
-                "tripCount": TripLibrary().trips.count, "pinCount": session.savedPins.count,
+                "tripCount": reloaded.trips.count, "pinCount": session.savedPins.count,
                 "filesReady": FileManager.default.fileExists(atPath: documents.appendingPathComponent(".validation-files-ready").path)
             ]
+            if reloaded.error == nil { result["readableTripCount"] = reloaded.trips.count }
+            if ["backup-unreadable-trips", "backup-late-trip-corruption"].contains(ValidationFixture.scenario) {
+                result["originalKept"] = try Data(contentsOf: AppDataWorkspace.file("Trips.json")) == ValidationFixture.unreadableTrips
+            }
             if let files = FileManager.default.enumerator(at: documents, includingPropertiesForKeys: nil) {
                 for case let file as URL in files where file.lastPathComponent.hasPrefix("Elsepin-Settings") && file.pathExtension == "json" {
                     let data = try Data(contentsOf: file)
@@ -44,6 +49,15 @@ struct ValidationBackupHarness: View {
         NavigationStack {
             List {
                 Button("Import and export") { showing = true }
+                if ValidationFixture.scenario == "backup-late-trip-corruption" {
+                    Button("Corrupt trips after opening library") {
+                        guard library.trips.count == 1 else { snapshot = "ERROR: The initial route did not load"; return }
+                        do {
+                            try ValidationFixture.unreadableTrips.write(to: AppDataWorkspace.file("Trips.json"), options: .atomic)
+                            refresh()
+                        } catch { snapshot = "ERROR: \(error.localizedDescription)" }
+                    }
+                }
                 Button("Change disposable settings") {
                     session.setUsualSpeedMPH(6, for: .walk)
                     session.setUsualSpeedMPH(1, for: .drive)

@@ -1,6 +1,8 @@
 #if !ELSEPIN_UI_TESTING || !targetEnvironment(simulator)
 #error("Validation fixtures must never compile into a device app")
 #endif
+import Combine
+import CoreFoundation
 import SwiftUI
 import MapKit
 
@@ -11,15 +13,23 @@ enum ValidationFixture {
     static var dark: Bool { ProcessInfo.processInfo.arguments.contains("--dark") }
     static var fallback: Bool { ProcessInfo.processInfo.arguments.contains("--accessibility-fallback") }
     static var routeIdentityScenario: Bool { scenario.hasPrefix("route-identity-") }
+    static let routeReplacementRequest = Notification.Name("com.n3mostudio.elsepin.validation.replace-route")
+    static let unreadableTrips = Data("corrupt disposable trips".utf8)
     static let longName = "Test botanical garden walking route beside the riverside observatory and community orchard"
     static let points = [CLLocationCoordinate2D(latitude: 40.768, longitude: -73.981),
                          CLLocationCoordinate2D(latitude: 40.770, longitude: -73.975),
                          CLLocationCoordinate2D(latitude: 40.779, longitude: -73.970)]
     static var route: PlannedRoute {
+        makeRoute(points, start: "Test garden entrance", end: longName)
+    }
+    static var replacementRoute: PlannedRoute {
+        makeRoute(Array(points.reversed()), start: longName, end: "Test replacement destination")
+    }
+    private static func makeRoute(_ points: [CLLocationCoordinate2D], start: String, end: String) -> PlannedRoute {
         let track = RouteTrack(points.map { RoutePoint($0) })!
-        return PlannedRoute(name: longName,
-            origin: RoutePlace(name: "Test garden entrance", coordinate: points[0]),
-            destination: RoutePlace(name: longName, coordinate: points[2]),
+        return PlannedRoute(name: end,
+            origin: RoutePlace(name: start, coordinate: points[0]),
+            destination: RoutePlace(name: end, coordinate: points[2]),
             coordinates: points, track: track, source: .drawn, distance: track.length,
             notices: ["Synthetic test path only. These are not verified walking directions."],
             appleTravelTime: nil, instructions: [], calculatedAt: Date())
@@ -27,6 +37,14 @@ enum ValidationFixture {
     @MainActor static func prepare() {
         guard enabled, Bundle.main.bundleIdentifier == "com.n3mostudio.elsepin.validation" else {
             preconditionFailure("Disposable validation app must be launched explicitly by UI tests")
+        }
+        if scenario == "route-search-replacement" {
+            // The test runner requests the transition while the native dialog is on screen.
+            CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), nil, { _, _, _, _, _ in
+                Task { @MainActor in
+                    NotificationCenter.default.post(name: ValidationFixture.routeReplacementRequest, object: nil)
+                }
+            }, routeReplacementRequest.rawValue as CFString, nil, .deliverImmediately)
         }
         if scenario == "backup-settings", ProcessInfo.processInfo.arguments.contains("--preserve-backup-test-data") { return }
         // The validation bundle has its own sandbox and no App Group entitlement.
@@ -49,6 +67,22 @@ enum ValidationFixture {
                 speed: 1.4, smooth: false, favorite: true)
         }
         if scenario == "import-review" { AppDataWorkspace.defaults.set(Data("corrupt disposable pins".utf8),forKey:"locus.favorites") }
+        if scenario == "import-review", ProcessInfo.processInfo.arguments.contains("--validated-recovery") {
+            let current = SavedPlace(name: "Current saved place", latitude: 41, longitude: -72)
+            let invalid = SavedPlace(name: "Duplicate saved place", latitude: 42, longitude: -72)
+            let valid = SavedPlace(name: "Validated recovery place", latitude: 43, longitude: -72)
+            do {
+                let defaults = AppDataWorkspace.defaults
+                let encoder = JSONEncoder()
+                defaults.set(try encoder.encode([current]), forKey: "locus.favorites")
+                defaults.set(try encoder.encode([invalid, invalid]), forKey: "locus.favorites.recovery")
+                defaults.set(try encoder.encode([encoder.encode([valid])]), forKey: "locus.favorites.recovery.history")
+            } catch { preconditionFailure("Could not seed recovery fixtures: \(error)") }
+        }
+        if scenario == "backup-unreadable-trips" {
+            do { try unreadableTrips.write(to: AppDataWorkspace.file("Trips.json")) }
+            catch { preconditionFailure("Could not seed unreadable trips: \(error)") }
+        }
         if routeIdentityScenario {
             let library = TripLibrary()
             guard let saved = library.trips.first else { preconditionFailure("Missing disposable route") }
@@ -87,12 +121,24 @@ private struct ValidationHost: View {
     @State private var runSession = false
     @State private var permissionsReady = false
     @State private var routeLibrarySnapshot = ""
-    private var sessionScenario: Bool { ValidationFixture.routeIdentityScenario || ["moving", "paused", "connecting", "failed", "map-pins"].contains(ValidationFixture.scenario) }
+    private var sessionScenario: Bool { ValidationFixture.routeIdentityScenario || ["moving", "paused", "connecting", "failed", "map-pins", "route-search-replacement"].contains(ValidationFixture.scenario) }
+
+    private func replaceRoute() async {
+        guard session.routeActive else { return }
+        session.stopRoute()
+        if session.journey != nil {
+            // Let the production worker settle any pending location write.
+            for await journey in session.$journey.values where journey == nil { break }
+        }
+        guard !Task.isCancelled else { return }
+        session.followRoute(ValidationFixture.replacementRoute, pairing: pairing, smoothing: false)
+    }
+
     var body: some View {
         Group {
             if ValidationFixture.scenario == "route-editing" { ValidationRouteHarness() }
             else if ValidationFixture.scenario == "import-review" { ValidationImportHarness() }
-            else if ValidationFixture.scenario == "backup-settings" { ValidationBackupHarness() }
+            else if ValidationFixture.scenario.hasPrefix("backup-") { ValidationBackupHarness() }
             else if ValidationFixture.scenario == "deleted-selection" { NavigationStack { RecentlyDeletedView() } }
             else { RootView(incomingShortcut: $shortcut, incomingSessionDetails: $details) }
         }
@@ -143,6 +189,9 @@ private struct ValidationHost: View {
             .environment(\.dynamicTypeSize, ValidationFixture.largeText ? .accessibility5 : .large)
             .preferredColorScheme(ValidationFixture.dark ? .dark : .light)
             .tint(ShiftPalette.color(.accent, style: preferences.visualStyle))
+            .onReceive(NotificationCenter.default.publisher(for: ValidationFixture.routeReplacementRequest)) { _ in
+                Task { await replaceRoute() }
+            }
             .task {
                 guard !started else { return }; started = true
                 preferences.liveActivities = false; preferences.connectionAlerts = false

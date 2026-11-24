@@ -45,6 +45,20 @@ final class DeveloperIncidentTests: XCTestCase {
         XCTAssertTrue(slice.truncated)
     }
 
+    func testRedactedPairingRecordsOnlyCountTheirExportedBytes() throws {
+        let url = try folder().appendingPathComponent("events.jsonl")
+        let original = try line("notification_foreground_delivery", offset: 0, details: [
+            "id": "locus.pairing.pin", "body": String(repeating: "1", count: 1000), "title": "Pairing code"
+        ])
+        let redacted = try line("notification_foreground_delivery", offset: 0, details: ["id": "locus.pairing.pin"])
+        let preserved = try line("ordinary_event", offset: 1, details: ["body": "retained"])
+        try (original + preserved).write(to: url)
+        let slice = try DeveloperIncident.read(from: url, around: moment, marker: "mine", maximumBytes: redacted.count + preserved.count)
+        XCTAssertFalse(slice.truncated)
+        XCTAssertEqual(slice.events, 2)
+        XCTAssertEqual(Array(slice.data.suffix(preserved.count)), Array(preserved))
+    }
+
     func testStreamingAcrossChunksAndMalformedTailAreExplicit() throws {
         let url = try folder().appendingPathComponent("events.jsonl")
         var input = Data("not-json\n".utf8)

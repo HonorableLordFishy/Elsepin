@@ -73,6 +73,7 @@ class NearbyRuntime:
         if self.lock.locked():
             return
         async with self.lock:
+            generations = {owner.provider: owner.generation for owner in (self.apple, self.life)}
             cache = {}
             for rule in list(self.engine.rules):
                 if not self.engine.active(rule):
@@ -85,17 +86,21 @@ class NearbyRuntime:
                 if self.engine.get(rule["id"]) is rule and rule.get("revision") == revision:
                     self.engine.observe(rule, cache[key])
             for rule in self.engine.due():
-                if not self.known(rule) or self.engine.status(rule) == "Location unavailable":
+                owner = self.apple if rule["provider"] == "findmy-device" else self.life
+                if (owner.generation != generations[rule["provider"]] or not self.known(rule)
+                        or self.engine.status(rule) == "Location unavailable"):
                     continue
                 event = rule["alert"]
                 at = datetime.fromtimestamp(event["at"], timezone.utc).strftime("%H:%M UTC")
                 body = f'{rule["targetName"]} {"entered" if rule["event"] == "enter" else "left"} {rule["name"]} at {at}. Open Nearby to stop reminders.'
-                # Recheck acknowledgement before each device delivery. An already
-                # accepted push cannot be recalled; payload TTL is just 60 seconds.
+                # Recheck provider identity and acknowledgement before each device
+                # delivery. An accepted push cannot be recalled; TTL is 60 seconds.
                 sent = False
                 for entry in list(self.engine.state.data["subscriptions"]):
                     if (self.stopped or self.engine.get(rule["id"]) is not rule
-                            or not self.engine.active(rule) or event["acknowledged"]):
+                            or not self.engine.active(rule) or event["acknowledged"]
+                            or owner.generation != generations[rule["provider"]]
+                            or not self.known(rule)):
                         break
                     if not any(s["endpoint"] == entry["endpoint"] for s in self.engine.state.data["subscriptions"]):
                         continue

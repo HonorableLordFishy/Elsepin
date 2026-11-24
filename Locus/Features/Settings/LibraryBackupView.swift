@@ -11,6 +11,7 @@ struct LibraryBackupView: View {
     @State private var reviewing = false
     @State private var selection = BackupImportSelection()
     @State private var exportScope = BackupExportScope.everything
+    @State private var preparingExport: BackupExportScope?
     @State private var exportName = "Elsepin-Routes-Areas.json"
     @State private var message: String?
     @State private var showingJSONSite = false
@@ -23,7 +24,7 @@ struct LibraryBackupView: View {
                         ShiftSettingsIcon(symbol: "doc")
                         Text("Choose backup file").foregroundStyle(.primary)
                     }.frame(minHeight: 44)
-                }.disabled(input.state.isLoading)
+                }.disabled(input.state.isLoading || preparingExport != nil)
                 HStack(spacing: 12) {
                     ShiftSettingsIcon(symbol: "doc.on.clipboard")
                     Text("Paste backup text")
@@ -31,12 +32,12 @@ struct LibraryBackupView: View {
                     PasteButton(payloadType: String.self) { strings in message = nil; input.paste(strings) }
                         .labelStyle(.titleOnly).accessibilityLabel("Paste backup text")
                         .accessibilityHint("Analyze copied JSON and review individual changes before importing.")
-                        .disabled(input.state.isLoading || input.isChoosingFile)
+                        .disabled(input.state.isLoading || input.isChoosingFile || preparingExport != nil)
                 }.frame(minHeight: 44)
                 if input.state.isLoading { ProgressView("Analyzing backup…") }
                 if input.state.preview != nil {
                     Button("Review selected backup") { reviewing = true }.frame(minHeight: 44)
-                        .disabled(input.state.isLoading)
+                        .disabled(input.state.isLoading || preparingExport != nil)
                 }
             } header: { Text("Import settings, routes & areas") } footer: {
                 Text("Open [json.site](https://json.site), copy the JSON, then tap Done and Paste here.")
@@ -45,7 +46,7 @@ struct LibraryBackupView: View {
                     // contents from the app; choosing a file and copying are manual.
                     .environment(\.openURL, OpenURLAction { url in
                         guard url == BackupJSONBrowser.siteURL else { return .systemAction }
-                        guard !input.state.isLoading, !input.isChoosingFile, !exporting, !confirmExport else { return .handled }
+                        guard !input.state.isLoading, !input.isChoosingFile, !exporting, !confirmExport, preparingExport == nil else { return .handled }
                         showingJSONSite = true
                         return .handled
                     })
@@ -77,7 +78,8 @@ struct LibraryBackupView: View {
                         ShiftSettingsIcon(symbol: "square.and.arrow.up")
                         Text("Export backup").foregroundStyle(.primary)
                     }.frame(minHeight: 44)
-                }
+                }.disabled(preparingExport != nil)
+                if preparingExport != nil { ProgressView("Preparing backup…") }
             } header: { Text("Export a backup") } footer: {
                 Text("Save everything together, or choose settings or your saved library.")
             }.shiftSettingsRows()
@@ -106,13 +108,8 @@ struct LibraryBackupView: View {
         }
         .loggedConfirmationDialog("Export this backup?", isPresented: $confirmExport, titleVisibility: .visible) {
             Button("Export \(exportScope.title.lowercased())") {
-                do {
-                    let backup = LibraryBackup(places: session.savedPins.map(\.backupPlace), trips: library.trips,
-                        preferences: session.backupPreferences, areas: session.namedAreas).selecting(exportScope.categories)
-                    document = LibraryBackupDocument(data: try backup.encoded())
-                    exportName = exportScope.filename
-                    exporting = true
-                } catch { message = error.localizedDescription }
+                message = nil
+                preparingExport = exportScope
             }
         } message: { Text("This readable file can include the selected settings, saved locations, routes and area boundaries. Pairing files and helper keys are excluded.") }
         .fileExporter(isPresented: $exporting, document: document, contentType: .json, defaultFilename: exportName) { result in
@@ -138,7 +135,36 @@ struct LibraryBackupView: View {
             selection = BackupImportReview(backup: backup, current: current).defaultSelection
             reviewing = true
         }
-        .onDisappear { if !input.isChoosingFile { input.cancelPreparation() } }
+        .task(id: preparingExport) {
+            if let scope = preparingExport { await prepareBackup(scope) }
+        }
+        .onDisappear {
+            preparingExport = nil
+            if !input.isChoosingFile { input.cancelPreparation() }
+        }
+    }
+
+    @MainActor
+    private func prepareBackup(_ scope: BackupExportScope) async {
+        let workspace = AppDataWorkspace.shared.context.generation
+        let categories = scope.categories
+        var backup = LibraryBackup(places: session.savedPins.map(\.backupPlace), trips: [],
+            preferences: session.backupPreferences, areas: session.namedAreas).selecting(categories)
+        do {
+            if categories.contains(.trips) { backup.trips = try await library.tripsForBackup() }
+            let exportBackup = backup
+            let worker = Task.detached(priority: .userInitiated) { try exportBackup.encoded() }
+            let data = try await worker.value
+            try Task.checkCancellation()
+            guard AppDataWorkspace.shared.context.generation == workspace else { throw BackupError.exportWorkspaceChanged }
+            document = LibraryBackupDocument(data: data)
+            exportName = scope.filename
+            exporting = true
+        } catch {
+            guard !Task.isCancelled else { return }
+            message = error.localizedDescription
+        }
+        preparingExport = nil
     }
 }
 

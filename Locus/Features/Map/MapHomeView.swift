@@ -19,7 +19,16 @@ struct MapHomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var showSearch = false
-    @State private var showRouteSearch = false
+    private struct RouteSearchContext: Identifiable {
+        let route: PlannedRoute
+        let generation: Int
+        var id: UUID { route.id }
+
+        @MainActor func isCurrent(in session: SpoofSession) -> Bool {
+            session.activeRoute?.id == id && session.commandGeneration == generation
+        }
+    }
+    @State private var browsedRoute: RouteSearchContext?
     @State private var selectedSavedPin: String?
     @State private var lastPinAdjustmentEnd = -Double.infinity
     @State private var thermallyLimited = ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue
@@ -28,9 +37,8 @@ struct MapHomeView: View {
     @State private var visibleSavedPins: [SavedPlace] = []
     @State private var savedMapAreas: [SavedMapArea] = []
     @State private var pendingBrowsePin: PinDraft?
-    @State private var pendingBrowseStop: (place: RoutePlace, alongRoute: Bool)?
-    @State private var pendingRouteEdit: SavedTrip?
-    @State private var pendingRouteEditID: UUID?
+    @State private var pendingBrowseStop: (context: RouteSearchContext, place: RoutePlace, alongRoute: Bool)?
+    @State private var pendingRouteEdit: (trip: SavedTrip, savedID: UUID?, place: RoutePlace, alongRoute: Bool, generation: Int)?
     @State private var showBrowseStopConfirmation = false
     @State private var pinEditor: PinDraft?
     @State private var pendingDestination: RoutePlace?
@@ -64,7 +72,7 @@ struct MapHomeView: View {
 #endif
 
     private var visualUpdatesEnabled: Bool {
-        isVisible && scenePhase == .active && !showSearch && !showRouteSearch && !showPathEditor
+        isVisible && scenePhase == .active && !showSearch && browsedRoute == nil && !showPathEditor
             && pinEditor == nil && !planner.isDrawing
     }
 
@@ -511,12 +519,14 @@ struct MapHomeView: View {
             }
         }
         .onChange(of: session.activeRoute?.id, initial: true) { _, id in
+            dismissStaleRouteSearch()
             selection = nil
             routeTouchMap.map = nil
             markerDragging = false
             snapIndex = session.activeRoute.map { (routeID: $0.id, index: RouteSnapIndex(track: $0.track)) }
             if id != nil { followMovement = true; centerOnLocation() }
         }
+        .onChange(of: session.commandGeneration) { _, _ in dismissStaleRouteSearch() }
         .onChange(of: canSelectRouteMarker) { _, allowed in
             if !allowed { selection = nil; markerDragging = false; routeTouchMap.map = nil }
         }
@@ -585,23 +595,24 @@ struct MapHomeView: View {
         .onReceive(NotificationCenter.default.publisher(for: ProcessInfo.thermalStateDidChangeNotification)) { _ in
             thermallyLimited = ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue
         }
-        .sheet(isPresented: $showRouteSearch, onDismiss: {
+        .sheet(item: $browsedRoute, onDismiss: {
             if let draft = pendingBrowsePin { pendingBrowsePin = nil; pinEditor = draft }
-            else if pendingBrowseStop != nil { showBrowseStopConfirmation = true }
-        }) {
-            if let route = session.activeRoute {
-                NavigationStack {
-                    RouteStopSearchSheet(route: route, browsing: true, onSavePin: { place in
-                        let saved = session.savedPins.first { $0.id == "\(place.coordinate.latitude),\(place.coordinate.longitude)" }
-                        let draft = PinDraft(place: saved, center: place.coordinate, selectedCoordinate: place.coordinate)
-                        draft.name = saved?.name ?? place.name
-                        // Present the editor after the route-search sheet has dismissed.
-                        pendingBrowsePin = draft
-                    }) { place, alongRoute in
-                        pendingBrowseStop = (place, alongRoute)
-                    }
-                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { showRouteSearch = false } } }
+            else if let choice = pendingBrowseStop, choice.context.isCurrent(in: session) {
+                showBrowseStopConfirmation = true
+            }
+        }) { context in
+            NavigationStack {
+                RouteStopSearchSheet(route: context.route, browsing: true, onSavePin: { place in
+                    let saved = session.savedPins.first { $0.id == "\(place.coordinate.latitude),\(place.coordinate.longitude)" }
+                    let draft = PinDraft(place: saved, center: place.coordinate, selectedCoordinate: place.coordinate)
+                    draft.name = saved?.name ?? place.name
+                    // Present the editor after the route-search sheet has dismissed.
+                    pendingBrowsePin = draft
+                }) { place, alongRoute in
+                    guard context.isCurrent(in: session) else { return }
+                    pendingBrowseStop = (context, place, alongRoute)
                 }
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { browsedRoute = nil } } }
             }
         }
         .confirmationDialog("Hold location and edit this route?", isPresented: $showBrowseStopConfirmation, titleVisibility: .visible) {
@@ -639,33 +650,41 @@ struct MapHomeView: View {
         }
     }
 
+    private func dismissStaleRouteSearch() {
+        if let browsedRoute, !browsedRoute.isCurrent(in: session) { self.browsedRoute = nil }
+        if let choice = pendingBrowseStop, !choice.context.isCurrent(in: session) {
+            pendingBrowseStop = nil
+            showBrowseStopConfirmation = false
+        }
+        if let edit = pendingRouteEdit, edit.generation != session.commandGeneration {
+            pendingRouteEdit = nil
+        }
+    }
+
     private func beginBrowseStopEdit() {
         guard pendingRouteEdit == nil else { return }
-        guard pendingBrowseStop != nil, let route = session.activeRoute,
+        guard let choice = pendingBrowseStop, choice.context.isCurrent(in: session), let route = session.activeRoute,
               route.stops.count < 8, !session.isBusy else {
             pendingBrowseStop = nil
-            pendingRouteEditID = nil
             return
         }
-        pendingRouteEditID = session.activeSavedTripID
-        pendingRouteEdit = route.savedTrip(name: route.name, mode: session.travelMode,
+        let trip = route.savedTrip(name: route.name, mode: session.travelMode,
             speed: session.speedMPH(for: session.travelMode), smooth: session.currentSmoothMovement,
             arrival: session.arrivalChoice)
+        pendingRouteEdit = (trip, session.activeSavedTripID, choice.place, choice.alongRoute, choice.context.generation)
+        pendingBrowseStop = nil
         session.stopRoute()
         finishBrowseStopEditIfReady()
     }
 
     private func finishBrowseStopEditIfReady() {
-        guard session.journey == nil, let trip = pendingRouteEdit,
-              let choice = pendingBrowseStop else { return }
-        let editingTripID = pendingRouteEditID
+        guard session.journey == nil, let edit = pendingRouteEdit else { return }
         pendingRouteEdit = nil
-        pendingRouteEditID = nil
-        pendingBrowseStop = nil
-        planner.useSaved(trip)
-        planner.editingTripID = editingTripID
-        planner.addWaypoint(choice.place, mode: trip.mode, speedMPH: trip.speedMPH,
-                            insertAlongRoute: choice.alongRoute)
+        guard session.commandGeneration == edit.generation else { return }
+        planner.useSaved(edit.trip)
+        planner.editingTripID = edit.savedID
+        planner.addWaypoint(edit.place, mode: edit.trip.mode, speedMPH: edit.trip.speedMPH,
+                            insertAlongRoute: edit.alongRoute)
     }
 
     private var mapTools: some View {
@@ -692,7 +711,9 @@ struct MapHomeView: View {
                                 // An outside-tap cancellation of the native confirmation
                                 // must not leave an old stop queued for the next search.
                                 pendingBrowseStop = nil
-                                showRouteSearch = true
+                                if let route = session.activeRoute {
+                                    browsedRoute = RouteSearchContext(route: route, generation: session.commandGeneration)
+                                }
                             } label: {
                                 Image(systemName: "magnifyingglass").font(.system(size: 20)).frame(width: 46, height: 46)
                             }.buttonStyle(.plain).locusGlass(.interactive, in: Circle())

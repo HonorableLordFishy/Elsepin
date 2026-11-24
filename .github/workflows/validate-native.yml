@@ -155,13 +155,18 @@ jobs:
             done
           elif [[ "$UI_FOCUS" == route-search ]]; then
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testRouteSearchSeparatesAddStopFromSavePin")
+            test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testRouteSearchDismissesAddStopAfterRouteReplacement")
           elif [[ "$UI_FOCUS" == route-identity ]]; then
             for test_name in testRouteSearchUpdatesSavedIdentityAndMetadata testRouteSearchUpdatesSavedIdentityAtLibraryLimit testRouteSearchSavesUnsavedRouteAsOneNewTrip testRouteSearchSeparatesAddStopFromSavePin; do
               test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$test_name")
             done
           elif [[ "$UI_FOCUS" == review-fixes ]]; then
-            test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testRouteSearchSeparatesAddStopFromSavePin")
+            for test_name in testRouteSearchSeparatesAddStopFromSavePin testRouteSearchDismissesAddStopAfterRouteReplacement testRouteSearchUpdatesSavedIdentityAndMetadata testRouteSearchUpdatesSavedIdentityAtLibraryLimit testRouteSearchSavesUnsavedRouteAsOneNewTrip; do
+              test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$test_name")
+            done
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinBackupUITests")
+            test_selection+=("-only-testing:LocusValidationUITests/ElsepinImportUITests/testSavedPlaceRecoveryPreviewsAndRestoresValidatedCopy")
+            test_selection+=("-only-testing:LocusValidationUITests/ElsepinImportUITests/testRecoveryLimitsRetainExportableOriginals")
           elif [[ "$UI_FOCUS" == backups ]]; then
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinBackupUITests")
           elif [[ "$UI_FOCUS" == imports ]]; then

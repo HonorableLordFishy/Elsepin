@@ -15,16 +15,33 @@ final class TripLibrary: ObservableObject {
     }
 
     init() {
-        guard FileManager.default.fileExists(atPath: file.path) else { return }
         do {
-            let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-            guard size <= TripLibraryDocument.maximumBytes else { throw CocoaError(.fileReadTooLarge) }
-            let loaded = try TripLibraryDocument.decode(Data(contentsOf: file))
+            guard let loaded = try TripLibraryDocument.read(from: file) else { return }
             trips = loaded.trips
             revisions = loaded.revisions
         } catch {
             loadFailed = true
             self.error = "Saved trips could not be read. The original file was kept; no trips will be overwritten."
+        }
+    }
+
+    func tripsForBackup() async throws -> [SavedTrip] {
+        guard isCurrentWorkspace else { throw BackupError.exportWorkspaceChanged }
+        let source = file
+        let worker = Task.detached(priority: .userInitiated) {
+            Result { try TripLibraryDocument.read(from: source)?.trips }
+        }
+        let snapshot = await worker.value
+        try Task.checkCancellation()
+        guard isCurrentWorkspace else { throw BackupError.exportWorkspaceChanged }
+        switch snapshot {
+        case .success(let stored?):
+            return stored
+        case .success(nil):
+            guard trips.isEmpty, !loadFailed else { throw BackupError.missingTrips }
+            return []
+        case .failure:
+            throw BackupError.unreadableTrips
         }
     }
 

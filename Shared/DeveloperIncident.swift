@@ -38,7 +38,7 @@ enum DeveloperIncident {
     }
 
     // Stream the capped on-disk log off the main thread. Do not load a whole
-    // 256 MiB batch just to export ten minutes. Keep original JSONL records.
+    // 256 MiB batch just to export ten minutes. Preserve unrelated JSONL records.
     static func read(from url: URL, around moment: Date, marker: String,
                      maximumBytes: Int = maximumBytes) throws -> Slice {
         let reader = try FileHandle(forReadingFrom: url)
@@ -58,10 +58,13 @@ enum DeveloperIncident {
             // outside the time window are excluded, including nearby markers.
             let ownNote = event == "problem_note" && details?["marker"] == marker
             guard ownNote || (lower...upper).contains(milliseconds) else { return }
-            guard !result.truncated, result.data.count + line.count + 1 <= maximumBytes else {
+            guard let exportLine = PairingNotificationLog.exportLine(line, parsed: object) else {
+                result.malformedLines += 1; return
+            }
+            guard !result.truncated, result.data.count + exportLine.count + 1 <= maximumBytes else {
                 result.truncated = true; return
             }
-            result.data.append(line); result.data.append(0x0A); result.events += 1
+            result.data.append(exportLine); result.data.append(0x0A); result.events += 1
         }
         while let chunk = try reader.read(upToCount: 64 * 1024), !chunk.isEmpty {
             buffer.append(chunk)

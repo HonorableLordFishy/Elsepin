@@ -71,27 +71,51 @@ struct SavedPlace: Identifiable, Codable, Equatable {
         archive(key).hasRecovery
     }
 
-    static func recovery(key: String) -> [SavedPlace]? {
-        archive(key).recovery()
+    struct Recovery {
+        fileprivate let workspace: UUID
+        fileprivate let copy: RecoverableJSONList<SavedPlace>.RecoveryCopy
+        var places: [SavedPlace] { copy.values }
     }
 
-    static func restoreRecovery(key: String) -> [SavedPlace]? {
-        archive(key).restoreRecovery { places in
+    static func recovery(key: String) -> Recovery? {
+        let workspace = AppDataWorkspace.shared.context
+        let archive = RecoverableJSONList<SavedPlace>(key: key, store: workspace.defaults)
+        guard let copy = archive.recoveryCopy(prepare: { places in
             guard places.count <= 1_000, Set(places.map(\.id)).count == places.count,
                   places.allSatisfy({ $0.coordinate.isValidForRecovery }) else { return nil }
             return places
-        }
+        }) else { return nil }
+        return Recovery(workspace: workspace.generation, copy: copy)
     }
 
-    static func restoreRecentRecovery(retention: RecentHistoryRetention, now: Date = Date()) -> [SavedPlace]? {
+    static func restoreRecovery(_ recovery: Recovery, key: String) -> [SavedPlace]? {
+        let workspace = AppDataWorkspace.shared.context
+        guard workspace.generation == recovery.workspace else { return nil }
+        return RecoverableJSONList<SavedPlace>(key: key, store: workspace.defaults).restoreRecovery(recovery.copy)
+    }
+
+    static func recentRecovery(retention: RecentHistoryRetention, now: Date = Date()) -> Recovery? {
+        let workspace = AppDataWorkspace.shared.context
+        let archive = RecoverableJSONList<SavedPlace>(key: "locus.recents", store: workspace.defaults)
+        guard let copy = archive.recoveryCopy(prepare: { keptRecoveryRecents($0, retention: retention, now: now) }) else { return nil }
+        return Recovery(workspace: workspace.generation, copy: copy)
+    }
+
+    static func restoreRecentRecovery(_ recovery: Recovery, retention: RecentHistoryRetention, now: Date = Date()) -> [SavedPlace]? {
+        let workspace = AppDataWorkspace.shared.context
+        guard workspace.generation == recovery.workspace,
+              keptRecoveryRecents(recovery.places, retention: retention, now: now) == recovery.places else { return nil }
         // Keep the full copy available for export, including expired/overflow entries.
-        archive("locus.recents").restoreRecovery(keepingOriginal: true) { places in
-            var seen = Set<String>()
-            return Array(places.filter {
-                $0.coordinate.isValidForRecovery && retention.keeps(visitedAt: $0.visitedAt, now: now)
-                    && seen.insert($0.id).inserted
-            }.prefix(20))
-        }
+        return RecoverableJSONList<SavedPlace>(key: "locus.recents", store: workspace.defaults)
+            .restoreRecovery(recovery.copy, keepingOriginal: true)
+    }
+
+    private static func keptRecoveryRecents(_ places: [SavedPlace], retention: RecentHistoryRetention, now: Date) -> [SavedPlace] {
+        var seen = Set<String>()
+        return Array(places.filter {
+            $0.coordinate.isValidForRecovery && retention.keeps(visitedAt: $0.visitedAt, now: now)
+                && seen.insert($0.id).inserted
+        }.prefix(20))
     }
 
     static func discardRecovery(key: String) {

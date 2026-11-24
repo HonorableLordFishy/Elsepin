@@ -1,6 +1,7 @@
 import Foundation
 import UserNotifications
 import Combine
+import UIKit
 
 /// Retains a cold-launch tap until the map and privacy gate can consume it.
 @MainActor
@@ -13,8 +14,17 @@ final class SessionNotifications: NSObject, UNUserNotificationCenterDelegate {
     static let shared = SessionNotifications()
     static let reminderID = "locus.session.reminder"
     static let connectionID = "locus.session.connection"
+    @MainActor private var pairingCleanup: AnyCancellable?
 
-    func install() { UNUserNotificationCenter.current().delegate = self }
+    @MainActor
+    func install() {
+        UNUserNotificationCenter.current().delegate = self
+        guard pairingCleanup == nil else { return }
+        PairingPINNotifications.shared.removeStaleNotifications()
+        pairingCleanup = NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification).sink { _ in
+            Task { @MainActor in PairingPINNotifications.shared.removeStaleNotifications() }
+        }
+    }
 
     func requestPermission() async -> Bool {
         let allowed = (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])) ?? false
@@ -54,10 +64,24 @@ final class SessionNotifications: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        DeveloperLogStore.shared.record("notification_foreground_delivery", ["id": notification.request.identifier,
+        let identifier = notification.request.identifier
+        if PairingPINNotification.matches(identifier) {
+            DeveloperLogStore.shared.record("notification_foreground_delivery", ["id": identifier])
+            Task { @MainActor in
+                let notifications = PairingPINNotifications.shared
+                if notifications.canPresent(identifier) {
+                    completionHandler([.banner, .sound])
+                } else {
+                    notifications.clear(identifier)
+                    completionHandler([])
+                }
+            }
+            return
+        }
+        DeveloperLogStore.shared.record("notification_foreground_delivery", ["id": identifier,
             "title": notification.request.content.title, "body": notification.request.content.body])
         // Connection errors already have an in-app alert. Reminders still need a banner.
-        completionHandler(notification.request.identifier == Self.connectionID ? [] : [.banner, .sound])
+        completionHandler(identifier == Self.connectionID ? [] : [.banner, .sound])
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
@@ -80,6 +104,80 @@ final class SessionNotifications: NSObject, UNUserNotificationCenterDelegate {
             var details = ["id": request.identifier, "result": error == nil ? "accepted_by_iOS_not_proof_seen" : "failed"]
             if let error = error as NSError? { details["error_domain"] = error.domain; details["error_code"] = String(error.code) }
             DeveloperLogStore.shared.record("notification_request_result", details)
+        }
+    }
+}
+
+/// Owns PIN notification display independently from ActivityKit and the pairing worker.
+@MainActor
+final class PairingPINNotifications {
+    static let shared = PairingPINNotifications()
+    private let center = UNUserNotificationCenter.current()
+    private let clock = ContinuousClock()
+    private var current: PairingPINNotification?
+    private var expiry: Task<Void, Never>?
+
+    func post(_ pin: String) -> String {
+        if let current { clear(current.identifier) }
+        let notification = PairingPINNotification(startedAt: clock.now)
+        let identifier = notification.identifier
+        current = notification
+        expiry = Task {
+            do { try await clock.sleep(until: notification.expiresAt, tolerance: .zero) }
+            catch { return }
+            clear(identifier)
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Elsepin pairing code"
+        content.body = pin
+        content.sound = .default
+        content.interruptionLevel = .timeSensitive
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+        DeveloperLogStore.shared.record("notification_requested", ["id": identifier, "scheduled": "false"])
+        center.add(request) { error in
+            let accepted = error == nil
+            DeveloperLogStore.shared.record("notification_request_result", [
+                "id": identifier, "result": accepted ? "accepted_by_iOS_not_proof_seen" : "failed"
+            ])
+            Task { @MainActor in
+                if !accepted || !self.canPresent(identifier) { self.clear(identifier) }
+            }
+        }
+        return identifier
+    }
+
+    func canPresent(_ identifier: String) -> Bool {
+        current?.canPresent(identifier, at: clock.now) == true
+    }
+
+    func clear(_ identifier: String) {
+        if current?.identifier == identifier {
+            current = nil
+            expiry?.cancel()
+            expiry = nil
+        }
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
+        center.removeDeliveredNotifications(withIdentifiers: [identifier])
+    }
+
+    /// iOS can keep delivered local notifications while the app cannot run.
+    /// On launch or resume, discard expired and abandoned PIN requests and alerts.
+    func removeStaleNotifications() {
+        if let current, !canPresent(current.identifier) { clear(current.identifier) }
+        center.getPendingNotificationRequests { requests in
+            let identifiers = requests.map(\.identifier)
+            Task { @MainActor in self.clearStale(identifiers) }
+        }
+        center.getDeliveredNotifications { notifications in
+            let identifiers = notifications.map(\.request.identifier)
+            Task { @MainActor in self.clearStale(identifiers) }
+        }
+    }
+
+    private func clearStale(_ identifiers: [String]) {
+        for identifier in identifiers where PairingPINNotification.matches(identifier) && !canPresent(identifier) {
+            clear(identifier)
         }
     }
 }

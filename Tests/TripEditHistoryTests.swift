@@ -19,6 +19,21 @@ final class TripEditHistoryTests: XCTestCase {
         XCTAssertEqual(try TripLibraryDocument.decode(migrated.encoded()), migrated)
     }
 
+    func testDiskReadDistinguishesMissingValidAndNewlyCorruptLibrary() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("Trips.json")
+        XCTAssertNil(try TripLibraryDocument.read(from: file))
+        let library = TripLibraryDocument(trips: [trip()])
+        try library.encoded().write(to: file)
+        XCTAssertEqual(try TripLibraryDocument.read(from: file), library)
+
+        let corrupt = Data("corrupt replacement".utf8)
+        try corrupt.write(to: file, options: .atomic)
+        XCTAssertThrowsError(try TripLibraryDocument.read(from: file))
+        XCTAssertEqual(try Data(contentsOf: file), corrupt)
+    }
     func testOnlyLastThreePreviousVersionsAreKeptPerTrip() throws {
         var current = trip("Version 0")
         var library = TripLibraryDocument(trips: [current])

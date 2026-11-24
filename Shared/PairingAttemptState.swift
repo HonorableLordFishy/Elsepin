@@ -1,5 +1,26 @@
 import Foundation
 
+/// Lifetime of one notification submission, including time spent suspended.
+struct PairingPINNotification {
+    static let legacyIdentifier = "locus.pairing.pin"
+    static let lifetime: Duration = .seconds(5 * 60)
+    let identifier: String
+    let expiresAt: ContinuousClock.Instant
+
+    init(startedAt: ContinuousClock.Instant, id: UUID = UUID()) {
+        identifier = "\(Self.legacyIdentifier).\(id.uuidString)"
+        expiresAt = startedAt.advanced(by: Self.lifetime)
+    }
+
+    static func matches(_ identifier: String) -> Bool {
+        identifier == legacyIdentifier || identifier.hasPrefix(legacyIdentifier + ".")
+    }
+
+    func canPresent(_ identifier: String, at now: ContinuousClock.Instant) -> Bool {
+        self.identifier == identifier && now < expiresAt
+    }
+}
+
 /// Main-actor owned by the native adapter. Kept independent of Network/idevice
 /// so cancellation ordering and file-replacement decisions can be regression tested.
 struct PairingAttemptState {

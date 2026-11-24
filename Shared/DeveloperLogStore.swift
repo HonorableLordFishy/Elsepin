@@ -210,7 +210,7 @@ final class DeveloperLogStore: @unchecked Sendable {
                         "format": "Elsepin developer log v1, one JSON object per line; UTC time, Unix timeMilliseconds and monotonic uptime",
                         "window_start": self.window?.startedAt.ISO8601Format() ?? "unknown",
                         "window_end": self.window?.endsAt.ISO8601Format() ?? "unknown",
-                        "privacy": "Includes exact locations sent by Elsepin and optional problem notes you enter. No automatic keyboard capture, credentials, pairing file, or automatic upload.",
+                        "privacy": "Includes exact locations sent by Elsepin and optional problem notes you enter. Pairing code notification contents are excluded. No automatic keyboard capture, credentials, pairing file, or automatic upload.",
                         "limits": "App-observed events only. Routine events may be buffered for up to 5 seconds while running and can be lost on abrupt termination. iOS does not expose an Airplane Mode toggle or reliable force-close callback. Network state is not proof of a working developer connection. Requests to show alerts/notifications are not proof they were seen. Suspended/terminated time has gaps; cleanup runs when Elsepin can run again.",
                         "storage_error_observed": String(self.storageError),
                         "omitted_this_process": String(self.omittedEvents),
@@ -219,7 +219,10 @@ final class DeveloperLogStore: @unchecked Sendable {
                     ])
                     var data = try self.encoder.encode(header)
                     data.append(0x0A)
-                    if FileManager.default.fileExists(atPath: self.logURL.path) { data.append(try Data(contentsOf: self.logURL)) }
+                    if FileManager.default.fileExists(atPath: self.logURL.path) {
+                        let records = try Data(contentsOf: self.logURL, options: .mappedIfSafe)
+                        PairingNotificationLog.appendExportRecords(records, to: &data)
+                    }
                     continuation.resume(returning: data)
                 } catch { self.storageError = true; continuation.resume(throwing: error) }
             }
@@ -240,7 +243,7 @@ final class DeveloperLogStore: @unchecked Sendable {
                     try self.handle?.synchronize()
                     let slice = try DeveloperIncident.read(from: self.logURL, around: moment.firstAt, marker: marker)
                     let header = DeveloperLogEvent(time: self.now(), process: self.process, event: "incident_export_information", details: [
-                        "format": "Elsepin incident log v1; original JSONL events",
+                        "format": "Elsepin incident log v1; JSONL events",
                         "version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
                         "build": Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown",
                         "marker": marker,
@@ -253,7 +256,7 @@ final class DeveloperLogStore: @unchecked Sendable {
                         "malformed_lines_skipped": String(slice.malformedLines),
                         "storage_error_observed": String(self.storageError),
                         "capacity_reached": String(self.capacityReached),
-                        "privacy": "Includes exact locations and optional notes. Shared only by your export; not a backup.",
+                        "privacy": "Includes exact locations and optional notes. Pairing code notification contents are excluded. Shared only by your export; not a backup.",
                         "limits": "Up to five minutes before and after the marked time, plus its later notes. Only retained events already recorded at export are included; recording gaps and previous process exits remain unknown. Capped at 8 MiB of events; use the full export if truncated. Not an iOS crash report."
                     ])
                     var data = try self.encoder.encode(header); data.append(0x0A); data.append(slice.data)

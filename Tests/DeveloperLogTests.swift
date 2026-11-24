@@ -67,6 +67,15 @@ final class DeveloperLogTests: XCTestCase {
         XCTAssertEqual(entry.details["message"]?.count, 1200)
     }
 
+    func testPairingNotificationRecordsKeepOnlySafeMetadata() {
+        let id = "locus.pairing.pin.\(UUID().uuidString)"
+        let entry = DeveloperLogEvent(process: "test", event: "notification_request_result", details: [
+            "id": id, "title": "Pairing code", "body": "201098", "result": "failed",
+            "message": "Unexpected request content: 201098"
+        ])
+        XCTAssertEqual(entry.details, ["id": id, "result": "failed"])
+    }
+
     func testOverlongKeysCannotCollideAndCrashTheRecorder() {
         let prefix = String(repeating: "a", count: 80)
         let entry = DeveloperLogEvent(process: "test", event: "test", details: [prefix + "x": "1", prefix + "y": "2"])
@@ -127,6 +136,65 @@ final class DeveloperLogTests: XCTestCase {
         log.record("location_write_requested", ["id": "export-pending"])
         let text = String(decoding: try await log.export(), as: UTF8.self)
         XCTAssertTrue(text.contains("export-pending"))
+    }
+
+    func testFullAndIncidentExportsRedactRetainedPairingNotificationRecords() async throws {
+        let folder = try temporaryFolder(), defaults = try preferences(), date = start
+        let store = DeveloperLogStore(folder: folder, defaults: defaults, now: { date })
+        let marker = UUID()
+        try await store.markProblem(id: marker, at: date)
+        defaults.set(false, forKey: DeveloperLogStore.enabledKey)
+
+        // Append old-format records directly to bypass the new write guard.
+        let file = folder.appendingPathComponent("events.jsonl")
+        let writer = try FileHandle(forWritingTo: file)
+        try writer.seekToEnd()
+        let attemptID = "locus.pairing.pin.\(UUID().uuidString)"
+        let notifications = [
+            ("notification_foreground_delivery", ["id": attemptID, "title": "Elsepin pairing code", "body": "931025"]),
+            ("notification_requested", ["id": "locus.pairing.pin", "title": "Pairing code", "body": "021536", "scheduled": "false"]),
+            ("notification_request_result", ["id": attemptID, "result": "failed", "error_message": "Rejected content 351637"]),
+            ("notification_foreground_delivery", ["id": "locus.session.reminder", "title": "Reminder", "body": "Check your session"])
+        ]
+        var retained = Data()
+        for (event, details) in notifications {
+            let object: [String: Any] = ["event": event, "timeMilliseconds": date.timeIntervalSince1970 * 1000, "details": details]
+            retained.append(try JSONSerialization.data(withJSONObject: object))
+            retained.append(0x0A)
+        }
+        try writer.write(contentsOf: retained)
+        try writer.close()
+        let original = try Data(contentsOf: file)
+        let reopened = DeveloperLogStore(folder: folder, defaults: defaults, now: { date })
+        let full = try await reopened.export()
+        let incident = try await reopened.exportIncident(marker: marker.uuidString)
+
+        for data in [full, incident] {
+            let output = String(decoding: data, as: UTF8.self)
+            for secret in ["\"931025\"", "\"021536\"", "Rejected content 351637", "Elsepin pairing code"] {
+                XCTAssertFalse(output.contains(secret))
+            }
+            let exported = try entries(data).compactMap { $0["details"] as? [String: String] }
+            XCTAssertTrue(exported.contains(["id": attemptID]))
+            XCTAssertTrue(exported.contains(["id": "locus.pairing.pin", "scheduled": "false"]))
+            XCTAssertTrue(exported.contains(["id": attemptID, "result": "failed"]))
+            XCTAssertTrue(exported.contains(["id": "locus.session.reminder", "title": "Reminder", "body": "Check your session"]))
+        }
+        XCTAssertEqual(try Data(contentsOf: file), original)
+    }
+
+    func testFullExportSkipsDamagedSensitiveLineWithoutDroppingAdjacentLines() {
+        let ordinary = "{\"event\":\"note\",\"message\":\"locus.pairing.pin\"}\n"
+        let escaped = #"{"event":"notification_requested","details":{"id":"locus.pairing.p\u0069n","body":"050605"}}"# + "\n"
+        let damaged = #"{"event":"notification_foreground_delivery","details":{"id":"locus.pairing.pin","body":"040304""# + "\n"
+        var data = Data()
+        PairingNotificationLog.appendExportRecords(Data((ordinary + escaped + damaged + ordinary).utf8), to: &data)
+        let output = String(decoding: data, as: UTF8.self)
+        XCTAssertFalse(output.contains("050605"))
+        XCTAssertFalse(output.contains("040304"))
+        XCTAssertTrue(output.hasPrefix(ordinary))
+        XCTAssertTrue(output.hasSuffix(ordinary))
+        XCTAssertEqual(data.split(separator: 0x0A).count, 3)
     }
 
     func testScheduledBatchFlushesWithoutAnotherEvent() async throws {

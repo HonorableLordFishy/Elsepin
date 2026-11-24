@@ -1,3 +1,4 @@
+import CoreFoundation
 import XCTest
 
 final class ElsepinFlowUITests: XCTestCase {
@@ -31,7 +32,7 @@ final class ElsepinFlowUITests: XCTestCase {
             let button = springboard.buttons[label]
             if button.exists { button.tap() }
         }
-        if scenario.hasPrefix("route-identity-") || ["moving", "paused", "connecting", "failed", "map-pins"].contains(scenario) {
+        if scenario.hasPrefix("route-identity-") || ["moving", "paused", "connecting", "failed", "map-pins", "route-search-replacement"].contains(scenario) {
             let start = app.buttons["validation.start"]
             if !start.isEnabled, springboard.buttons["Allow"].waitForExistence(timeout: 5) {
                 springboard.buttons["Allow"].tap()
@@ -389,14 +390,7 @@ final class ElsepinFlowUITests: XCTestCase {
         return try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [[String: Any]])
     }
 
-    private func exerciseRouteSearchSave(scenario: String, expectedCount: Int, saved: Bool) throws {
-        launch(scenario, narrow: false)
-        XCTAssertTrue(app.buttons["session.pause"].waitForExistence(timeout: 15))
-        let before = try routeLibrarySnapshot()
-        XCTAssertEqual(before.count, expectedCount)
-        let original = try XCTUnwrap(before.first { ($0["folder"] as? String) == "Route QA" })
-        let originalID = try XCTUnwrap(original["id"] as? String)
-        XCTAssertEqual(original["favorite"] as? Bool, true)
+    private func openAddStopConfirmation() -> XCUIElement {
         app.buttons["map.routeSearch"].tap()
         let expand = app.buttons["routeSearch.fullMap"]
         XCTAssertTrue(expand.waitForExistence(timeout: 10)); expand.tap()
@@ -406,7 +400,19 @@ final class ElsepinFlowUITests: XCTestCase {
         let add = app.buttons["routeSearch.addStop"].firstMatch
         XCTAssertTrue(add.waitForExistence(timeout: 10)); add.tap()
         let confirm = app.buttons["Hold location and add stop"].firstMatch
-        XCTAssertTrue(confirm.waitForExistence(timeout: 10)); confirm.tap()
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10))
+        return confirm
+    }
+
+    private func exerciseRouteSearchSave(scenario: String, expectedCount: Int, saved: Bool) throws {
+        launch(scenario, narrow: false)
+        XCTAssertTrue(app.buttons["session.pause"].waitForExistence(timeout: 15))
+        let before = try routeLibrarySnapshot()
+        XCTAssertEqual(before.count, expectedCount)
+        let original = try XCTUnwrap(before.first { ($0["folder"] as? String) == "Route QA" })
+        let originalID = try XCTUnwrap(original["id"] as? String)
+        XCTAssertEqual(original["favorite"] as? Bool, true)
+        openAddStopConfirmation().tap()
         XCTAssertTrue(app.navigationBars["Plan a route"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["Dropped pin"].waitForExistence(timeout: 20))
         routeControl(app.buttons[saved ? "Save changes" : "Save route"]).tap()
@@ -439,6 +445,23 @@ final class ElsepinFlowUITests: XCTestCase {
             XCTAssertEqual((newTrips.first?["stops"] as? [[String: Any]])?.count, 1)
         }
         XCTAssertFalse(app.buttons["session.pause"].exists, "Saving must not restart travel")
+    }
+
+    func testRouteSearchDismissesAddStopAfterRouteReplacement() {
+        launch("route-search-replacement", narrow: false)
+        let following = app.staticTexts["Following route"]
+        XCTAssertTrue(following.waitForExistence(timeout: 15))
+        let confirm = openAddStopConfirmation()
+
+        let request = CFNotificationName(rawValue: "com.n3mostudio.elsepin.validation.replace-route" as CFString)
+        CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), request, nil, nil, true)
+
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 10), "The original route's confirmation must be dismissed")
+        XCTAssertTrue(app.staticTexts["Test replacement destination"].waitForExistence(timeout: 10))
+        XCTAssertTrue(following.waitForExistence(timeout: 10), "The replacement route must keep moving")
+        XCTAssertTrue(app.buttons["session.pause"].exists)
+        XCTAssertFalse(app.navigationBars["Plan a route"].exists)
+        capture("41-route-search-replacement-stays-active")
     }
 
     func testRouteSearchSeparatesAddStopFromSavePin() {

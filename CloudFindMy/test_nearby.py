@@ -398,6 +398,65 @@ class NearbyWebTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(sender.call_count, 1)
         self.assertEqual(self.runtime.engine.due(), [])
 
+    async def test_provider_change_during_delivery_stops_remaining_devices(self):
+        # Hold the first delivery at its await boundary. All provider transitions
+        # run on the event loop; no real provider or push service is contacted.
+        for provider in ('findmy-device', 'life360'):
+            for transition in ('unchanged', 'disconnect', 'reconnect', 'target-change'):
+                with self.subTest(provider=provider, transition=transition):
+                    self.runtime.engine.rules.clear()
+                    self.runtime.engine.runtime.clear()
+                    self.ready()
+                    owner = self.runtime.apple if provider == 'findmy-device' else self.runtime.life
+                    if provider == 'life360':
+                        owner.stage = 'ready'
+                        owner.connector.circle_id = 'circle'
+                        owner.connector.choices = [('member', 'Shared profile')]
+                    target = dict(TARGET, provider=provider,
+                                  id='device-one' if provider == 'findmy-device' else json.dumps(['circle', 'member']))
+                    rule = self.runtime.engine.add(FIELDS, target)
+                    event = {'id':'e', 'at':time.time(), 'acknowledged':False, 'sent':0, 'next':0}
+                    rule['alert'] = event
+                    entries = [{'endpoint':'https://web.push.apple.com/Qone'},
+                               {'endpoint':'https://web.push.apple.com/Qtwo'}]
+                    self.runtime.engine.state.data['subscriptions'] = entries
+                    started, release = asyncio.Event(), asyncio.Event()
+                    async def delivery(send, *args):
+                        result = send(*args)
+                        started.set()
+                        await release.wait()
+                        return result
+                    report = dict(state='ok', provider=provider, latitude=0, longitude=0,
+                                  accuracy=5, locatedAt=time.time())
+                    with patch.object(self.runtime, 'report', new=AsyncMock(return_value=report)), \
+                            patch('nearby_web.asyncio.to_thread', side_effect=delivery), \
+                            patch.object(self.runtime.push, 'send', return_value='sent') as sender:
+                        task = asyncio.create_task(self.runtime.tick())
+                        try:
+                            await asyncio.wait_for(started.wait(), 1)
+                            if transition in ('disconnect', 'reconnect'):
+                                with patch.object(owner, 'call', new=AsyncMock(return_value='sign-in')):
+                                    owner.start('close')
+                                    await owner.job
+                                if transition == 'reconnect':
+                                    owner.stage = 'ready'  # Same target, new account generation.
+                            elif transition == 'target-change':
+                                if provider == 'findmy-device':
+                                    owner.connector.device_id = 'another-device'
+                                else:
+                                    owner.connector.circle_id = 'another-circle'
+                        finally:
+                            release.set()
+                            await task
+                        self.assertEqual(sender.call_count, 2 if transition == 'unchanged' else 1)
+                    # Keep the pending event and account for the accepted push;
+                    # disconnect is suspension, not acknowledgement or deletion.
+                    self.assertIs(rule['alert'], event)
+                    self.assertFalse(event['acknowledged'])
+                    self.assertTrue(rule['enabled'])
+                    self.assertEqual(event['sent'], 1)
+                    self.assertGreater(event['next'], event['at'])
+
 
 class NearbyLife360Tests(unittest.IsolatedAsyncioTestCase):
     async def test_other_authorized_member_does_not_replace_own_checker_profile(self):

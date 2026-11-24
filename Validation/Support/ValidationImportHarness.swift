@@ -28,8 +28,12 @@ struct ValidationImportHarness: View {
                 Button("Open slow GPX") { load("slow.gpx", Self.valid) }
                 NavigationLink("Recovery copies") { SavedPlaceRecoveryView() }
                 Button("Check recovery persisted") {
-                    _ = SavedPlace.load(key:"locus.favorites")
-                    recoveryResult = SavedPlace.hasRecovery(key:"locus.favorites") ? "Recovery remains" : "Recovery discarded after reload"
+                    let live = SavedPlace.load(key: "locus.favorites")
+                    if live.map(\.name) == ["Validated recovery place"], SavedPlace.recoveryCopyCount(key: "locus.favorites") == 1 {
+                        recoveryResult = "Validated place restored and other copy kept"
+                    } else {
+                        recoveryResult = SavedPlace.hasRecovery(key: "locus.favorites") ? "Recovery remains" : "Recovery discarded after reload"
+                    }
                 }
                 Text(recoveryResult)
             }.navigationTitle("Import validation")
@@ -69,7 +73,7 @@ struct ValidationImportHarness: View {
             let tooMany = (0..<1_001).map { SavedPlace(name:"Place \($0)",latitude:40+Double($0)*0.00001,longitude:-73) }
             let original = try JSONEncoder().encode(tooMany)
             defaults.set(original,forKey:key+".recovery")
-            let refused = SavedPlace.restoreRecovery(key:key) == nil
+            let refused = SavedPlace.recovery(key: key) == nil
                 && defaults.data(forKey:key+".recovery") == original && defaults.data(forKey:key) == nil
             let good = Array(tooMany.prefix(1))
             defaults.set(try JSONEncoder().encode(good),forKey:key+".recovery")
@@ -78,17 +82,34 @@ struct ValidationImportHarness: View {
             let exported = SavedPlace.exportRecovery(key:key)
             let json = try JSONSerialization.jsonObject(with: exported ?? Data()) as? [String:Any]
             let raw = (json?["copiesBase64"] as? [String]) ?? []
-            let restored = SavedPlace.restoreRecovery(key:key) == good
+            let restored = SavedPlace.recovery(key: key).flatMap { SavedPlace.restoreRecovery($0, key: key) } == good
             let kept = SavedPlace.recoveryCopyCount(key:key) == 1
                 && SavedPlace.exportRecovery(key:key) != nil
+            let now = Date()
             let recent = tooMany.prefix(30).map { value -> SavedPlace in
-                var copy=value; copy.visitedAt=Date(); return copy
+                var copy = value
+                copy.visitedAt = now.addingTimeInterval(-2 * 86_400)
+                return copy
             }
             let recentRaw = try JSONEncoder().encode(recent)
-            defaults.set(recentRaw,forKey:"locus.recents.recovery")
-            let capped = SavedPlace.restoreRecentRecovery(retention:.oneWeek)?.count == 20
-                && defaults.data(forKey:"locus.recents.recovery") == recentRaw
-            recoveryResult = refused && restored && kept && capped && raw.contains(broken.base64EncodedString())
+            defaults.set(recentRaw, forKey: "locus.recents.recovery")
+            let preview = SavedPlace.recentRecovery(retention: .oneWeek, now: now)
+            let stricterLimitRefused = preview.flatMap {
+                SavedPlace.restoreRecentRecovery($0, retention: .oneDay, now: now)
+            } == nil && defaults.data(forKey: "locus.recents") == nil
+            let capped = preview?.places.count == 20
+                && preview.flatMap { SavedPlace.restoreRecentRecovery($0, retention: .oneWeek, now: now) } == preview?.places
+                && defaults.data(forKey: "locus.recents.recovery") == recentRaw
+
+            defaults.set(try JSONEncoder().encode(good), forKey: key + ".recovery")
+            let selected = SavedPlace.recovery(key: key)
+            let replacement = try JSONEncoder().encode(Array(tooMany.dropFirst().prefix(1)))
+            defaults.set(replacement, forKey: key + ".recovery")
+            let replacementRefused = selected != nil
+                && selected.flatMap { SavedPlace.restoreRecovery($0, key: key) } == nil
+                && SavedPlace.load(key: key) == good && defaults.data(forKey: key + ".recovery") == replacement
+            recoveryResult = refused && restored && kept && capped && stricterLimitRefused && replacementRefused
+                && raw.contains(broken.base64EncodedString())
                 ? "Recovery limits and raw copies preserved" : "Recovery edge validation failed"
         } catch { recoveryResult=error.localizedDescription }
     }
