@@ -120,11 +120,10 @@ struct LibraryBackupView: View {
             case .failure(let error): message = error.localizedDescription
             }
         }
-        .background {
-            BackupDocumentPicker(isPresented: input.isChoosingFile, onPick: input.picked,
-                onCancel: input.cancelledFileSelection, onUnavailable: input.filePickerUnavailable)
-                .frame(width: 0, height: 0)
-        }
+        .fileImporter(isPresented: $input.isChoosingFile, allowedContentTypes: [.json, .text, .data, .item],
+            allowsMultipleSelection: false, onCompletion: input.picked,
+            onCancellation: input.cancelledFileSelection)
+        .fileDialogBrowserOptions(.displayFileExtensions)
         .sheet(isPresented: $showingJSONSite) {
             BackupJSONBrowser()
         }

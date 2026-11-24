@@ -14,7 +14,7 @@ successful packages separately from failed attempts and simulator/device evidenc
 - Hold the current teleport marker to choose its symbol. Joystick movement starts at the usual speed for its mode. An address can use more lines when it wraps.
 - Starting a route focuses its start or checkpoint. Fit toggles back to detail. Along-route search samples both ends and the middle and makes room for matches across the trip.
 - Import using Files or paste JSON, review the additions, and confirm from the Import button. The solid tab bar reserves space for the last control on pushed screens.
-- Icon changes account for delayed system updates. Leg movement shows the old and new mode. Reset review separates what is erased from what you keep.
+- Icon changes account for delayed system updates. When changing a leg’s movement mode, choose Keep path or New directions above Speed, then tap Done. Reset review separates what is erased from what you keep.
 - Try the [single-loop GPX](Samples/GPX/Garden-loop.gpx) and [two-section GPX](Samples/GPX/Waterfront-sections.gpx) from Files.
 
 ## Build 95 - pairing privacy, backups and route editing (23 November 2026)

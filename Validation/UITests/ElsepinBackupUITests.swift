@@ -300,6 +300,20 @@ final class ElsepinBackupUITests: XCTestCase {
         openImport(named: filename)
         XCTAssertFalse(visible(app.buttons["backup.review.apply"]).isEnabled, "Settings must start unchecked")
         capture("34-import-starts-unchecked")
+        // Back retains the valid preview. Canceling Files while choosing a
+        // replacement must keep that preview available and release the picker.
+        let review = app.navigationBars["Review import"]
+        review.buttons["BackButton"].tap()
+        let chooseFile = app.buttons["Choose backup file"]
+        XCTAssertTrue(chooseFile.waitForExistence(timeout: 5))
+        chooseFile.tap()
+        let cancelFiles = app.navigationBars["FullDocumentManagerViewControllerNavigationBar"].buttons["Cancel"]
+        XCTAssertTrue(cancelFiles.waitForExistence(timeout: 25))
+        cancelFiles.tap()
+        XCTAssertTrue(app.staticTexts["No file selected. Your previous preview is unchanged."].waitForExistence(timeout: 10))
+        XCTAssertTrue(chooseFile.isEnabled)
+        app.buttons["Review selected backup"].tap()
+        XCTAssertTrue(review.waitForExistence(timeout: 5))
         visible(app.buttons["Cancel import"]).tap()
         app.buttons["Close backup test"].tap()
         XCTAssertTrue(NSDictionary(dictionary: try settings(snapshot())).isEqual(to: changed), "Cancel changed settings")

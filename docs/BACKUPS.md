@@ -2,9 +2,9 @@
 
 ## Build 96 import and review follow-up
 
-Choose backup file opens the UIKit Files picker in copy mode, with JSON, text
-and generic file types enabled. The selected copy goes through the existing
-regular-file, size and backup-format checks after Files dismisses. Paste backup
+Choose backup file opens the system Files picker for JSON, text and generic
+files. The selected file goes through the regular-file, size and backup-format
+checks before review. Paste backup
 text uses the native iOS paste control. Either input opens the same review in
 Settings. The confirmation points to Import selected changes, and the solid tab
 bar reserves room for the last rows of the review and other Settings screens.
