@@ -299,7 +299,7 @@ struct RouteSectionChoiceSheet: View {
                         Button("Cancel", role: .cancel) { }
                     } message: {
                         Text(keepsExactPath
-                            ? "Keep the saved path or find new directions through the same stops. Your Library copy changes only when you save."
+                            ? "Both options keep your stops. Save to update your Library copy."
                             : "Keep this path at the new speed or find directions for \(mode.title).")
                     }
                 }

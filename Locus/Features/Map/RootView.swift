@@ -997,8 +997,7 @@ struct SessionSpotNameButton: View {
             guard let coordinate = preview ? session.pin : session.simulated else { return }
             let point = RoutePoint(coordinate)
             target = NameTarget(point: point, preview: preview, context: session.namingContext)
-            let existing = preview ? session.previewSpotName : session.sessionSpotName
-            text = existing.flatMap { $0.point.distance(to: point) <= SessionSpotName.nearbyMetres ? $0.name : nil } ?? session.placeName(at: coordinate) ?? ""
+            text = session.placeName(at: coordinate) ?? ""
             showEditor = true
         } label: {
             Image(systemName: "tag")

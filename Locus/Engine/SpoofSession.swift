@@ -463,7 +463,7 @@ final class SpoofSession: ObservableObject {
         pin = coordinate
         pinIsPreview = true
         if let name { rememberPlaceName(name, at: coordinate) }
-        previewSpotName = previewSpotName.flatMap { $0.point.distance(to: RoutePoint(coordinate)) <= 5 ? $0 : nil }
+        if previewSpotName?.point != RoutePoint(coordinate) { previewSpotName = nil }
         pinSelectionID = UUID()
         resolvedPinAddress = nil
         pinLookupTask?.cancel()
@@ -584,7 +584,9 @@ final class SpoofSession: ObservableObject {
             lastError = "Pair this iPhone in Settings before starting a session."
             return false
         }
-        let selectedName = pinIsPreview && pin.map({ RoutePoint($0) == RoutePoint(coordinate) }) == true ? previewSpotName : nil
+        let point = RoutePoint(coordinate)
+        let selectedName = pinIsPreview && pin.map({ RoutePoint($0) == point }) == true
+            && previewSpotName?.point == point ? previewSpotName : nil
         cancelRoute()
         stopJoystick()
         pin = coordinate
@@ -1452,7 +1454,12 @@ final class SpoofSession: ObservableObject {
                 SessionLifetime.shared.locationCleared()
                 locationKeeper.acceptDeviceFixes = true
                 pinIsPreview = pin != nil
-                if pinIsPreview { previewSpotName = confirmedName }
+                if let pin {
+                    let point = RoutePoint(pin)
+                    if previewSpotName?.point != point {
+                        previewSpotName = confirmedName?.point == point ? confirmedName : nil
+                    }
+                }
                 startedAt = nil
                 SessionNotifications.shared.cancelReminder()
             }
@@ -1995,16 +2002,18 @@ final class SpoofSession: ObservableObject {
 
     func placeName(at coordinate: CLLocationCoordinate2D) -> String? {
         let point = RoutePoint(coordinate)
-        // Explicit labels outrank search titles and broader area labels.
-        for label in [previewSpotName, sessionSpotName].compactMap({ $0 }) {
-            if label.point.distance(to: point) <= 5 { return label.name }
-        }
-        if let route = activeRoute {
+        let routeLabels: [(point: RoutePoint, name: String)] = activeRoute.map { route in
             let places = [route.origin, route.destination] + route.stops.map {
                 RoutePlace(name: $0.name, coordinate: route.track.point(at: $0.metres).coordinate)
             }
-            if let place = places.first(where: { RoutePoint($0.coordinate).distance(to: point) <= 5 && !Self.isGenericFavoriteName($0.name) }) { return place.name }
-        }
+            return places.compactMap { place in
+                Self.isGenericFavoriteName(place.name) ? nil : (RoutePoint(place.coordinate), place.name)
+            }
+        } ?? []
+        let exactSaved = savedPin(at: coordinate).flatMap { Self.isGenericFavoriteName($0.name) ? nil : $0.name }
+        // Exact identity wins before proximity-based names for another coordinate.
+        if let label = SessionSpotName.preferredPlaceLabel(at: point,
+            explicit: [previewSpotName, sessionSpotName].compactMap { $0 }, route: routeLabels, exactSaved: exactSaved) { return label }
         if let place = savedPins.first(where: { RoutePoint($0.coordinate).distance(to: point) <= 5 && !Self.isGenericFavoriteName($0.name) }) { return place.name }
         if let name = chosenNames.first(where: { $0.point.distance(to: point) <= 5 }) { return name.name }
         if let place = recents.first(where: { RoutePoint($0.coordinate).distance(to: point) <= 5 && !Self.isGenericFavoriteName($0.name) }) { return place.name }

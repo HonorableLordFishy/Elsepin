@@ -142,4 +142,13 @@ struct SessionSpotName: Equatable {
         guard current.isValid else { return nil }
         return point.distance(to: current) <= Self.nearbyMetres ? name : nil
     }
+
+    static func preferredPlaceLabel(at point: RoutePoint, explicit: [Self],
+                                    route: [(point: RoutePoint, name: String)], exactSaved: String?) -> String? {
+        if let exact = explicit.first(where: { $0.point == point }) { return exact.name }
+        if let exact = route.first(where: { $0.point == point }) { return exact.name }
+        if let exactSaved { return exactSaved }
+        if let nearby = explicit.lazy.compactMap({ $0.display(at: point) }).first { return nearby }
+        return route.first(where: { $0.point.distance(to: point) <= nearbyMetres })?.name
+    }
 }

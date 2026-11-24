@@ -15,8 +15,20 @@ struct ValidationBackupHarness: View {
     @State private var started = false
     @State private var snapshot = "{}"
 
-    private var documents: URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    static var observedExportURL: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ValidationSettingsExport.json")
+    }
+
+    private struct ObservedExport: Decodable {
+        let filename: String
+        let text: String
+    }
+
+    private func observedExport() throws -> ObservedExport? {
+        let url = Self.observedExportURL
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return try JSONDecoder().decode(ObservedExport.self, from: Data(contentsOf: url))
     }
 
     private func refresh() {
@@ -24,22 +36,18 @@ struct ValidationBackupHarness: View {
             let reloaded = TripLibrary()
             var result: [String: Any] = [
                 "settings": try JSONSerialization.jsonObject(with: JSONEncoder().encode(session.backupPreferences)),
-                "tripCount": reloaded.trips.count, "pinCount": session.savedPins.count,
-                "filesReady": FileManager.default.fileExists(atPath: documents.appendingPathComponent(".validation-files-ready").path)
+                "tripCount": reloaded.trips.count, "pinCount": session.savedPins.count
             ]
             if reloaded.error == nil { result["readableTripCount"] = reloaded.trips.count }
             if ["backup-unreadable-trips", "backup-late-trip-corruption"].contains(ValidationFixture.scenario) {
                 result["originalKept"] = try Data(contentsOf: AppDataWorkspace.file("Trips.json")) == ValidationFixture.unreadableTrips
             }
-            if let files = FileManager.default.enumerator(at: documents, includingPropertiesForKeys: nil) {
-                for case let file as URL in files where file.lastPathComponent.hasPrefix("Elsepin-Settings") && file.pathExtension == "json" {
-                    let data = try Data(contentsOf: file)
-                    let backup = try LibraryBackup.decode(data)
-                    result["export"] = try JSONSerialization.jsonObject(with: data)
-                    result["valid"] = backup.isValid
-                    result["file"] = file.lastPathComponent
-                    break
-                }
+            if let export = try observedExport() {
+                let data = Data(export.text.utf8)
+                let backup = try LibraryBackup.decode(data)
+                result["export"] = try JSONSerialization.jsonObject(with: data)
+                result["valid"] = backup.isValid
+                result["file"] = export.filename
             }
             snapshot = String(decoding: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), as: UTF8.self)
         } catch { snapshot = "ERROR: \(error.localizedDescription)" }
@@ -70,12 +78,8 @@ struct ValidationBackupHarness: View {
                 Button("Read settings and export") { refresh() }
                 Button("Copy exported backup text") {
                     do {
-                        let files = FileManager.default.enumerator(at: documents, includingPropertiesForKeys: nil)
-                        let file = (files?.allObjects as? [URL])?.first {
-                            $0.lastPathComponent.hasPrefix("Elsepin-Settings") && $0.pathExtension == "json"
-                        }
-                        guard let file else { snapshot = "ERROR: No actual export to copy"; return }
-                        UIPasteboard.general.string = try String(contentsOf: file, encoding: .utf8)
+                        guard let export = try observedExport() else { snapshot = "ERROR: No actual export to copy"; return }
+                        UIPasteboard.general.string = export.text
                     } catch { snapshot = "ERROR: \(error.localizedDescription)" }
                 }
                 Text(snapshot).font(.system(size: 7)).lineLimit(1)
@@ -96,19 +100,16 @@ struct ValidationBackupHarness: View {
         .environmentObject(planner)
         .task {
             guard !started else { return }; started = true
-            do {
-                try FileManager.default.createDirectory(at: documents.appendingPathComponent("Validation exports"), withIntermediateDirectories: true)
-                if !ProcessInfo.processInfo.arguments.contains("--preserve-backup-test-data") {
-                    session.setUsualSpeedMPH(4.5, for: .walk)
-                    session.setUsualSpeedMPH(85, for: .drive)
-                    session.smoothMovement = true
-                    preferences.mapPinSize = 52
-                    preferences.mapPinVisibilityMiles = 7
-                    preferences.showSavedPinsOnMap = true
-                    preferences.speedUnit = .mph
-                }
-                refresh()
-            } catch { snapshot = "ERROR: \(error.localizedDescription)" }
+            if !ProcessInfo.processInfo.arguments.contains("--preserve-backup-test-data") {
+                session.setUsualSpeedMPH(4.5, for: .walk)
+                session.setUsualSpeedMPH(85, for: .drive)
+                session.smoothMovement = true
+                preferences.mapPinSize = 52
+                preferences.mapPinVisibilityMiles = 7
+                preferences.showSavedPinsOnMap = true
+                preferences.speedUnit = .mph
+            }
+            refresh()
         }
     }
 }

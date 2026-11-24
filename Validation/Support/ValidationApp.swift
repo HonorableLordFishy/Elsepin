@@ -53,14 +53,11 @@ enum ValidationFixture {
         // Every launch clears only that disposable sandbox, never the shipping app.
         if scenario == "backup-settings" {
             let manager = FileManager.default
-            let documents = manager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            do {
-                try manager.createDirectory(at: documents, withIntermediateDirectories: true)
-                let previousExports = try manager.contentsOfDirectory(at: documents, includingPropertiesForKeys: [.isRegularFileKey])
-                for file in previousExports where file.lastPathComponent.hasPrefix("Elsepin-Settings") && file.pathExtension == "json" {
-                    if try file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true { try manager.removeItem(at: file) }
-                }
-            } catch { preconditionFailure("Could not clear old disposable settings exports: \(error)") }
+            let observation = ValidationBackupHarness.observedExportURL
+            if manager.fileExists(atPath: observation.path) {
+                do { try manager.removeItem(at: observation) }
+                catch { preconditionFailure("Could not clear the old export observation: \(error)") }
+            }
         }
         UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -160,6 +157,7 @@ private struct ValidationHost: View {
         let recents = SavedPlace.load(key: "locus.recents")
         let expected = SavedPlace(name: "My saved destination", latitude: coordinate.latitude, longitude: coordinate.longitude,
                                   folder: "Trips", icon: SavedPlaceSymbol.star.rawValue, color: "mint", favorite: true, address: address)
+        guard session.previewSpotName == nil else { pinAddressReport = "The previous explicit label was retained"; return }
         guard saved.count == 2, saved.contains(expected) else { pinAddressReport = "Saved pin metadata changed"; return }
         guard saved.first(where: { $0.id != expected.id })?.address == "Neighbor's address" else {
             pinAddressReport = "Nearby pin address changed"; return
@@ -219,15 +217,19 @@ private struct ValidationHost: View {
                         .accessibilityIdentifier("validation.commandGeneration")
                 }
                 if ValidationFixture.scenario == "pin-address-refresh" {
-                    Button("Check saved address refresh") { checkSavedAddressRefresh() }
-                        .frame(minHeight: 44)
-                    Button("Edit pin from old snapshot") {
-                        guard var snapshot = session.savedPin(at: ValidationFixture.points[0]) else { return }
-                        snapshot.address = "Outdated address"
-                        pinAddressReport = ""
-                        stalePinDraft = PinDraft(place: snapshot, center: snapshot.coordinate)
+                    HStack {
+                        Button(action: checkSavedAddressRefresh) {
+                            Text("Check saved address refresh").frame(minHeight: 44).contentShape(Rectangle())
+                        }
+                        Button {
+                            guard var snapshot = session.savedPin(at: ValidationFixture.points[0]) else { return }
+                            snapshot.address = "Outdated address"
+                            pinAddressReport = ""
+                            stalePinDraft = PinDraft(place: snapshot, center: snapshot.coordinate)
+                        } label: {
+                            Text("Edit pin from old snapshot").frame(minHeight: 44).contentShape(Rectangle())
+                        }
                     }
-                    .frame(minHeight: 44)
                     Text(pinAddressReport).accessibilityIdentifier("validation.pinAddressReport")
                 }
                 if ValidationFixture.scenario == "route-camera", let simulated = session.simulated {
@@ -279,9 +281,15 @@ private struct ValidationHost: View {
                     permissionsReady = true
                 }
                 if ValidationFixture.scenario == "pin-address-refresh" {
-                    session.pushNamedRecent(name: "My saved destination", coordinate: ValidationFixture.points[0])
-                }
-                if !sessionScenario && !ValidationFixture.scenario.hasPrefix("home-") {
+                    let destination = ValidationFixture.points[0]
+                    let adjacent = CLLocationCoordinate2D(latitude: destination.latitude + 0.00001, longitude: destination.longitude)
+                    session.pushNamedRecent(name: "My saved destination", coordinate: destination)
+                    session.selectPin(adjacent)
+                    let namedNeighbor = session.nameSpot("Explicit neighboring label", at: RoutePoint(adjacent),
+                        preview: true, context: session.namingContext)
+                    precondition(namedNeighbor)
+                    session.selectPin(destination)
+                } else if !sessionScenario && !ValidationFixture.scenario.hasPrefix("home-") {
                     session.selectPin(ValidationFixture.points[0], name: "Test garden entrance")
                 }
                 if ValidationFixture.scenario == "pin-adjustment" {

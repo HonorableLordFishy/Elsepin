@@ -1,8 +1,7 @@
-"""Copy the actual UI export into disposable Simulator Files storage.
+"""Observe the real Files export for assertions in the disposable validation app.
 
-iOS 27.2's simulator can fail to enumerate FILocalAppContainerNode with nilError.
-Use Files' general storage for the import source, without replacing file-picker
-selection, the exporter, its bytes, the importer, or any review/apply action.
+Files creates its own provider item through the export UI. This helper reads
+that item and writes a test receipt outside Files, without changing the source.
 """
 import json
 import os
@@ -44,38 +43,38 @@ def main():
     started_at_ns = time.time_ns()
     deadline = time.monotonic() + 1800
     last_error = None
+    observed = None
+    group = None
     while time.monotonic() < deadline:
         try:
-            app = container(device, 'com.n3mostudio.elsepin.validation', 'data')
-            # Ignore exports left by a prior retry/run. The staging helper starts
-            # before this UI test exports, so a current-run file must be newer
-            # than the helper and the newest such file is the one just produced.
-            files = [path for path in (app / 'Documents').rglob('Elsepin-Settings*.json')
-                     if path.is_file() and path.stat().st_mtime_ns >= started_at_ns]
-            if not files:
-                time.sleep(1)
-                continue
-            source = max(files, key=lambda path: (path.stat().st_mtime_ns, str(path)))
-            payload = source.read_bytes()
-            backup = json.loads(payload)
-            if backup.get('categories') != ['settings'] or backup.get('places') or backup.get('trips'):
-                raise ValueError('Expected only the disposable settings export')
-            group = files_storage_group(device, app)
-            # Refuse any path outside this owned, disposable simulator.
-            if device not in group.parts or 'AppGroup' not in group.parts:
-                raise ValueError('Files group is outside the disposable simulator')
-            destination = group / 'File Provider Storage' / 'Elsepin-Settings.json'
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run(['rsync', '-a', '--', str(source), str(destination)], check=True, timeout=20)
-            if destination.read_bytes() != payload:
-                raise ValueError('Transferred export bytes differ')
-            receipt = {'actualUIExport': True, 'identicalBytes': True, 'bytes': len(payload),
-                       'source': 'validation app Documents', 'destination': 'On My iPhone/Elsepin-Settings.json'}
-            (evidence / 'files-staging.json').write_text(json.dumps(receipt, indent=2))
-            (evidence / 'staged-settings-export.json').write_bytes(payload)
-            (app / 'Documents/.validation-files-ready').write_text('ready')
-            print('Actual settings export copied to disposable Files storage; bytes verified.', flush=True)
-            return
+            if group is None:
+                app = container(device, 'com.n3mostudio.elsepin.validation', 'data')
+                storage_group = files_storage_group(device, app)
+                if device not in storage_group.parts or 'AppGroup' not in storage_group.parts:
+                    raise ValueError('Files group is outside the disposable simulator')
+                group = storage_group
+            files = [(path.stat().st_mtime_ns, path.name) for path in (group / 'File Provider Storage').glob('Elsepin-Settings*.json')
+                     if path.is_file() and not path.is_symlink()]
+            latest = max(files, default=None)
+            if latest is not None and latest[0] >= started_at_ns and latest != observed:
+                source = group / 'File Provider Storage' / latest[1]
+                payload = source.read_bytes()
+                backup = json.loads(payload)
+                if backup.get('categories') != ['settings'] or backup.get('places') or backup.get('trips'):
+                    raise ValueError('Expected only the disposable settings export')
+                app = container(device, 'com.n3mostudio.elsepin.validation', 'data')
+                if device not in app.parts or app.is_symlink():
+                    raise ValueError('Validation app is outside the disposable simulator')
+                cache = app / 'Library/Caches'
+                cache.mkdir(parents=True, exist_ok=True)
+                receipt = cache / 'ValidationSettingsExport.json'
+                temporary = receipt.with_suffix('.tmp')
+                temporary.write_text(json.dumps({'filename': source.name, 'text': payload.decode('utf-8')}), encoding='utf-8')
+                temporary.replace(receipt)
+                (evidence / 'native-settings-export.json').write_bytes(payload)
+                observed = latest
+                print(f'Observed settings export at On My iPhone/{source.name} ({len(payload)} bytes).', flush=True)
+            time.sleep(1)
         except (subprocess.SubprocessError, OSError, ValueError) as error:
             # Files' group may not exist until its first native presentation.
             message = str(error)
@@ -85,7 +84,8 @@ def main():
                 print(message, flush=True)
             last_error = message
             time.sleep(5)
-    raise RuntimeError(f'Timed out staging the actual UI export: {last_error}')
+    if observed is None:
+        raise RuntimeError(f'Timed out observing a native UI export: {last_error}')
 
 
 if __name__ == '__main__':

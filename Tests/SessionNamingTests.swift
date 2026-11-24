@@ -19,6 +19,27 @@ final class SessionNamingTests: XCTestCase {
         XCTAssertNil(name.display(at: RoutePoint(latitude: .nan, longitude: -122)))
     }
 
+    func testExactSavedNameWinsOverAdjacentExplicitAndRouteNames() throws {
+        let adjacent = RoutePoint(latitude: 37.00001, longitude: -122)
+        let explicit = try XCTUnwrap(SessionSpotName("Adjacent explicit label", at: adjacent))
+        let route = [(point: adjacent, name: "Adjacent route stop")]
+        XCTAssertEqual(SessionSpotName.preferredPlaceLabel(at: spot, explicit: [explicit], route: route,
+                                                            exactSaved: "Exact saved pin"), "Exact saved pin")
+        XCTAssertEqual(SessionSpotName.preferredPlaceLabel(at: spot, explicit: [explicit], route: route,
+                                                            exactSaved: nil), explicit.name)
+    }
+
+    func testExactRouteAndExplicitNamesKeepTheirPriority() throws {
+        let adjacent = RoutePoint(latitude: 37.00001, longitude: -122)
+        let nearbyLabel = try XCTUnwrap(SessionSpotName("Adjacent explicit label", at: adjacent))
+        let exactLabel = try XCTUnwrap(SessionSpotName("Exact explicit label", at: spot))
+        let route = [(point: adjacent, name: "Adjacent route stop"), (point: spot, name: "Exact route stop")]
+        XCTAssertEqual(SessionSpotName.preferredPlaceLabel(at: spot, explicit: [nearbyLabel], route: route,
+                                                            exactSaved: "Exact saved pin"), "Exact route stop")
+        XCTAssertEqual(SessionSpotName.preferredPlaceLabel(at: spot, explicit: [nearbyLabel, exactLabel], route: route,
+                                                            exactSaved: "Exact saved pin"), exactLabel.name)
+    }
+
     func testWhitespaceEmptyNamesAndLengthAreHandled() throws {
         XCTAssertNil(SessionSpotName(" \n\t ", at: spot))
         XCTAssertNil(SessionSpotName("Home", at: RoutePoint(latitude: 99, longitude: 0)))

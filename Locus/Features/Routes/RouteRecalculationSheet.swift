@@ -36,7 +36,7 @@ struct RouteRecalculationSheet: View {
                     .accessibilityAddTraits(mode == item ? .isSelected : [])
                 }
             } footer: {
-                Text("New directions through the same start, stops and destination. All legs use this mode; names and waits stay the same.")
+                Text("Applies to every leg. Keeps all stops, names and waits.")
             }.shiftSettingsRows()
             Section {
                 LabeledContent("Speed", value: preferences.speedUnit.formatted(mph: chosenSpeed))

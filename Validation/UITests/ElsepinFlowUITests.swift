@@ -393,7 +393,9 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         save.tap()
         let check = app.buttons["Check saved address refresh"]
-        XCTAssertTrue(check.waitForExistence(timeout: 5))
+        let editorDismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [editorDismissed], timeout: 5), .completed)
+        XCTAssertTrue(check.isHittable)
         check.tap()
         XCTAssertEqual(app.staticTexts["validation.pinAddressReport"].label, "Saved and recent addresses refreshed")
     }
