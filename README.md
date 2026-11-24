@@ -2,6 +2,8 @@
 
 Private development repository for Elsepin, the continuation of Shift.
 
+**Current private build on main is 2.6.1 (94).** Build 94 preserves a saved route’s identity when adding stops from map search. See the [build record](docs/BUILD-HISTORY.md) for the source revision and validation results.
+
 **Public release: [2.6.1 (89)](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/v2.6.1).** Build 89 uses the official update channel with build 88's features and fixes. Prism Jumpgate remains the primary icon; the app has eight themes and thirteen icon choices.
 
 Bloom is the default. Appearance offers Solid or Liquid Glass and compact rounded typography with accessibility support. The website is in `website/`; the public introduction is maintained in `docs/public/README.md`. See [changes since 2.6.0](docs/CHANGES-SINCE-2.6.0.md) for the complete update.
