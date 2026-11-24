@@ -21,9 +21,10 @@ final class LibraryBackupInput: ObservableObject {
             guard let url = urls.first else { cancelledFileSelection(); return }
             guard let id = state.begin() else { return }
             let access = BackupFileAccess(url)
-            prepare(id) {
+            let coordinatedRead = ImportFileReadCoordinator()
+            prepare(id, onCancel: { coordinatedRead.cancel() }) {
                 defer { withExtendedLifetime(access) {} }
-                return try BackupImportReader.file(access.url)
+                return try BackupImportReader.file(access.url, using: coordinatedRead)
             }
         case .failure(let error):
             state.notice(error.localizedDescription)
@@ -61,12 +62,16 @@ final class LibraryBackupInput: ObservableObject {
         state.cancel()
     }
 
-    private func prepare(_ id: UUID, _ load: @escaping @Sendable () throws -> BackupImportPreview) {
+    private func prepare(_ id: UUID, onCancel: @escaping @Sendable () -> Void = {},
+                         _ load: @escaping @Sendable () throws -> BackupImportPreview) {
         let worker = Task.detached(priority: .userInitiated) { Result { try load() } }
         preparation = Task {
             let result = await withTaskCancellationHandler {
                 await worker.value
-            } onCancel: { worker.cancel() }
+            } onCancel: {
+                worker.cancel()
+                onCancel()
+            }
             guard !Task.isCancelled else { return }
             state.finish(id, result: result)
             preparation = nil

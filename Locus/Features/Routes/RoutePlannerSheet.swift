@@ -25,6 +25,7 @@ struct RoutePlannerSheet: View {
     @State private var confirmPathChange = false
     @State private var pendingLiveAddStop = false
     @State private var showImporter = false
+    @State private var gpxPickerError: String?
     @StateObject private var gpxImport = GPXImportReviewModel()
     @State private var pendingGPX: [RoutePoint]?
     @State private var showExporter = false
@@ -261,9 +262,19 @@ struct RoutePlannerSheet: View {
                     }
                 }
             } message: { Text("Saves the whole path from its start, travel mode, target speed, and all stops.") }
-            .fileImporter(isPresented: $showImporter, allowedContentTypes: [.item]) { result in
-                if case .success(let url) = result { gpxImport.start(url) }
-                else if case .failure(let error) = result { planner.error = error.localizedDescription }
+            .fileImporter(isPresented: $showImporter, allowedContentTypes: ImportFileTypes.gpxImport) { result in
+                switch result {
+                case .success(let url): gpxImport.start(url)
+                case .failure(let error): gpxPickerError = error.localizedDescription
+                }
+            }
+            .fileDialogBrowserOptions(.displayFileExtensions)
+            .loggedAlert("Couldn’t open GPX file", isPresented: Binding(
+                get: { gpxPickerError != nil }, set: { if !$0 { gpxPickerError = nil } }
+            )) {
+                Button("OK", role: .cancel) { gpxPickerError = nil }
+            } message: {
+                Text(gpxPickerError ?? "")
             }
             .sheet(isPresented: $gpxImport.isPresented, onDismiss: {
                 gpxImport.cancel()
@@ -274,7 +285,7 @@ struct RoutePlannerSheet: View {
             }) {
                 GPXImportReviewView(model: gpxImport) { pendingGPX = $0 }
             }
-            .fileExporter(isPresented: $showExporter, document: exportDocument, contentType: .xml,
+            .fileExporter(isPresented: $showExporter, document: exportDocument, contentType: ImportFileTypes.gpx,
                           defaultFilename: "Elsepin-Route.gpx") { result in
                 if case .failure(let error) = result { planner.error = error.localizedDescription }
             }
@@ -891,7 +902,7 @@ struct RoutePlannerSheet: View {
 }
 
 private struct GPXRouteDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.xml] }
+    static var readableContentTypes: [UTType] { [ImportFileTypes.gpx] }
     let text: String
     init(text: String) { self.text = text }
     init(configuration: ReadConfiguration) throws {

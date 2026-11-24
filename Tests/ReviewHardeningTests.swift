@@ -35,7 +35,7 @@ final class ReviewHardeningTests: XCTestCase {
         let cancelled = expectation(description: "worker observes cancellation")
         let gate = DispatchSemaphore(value: 0)
         let task = Task {
-            try await GPXImporter.runCancellable {
+            try await GPXImporter.runCancellable(onCancel: { gate.signal() }) {
                 started.fulfill()
                 _ = gate.wait(timeout: .now() + 5)
                 if Task.isCancelled { cancelled.fulfill() }
@@ -44,7 +44,7 @@ final class ReviewHardeningTests: XCTestCase {
             }
         }
         await fulfillment(of: [started], timeout: 3)
-        task.cancel(); gate.signal()
+        task.cancel()
         do { _ = try await task.value; XCTFail("Cancelled import returned data") }
         catch { XCTAssertTrue(error is CancellationError) }
         await fulfillment(of: [cancelled], timeout: 3)

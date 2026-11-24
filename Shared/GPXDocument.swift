@@ -97,13 +97,19 @@ enum GPXDocument {
 }
 enum GPXImporter {
     static func load(from url: URL) async throws -> GPXImport {
-        try await runCancellable {
+        let coordinatedRead = ImportFileReadCoordinator()
+        return try await runCancellable(onCancel: { coordinatedRead.cancel() }) {
+            guard url.isFileURL else { throw GPXImportError.notAFile }
+            #if canImport(Darwin)
             let accessing = url.startAccessingSecurityScopedResource()
             defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-            return try GPXDocument.parse(readBounded(url))
+            #endif
+            let data = try coordinatedRead.read(url, using: readBounded)
+            return try GPXDocument.parse(data)
         }
     }
-    static func runCancellable<T: Sendable>(_ operation: @escaping @Sendable () throws -> T) async throws -> T {
+    static func runCancellable<T: Sendable>(onCancel: @escaping @Sendable () -> Void = {},
+                                            _ operation: @escaping @Sendable () throws -> T) async throws -> T {
         try Task.checkCancellation()
         let worker = Task.detached(priority: .userInitiated) {
             try Task.checkCancellation()
@@ -115,7 +121,10 @@ enum GPXImporter {
             let result = try await worker.value
             try Task.checkCancellation()
             return result
-        } onCancel: { worker.cancel() }
+        } onCancel: {
+            worker.cancel()
+            onCancel()
+        }
     }
     static func readBounded(_ url: URL) throws -> Data {
         guard url.isFileURL else { throw GPXImportError.notAFile }

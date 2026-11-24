@@ -2,10 +2,10 @@
 
 ## Build 96 import and review follow-up
 
-Choose backup file opens the system Files picker for JSON, text and generic
-files. The selected file goes through the regular-file, size and backup-format
-checks before review. Paste backup
-text uses the native iOS paste control. Either input opens the same review in
+Choose backup file opens Files. Select a JSON backup from Downloads, On My iPhone,
+or an available file provider. Elsepin checks the file size and backup format
+on the device and opens Review import. Paste backup text uses the native iOS
+paste control. Either input opens the same review in
 Settings. The confirmation points to Import selected changes, and the solid tab
 bar reserves room for the last rows of the review and other Settings screens.
 Check these interactions on an iPhone with local and cloud file providers.

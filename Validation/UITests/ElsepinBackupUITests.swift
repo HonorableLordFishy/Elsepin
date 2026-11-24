@@ -22,7 +22,7 @@ final class ElsepinBackupUITests: XCTestCase {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: above ? 0.35 : 0.77))
                 .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: above ? 0.77 : 0.35)))
         }
-        XCTFail("Unreachable backup control: \(element)"); return element
+        XCTFail("Unreachable import/export control: \(element)"); return element
     }
     private func openLocalFilesStorage() {
         // DocumentManager loads out of process. Wait for its navigation before
@@ -66,7 +66,7 @@ final class ElsepinBackupUITests: XCTestCase {
     private func settings(_ snapshot: [String: Any]) throws -> [String: Any] {
         try XCTUnwrap(snapshot["settings"] as? [String: Any])
     }
-    private func prepareFilesProvider() {
+    private func prepareFilesProvider(returningTo ready: XCUIElement? = nil) {
         // A successful simctl launch does not mean Files' provider has finished
         // its first-run indexing. Verify actual enumeration before opening an
         // export sheet; a blank system sheet is not a backup interaction result.
@@ -83,19 +83,21 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertTrue(localStorageTitle(in: files.navigationBars.firstMatch).waitForExistence(timeout: 60),
             "Simulator Files did not open On My iPhone")
         app.activate()
-        XCTAssertTrue(app.buttons["Read settings and export"].waitForExistence(timeout: 20))
+        XCTAssertTrue((ready ?? app.buttons["Read settings and export"]).waitForExistence(timeout: 20))
     }
     private func openImport(named filename: String) {
         app.buttons["Import and export"].tap()
         app.buttons["Choose backup file"].tap()
+        selectFile(named: filename, captureName: "33b-original-settings-file", until: app.navigationBars["Review import"])
+    }
+    private func selectFile(named filename: String, captureName: String, until review: XCUIElement) {
         openLocalFilesStorage()
         let stem = (filename as NSString).deletingPathExtension
         let file = app.cells.matching(NSPredicate(format: "label BEGINSWITH %@ OR label == %@ OR label BEGINSWITH %@",
             filename, stem, "\(stem),")).firstMatch
-        capture("33b-original-settings-file")
-        XCTAssertTrue(file.waitForExistence(timeout: 20), "Exported settings file not listed")
-        XCTAssertTrue(file.isEnabled, "Valid settings backup is disabled in Files")
-        let review = app.navigationBars["Review import"]
+        capture(captureName)
+        XCTAssertTrue(file.waitForExistence(timeout: 20), "\(filename) is missing from Files")
+        XCTAssertTrue(file.isEnabled, "\(filename) is disabled in Files")
         let open = app.navigationBars.buttons["Open"]
         func selectVisibleFile() -> Bool {
             // Prefer the thumbnail in grid mode, where the filename can sit
@@ -117,9 +119,16 @@ final class ElsepinBackupUITests: XCTestCase {
         // tap a stale file element after Files has already dismissed itself.
         if !opened, file.exists && file.isHittable { opened = selectVisibleFile() }
         if !opened {
-            capture("backup-file-selection-failure")
+            capture("\(captureName)-selection-failure")
             XCTFail("Selecting the original export did not open import review. \(app.debugDescription)")
         }
+    }
+    private func saveToLocalFiles() {
+        let export = app.navigationBars.buttons["Export"].firstMatch
+        if export.exists { export.tap() }
+        else { app.navigationBars.buttons["Save"].tap() }
+        let replace = app.buttons["Replace"].firstMatch
+        if replace.waitForExistence(timeout: 2) { replace.tap() }
     }
     private func expandSettings() {
         let group = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Settings ·'")).firstMatch
@@ -137,6 +146,49 @@ final class ElsepinBackupUITests: XCTestCase {
     private var importConfirmation: XCUIElement {
         app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@",
             "Import selected changes", "backup.review.apply")).firstMatch
+    }
+
+    func testGPXExportAndImportThroughNativeFiles() {
+        app = XCUIApplication()
+        app.launchArguments = ["--elsepin-ui-test"]
+        app.launchEnvironment["ELSEPIN_TEST_SCENARIO"] = "home-solid"
+        app.launch()
+        let libraryTab = app.buttons["navigation.library"]
+        XCTAssertTrue(libraryTab.waitForExistence(timeout: 20))
+        prepareFilesProvider(returningTo: libraryTab)
+        libraryTab.tap()
+        let routes = app.buttons["Routes"]
+        XCTAssertTrue(routes.waitForExistence(timeout: 10))
+        routes.tap()
+        let savedRoute = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Test botanical garden walking route'")).firstMatch
+        XCTAssertTrue(savedRoute.waitForExistence(timeout: 10))
+        savedRoute.tap()
+
+        let planner = app.navigationBars["Plan a route"]
+        XCTAssertTrue(planner.waitForExistence(timeout: 10))
+        XCTAssertTrue(visible(app.buttons["Save changes"]).isHittable)
+        visible(app.buttons["Options"]).tap()
+        visible(app.buttons["Export route"]).tap()
+        openLocalFilesStorage()
+        saveToLocalFiles()
+        XCTAssertTrue(app.navigationBars["FullDocumentManagerViewControllerNavigationBar"].waitForNonExistence(timeout: 10))
+
+        visible(app.buttons["Import GPX"]).tap()
+        let review = app.navigationBars["Import GPX"]
+        selectFile(named: "Elsepin-Route.gpx", captureName: "native-gpx-files", until: review)
+        XCTAssertTrue(app.staticTexts["3 points"].waitForExistence(timeout: 10))
+        let apply = app.buttons["gpx.apply"]
+        XCTAssertTrue(apply.isEnabled)
+        capture("native-gpx-review")
+        apply.tap()
+        XCTAssertTrue(review.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(planner.exists)
+        // Applying a GPX creates a new draft on the planner, separate from the
+        // saved Library entry used to export these coordinates.
+        let saveNew = app.buttons["Save route"]
+        for _ in 0..<5 where !saveNew.exists { app.swipeDown() }
+        XCTAssertTrue(saveNew.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Save changes"].exists)
     }
 
     func testSolidTabsLeaveSettingsAndPastedBackupReviewReachable() {
@@ -273,11 +325,7 @@ final class ElsepinBackupUITests: XCTestCase {
         capture("32-native-settings-export-picker")
         openLocalFilesStorage()
         capture("33-local-export-destination")
-        let exportButton = app.navigationBars.buttons["Export"].firstMatch
-        if exportButton.exists { exportButton.tap() }
-        else { app.navigationBars.buttons["Save"].tap() }
-        let replace = app.buttons["Replace"].firstMatch
-        if replace.waitForExistence(timeout: 2) { replace.tap() }
+        saveToLocalFiles()
         XCTAssertTrue(app.staticTexts["Backup exported."].waitForExistence(timeout: 10))
         app.buttons["Close backup test"].tap()
         var exported = try snapshot()

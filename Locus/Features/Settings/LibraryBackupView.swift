@@ -120,7 +120,7 @@ struct LibraryBackupView: View {
             case .failure(let error): message = error.localizedDescription
             }
         }
-        .fileImporter(isPresented: $input.isChoosingFile, allowedContentTypes: [.json, .text, .data, .item],
+        .fileImporter(isPresented: $input.isChoosingFile, allowedContentTypes: ImportFileTypes.backupImport,
             allowsMultipleSelection: false, onCompletion: input.picked,
             onCancellation: input.cancelledFileSelection)
         .fileDialogBrowserOptions(.displayFileExtensions)

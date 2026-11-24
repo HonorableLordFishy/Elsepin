@@ -16,20 +16,9 @@ enum BackupImportReader {
         return try decode(Data(text.utf8))
     }
 
-    static func file(_ url: URL) throws -> BackupImportPreview {
+    static func file(_ url: URL, using coordinatedRead: ImportFileReadCoordinator = .init()) throws -> BackupImportPreview {
         guard url.isFileURL else { throw BackupImportError.notFile }
-        #if canImport(Darwin)
-        var coordinationError: NSError?
-        var result: Result<BackupImportPreview, Error>?
-        NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readableURL in
-            result = Result { try readLocalFile(readableURL) }
-        }
-        if let coordinationError { throw coordinationError }
-        guard let result else { throw CocoaError(.fileReadUnknown) }
-        return try result.get()
-        #else
-        return try readLocalFile(url)
-        #endif
+        return try coordinatedRead.read(url, using: readLocalFile)
     }
 
     private static func readLocalFile(_ url: URL) throws -> BackupImportPreview {
