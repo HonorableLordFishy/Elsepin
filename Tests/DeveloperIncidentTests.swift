@@ -47,16 +47,23 @@ final class DeveloperIncidentTests: XCTestCase {
 
     func testRedactedPairingRecordsOnlyCountTheirExportedBytes() throws {
         let url = try folder().appendingPathComponent("events.jsonl")
-        let original = try line("notification_foreground_delivery", offset: 0, details: [
-            "id": "locus.pairing.pin", "body": String(repeating: "1", count: 1000), "title": "Pairing code"
-        ])
-        let redacted = try line("notification_foreground_delivery", offset: 0, details: ["id": "locus.pairing.pin"])
+        // Seed the historical on-disk format directly. The current recorder
+        // removes notification bodies before they ever reach this reader.
+        var record: [String: Any] = [
+            "timeMilliseconds": moment.timeIntervalSince1970 * 1000,
+            "event": "notification_foreground_delivery",
+            "details": ["id": "locus.pairing.pin", "body": String(repeating: "1", count: 1000), "title": "Pairing code"]
+        ]
+        let original = try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]) + Data([10])
+        record["details"] = ["id": "locus.pairing.pin"]
+        let redacted = try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]) + Data([10])
         let preserved = try line("ordinary_event", offset: 1, details: ["body": "retained"])
         try (original + preserved).write(to: url)
         let slice = try DeveloperIncident.read(from: url, around: moment, marker: "mine", maximumBytes: redacted.count + preserved.count)
         XCTAssertFalse(slice.truncated)
         XCTAssertEqual(slice.events, 2)
-        XCTAssertEqual(Array(slice.data.suffix(preserved.count)), Array(preserved))
+        XCTAssertEqual(slice.data, redacted + preserved)
+        XCTAssertGreaterThan(original.count, redacted.count)
     }
 
     func testStreamingAcrossChunksAndMalformedTailAreExplicit() throws {
