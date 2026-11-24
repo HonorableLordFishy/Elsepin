@@ -842,7 +842,6 @@ struct MapHomeView: View {
             if displayedRoute != nil {
                 mapButton(routeOverview == nil ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left",
                           label: routeOverview == nil ? "Route overview" : "Return to route detail") { toggleRouteOverview() }
-                    .accessibilityIdentifier("map.routeOverview")
             } else {
                 mapButton("pencil.tip", label: "Draw a route") { beginDrawing() }
             }

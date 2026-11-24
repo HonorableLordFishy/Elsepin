@@ -454,13 +454,14 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["validation.routeCameraLocation"].label, "Previous location held")
         let detailDistance = try XCTUnwrap(cameraValues().last)
 
-        let overview = app.buttons["map.routeOverview"]
-        XCTAssertEqual(overview.label, "Route overview")
+        let overview = app.buttons["Route overview"]
+        XCTAssertTrue(overview.waitForExistence(timeout: 5))
         overview.tap()
-        XCTAssertEqual(overview.label, "Return to route detail")
+        let returnToDetail = app.buttons["Return to route detail"]
+        XCTAssertTrue(returnToDetail.waitForExistence(timeout: 5))
         waitForCamera { offset, distance in offset > 400 && distance > detailDistance }
-        overview.tap()
-        XCTAssertEqual(overview.label, "Route overview")
+        returnToDetail.tap()
+        XCTAssertTrue(overview.waitForExistence(timeout: 5))
         waitForCamera { offset, distance in offset < 250 && abs(distance - detailDistance) < detailDistance * 0.1 }
         capture("route-camera-fit-round-trip")
     }

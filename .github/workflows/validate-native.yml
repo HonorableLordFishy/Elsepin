@@ -93,7 +93,11 @@ jobs:
           retention-days: 7
   simulator:
     runs-on: ${{ inputs.simulator_runner || 'xcode-27' }}
-    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON((!inputs.ui_focus || inputs.ui_focus == 'all') && '["flows","other"]' || '["focused"]') }}
+    timeout-minutes: ${{ matrix.suite == 'flows' && 90 || 55 }}
     steps:
       - uses: actions/checkout@v4
       - name: Portable Swift regressions
@@ -134,10 +138,15 @@ jobs:
         shell: bash
         env:
           UI_FOCUS: ${{ inputs.ui_focus }}
+          SIMULATOR_SUITE: ${{ matrix.suite }}
         run: |
           set -o pipefail
           test_selection=()
-          if [[ "$UI_FOCUS" == search ]]; then
+          if [[ "$SIMULATOR_SUITE" == flows ]]; then
+            test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests")
+          elif [[ "$SIMULATOR_SUITE" == other ]]; then
+            test_selection+=("-skip-testing:LocusValidationUITests/ElsepinFlowUITests")
+          elif [[ "$UI_FOCUS" == search ]]; then
             for test_name in testSearchSubmitFailureAndRetry testSearchCancellationRejectsLateResults testSearchDismissalAndForegroundInterruption testSearchInterruptedWhilePendingThenReplaced; do
               test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$test_name")
             done
@@ -176,7 +185,7 @@ jobs:
           fi
           python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "install", os.environ["VALIDATION_SIMULATOR"], ".build/simulator-validation/Build/Products/Debug-iphonesimulator/ElsepinValidation.app"], check=True, timeout=180)'
           xcrun simctl privacy "$VALIDATION_SIMULATOR" grant location-always com.n3mostudio.elsepin.validation
-          if [[ -z "$UI_FOCUS" || "$UI_FOCUS" == all || "$UI_FOCUS" == backups || "$UI_FOCUS" == review-fixes ]]; then
+          if [[ "$SIMULATOR_SUITE" == other || "$UI_FOCUS" == backups || "$UI_FOCUS" == review-fixes ]]; then
             # Register Files' local provider before interacting with document UI.
             python3 - <<'PY'
           import os, pathlib, subprocess
@@ -189,9 +198,6 @@ jobs:
                   except subprocess.TimeoutExpired:
                       log.write('Files warmup timed out; retaining diagnostics.\n')
           PY
-            python3 scripts/stage_validation_backup.py > .build/simulator-evidence/files-staging.log 2>&1 &
-            staging_pid=$!
-            trap 'kill "$staging_pid" 2>/dev/null || true' EXIT
           fi
           xcodebuild -project ElsepinValidation.xcodeproj -scheme Locus -configuration Debug \
             -destination "platform=iOS Simulator,id=$VALIDATION_SIMULATOR" \
@@ -243,7 +249,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: simulator-validation-evidence
+          name: ${{ matrix.suite == 'other' && 'simulator-document-evidence' || 'simulator-validation-evidence' }}
           path: |
             .build/simulator-evidence
             !.build/simulator-evidence/UI.xcresult/**

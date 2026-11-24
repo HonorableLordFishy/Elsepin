@@ -51,6 +51,17 @@ enum ValidationFixture {
         if scenario == "backup-settings", ProcessInfo.processInfo.arguments.contains("--preserve-backup-test-data") { return }
         // The validation bundle has its own sandbox and no App Group entitlement.
         // Every launch clears only that disposable sandbox, never the shipping app.
+        if scenario == "backup-settings" {
+            let manager = FileManager.default
+            let documents = manager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            do {
+                try manager.createDirectory(at: documents, withIntermediateDirectories: true)
+                let previousExports = try manager.contentsOfDirectory(at: documents, includingPropertiesForKeys: [.isRegularFileKey])
+                for file in previousExports where file.lastPathComponent.hasPrefix("Elsepin-Settings") && file.pathExtension == "json" {
+                    if try file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true { try manager.removeItem(at: file) }
+                }
+            } catch { preconditionFailure("Could not clear old disposable settings exports: \(error)") }
+        }
         UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.removeItem(at: support.appendingPathComponent("Locus"))

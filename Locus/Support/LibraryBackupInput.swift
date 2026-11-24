@@ -4,10 +4,8 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class LibraryBackupInput: ObservableObject {
-    @Published var isFilePickerPresented = false
     @Published private(set) var isChoosingFile = false
     @Published private(set) var state = BackupImportState()
-    private var pickedFile: BackupFileAccess?
     private var clipboardLoad: Progress?
     private var preparation: Task<Void, Never>?
 
@@ -15,33 +13,31 @@ final class LibraryBackupInput: ObservableObject {
         guard !isChoosingFile, !state.isLoading else { return }
         state.notice(nil)
         isChoosingFile = true
-        isFilePickerPresented = true
     }
 
     func picked(_ url: URL) {
         guard isChoosingFile else { return }
-        pickedFile = BackupFileAccess(url)
-        isFilePickerPresented = false
-    }
-
-    func dismissFilePicker() { isFilePickerPresented = false }
-
-    func filePickerDidDismiss() {
-        guard isChoosingFile else { return }
+        let access = BackupFileAccess(url)
         isChoosingFile = false
-        let access = pickedFile
-        pickedFile = nil
-        guard let access else {
-            state.notice("No file selected. Your previous preview is unchanged.")
-            return
-        }
-        // A fast read can finish immediately. Wait for the sheet to dismiss
-        // before decoding so its result can push Review on the same stack.
         guard let id = state.begin() else { return }
         prepare(id) {
             defer { withExtendedLifetime(access) {} }
             return try BackupImportReader.file(access.url)
         }
+    }
+
+    func cancelledFileSelection() {
+        endFileSelection(notice: "No file selected. Your previous preview is unchanged.")
+    }
+
+    func filePickerUnavailable() {
+        endFileSelection(notice: "Files couldn’t open. Tap Choose backup file to try again.")
+    }
+
+    private func endFileSelection(notice: String) {
+        guard isChoosingFile else { return }
+        isChoosingFile = false
+        state.notice(notice)
     }
 
     func paste(_ provider: NSItemProvider) {
@@ -85,37 +81,129 @@ final class LibraryBackupInput: ObservableObject {
 }
 
 struct BackupDocumentPicker: UIViewControllerRepresentable {
+    let isPresented: Bool
     let onPick: (URL) -> Void
     let onCancel: () -> Void
+    let onUnavailable: () -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick, onCancel: onCancel) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onPick: onPick, onCancel: onCancel, onUnavailable: onUnavailable)
+    }
+    func makeUIViewController(context: Context) -> UIViewController { UIViewController() }
 
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        // Ask for JSON explicitly and accept providers that identify the same
-        // bytes as generic text/data. Import mode returns a temporary copy.
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.json, .text, .data, .item], asCopy: true)
-        picker.delegate = context.coordinator
-        picker.allowsMultipleSelection = false
-        picker.shouldShowFileExtensions = true
-        return picker
+    func updateUIViewController(_ presenter: UIViewController, context: Context) {
+        if isPresented { context.coordinator.present(from: presenter) }
     }
 
-    func updateUIViewController(_ picker: UIDocumentPickerViewController, context: Context) {}
+    static func dismantleUIViewController(_ presenter: UIViewController, coordinator: Coordinator) {
+        coordinator.dismantle()
+    }
 
-    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+    @MainActor
+    final class Coordinator: NSObject, UIDocumentPickerDelegate, UIAdaptivePresentationControllerDelegate {
         let onPick: (URL) -> Void
         let onCancel: () -> Void
+        let onUnavailable: () -> Void
+        private var picker: UIDocumentPickerViewController?
+        private var presentationAttempt: Task<Void, Never>?
+        private var finishing = false
 
-        init(onPick: @escaping (URL) -> Void, onCancel: @escaping () -> Void) {
+        init(onPick: @escaping (URL) -> Void, onCancel: @escaping () -> Void, onUnavailable: @escaping () -> Void) {
             self.onPick = onPick
             self.onCancel = onCancel
+            self.onUnavailable = onUnavailable
+        }
+
+        func present(from presenter: UIViewController) {
+            guard picker == nil, presentationAttempt == nil else { return }
+            presentationAttempt = Task { @MainActor [weak self, weak presenter] in
+                guard let self else { return }
+                defer { presentationAttempt = nil }
+                // SwiftUI can update the anchor during attachment or while a
+                // previous presentation finishes. Allow that transition to settle.
+                for _ in 0..<6 {
+                    guard !Task.isCancelled else { return }
+                    if let presenter, presenter.viewIfLoaded?.window != nil,
+                       presenter.presentedViewController == nil, presenter.transitionCoordinator == nil {
+                        await showPicker(from: presenter)
+                        return
+                    }
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+                if !Task.isCancelled { onUnavailable() }
+            }
+        }
+
+        private func showPicker(from presenter: UIViewController) async {
+            // Ask for JSON explicitly and accept providers that identify the same
+            // bytes as generic text/data. Import mode returns a temporary copy.
+            let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.json, .text, .data, .item], asCopy: true)
+            self.picker = picker
+            picker.delegate = self
+            picker.allowsMultipleSelection = false
+            picker.shouldShowFileExtensions = true
+            presenter.present(picker, animated: true)
+            picker.presentationController?.delegate = self
+
+            // UIKit does not call a present completion if it refuses the
+            // presentation. Check that it actually installed this controller.
+            await Task.yield()
+            guard !Task.isCancelled, self.picker === picker, !finishing else { return }
+            if picker.presentingViewController == nil {
+                self.picker = nil
+                onUnavailable()
+            }
+        }
+
+        func dismantle() {
+            let wasChoosingFile = presentationAttempt != nil || picker != nil
+            presentationAttempt?.cancel()
+            presentationAttempt = nil
+            let activePicker = picker
+            picker = nil
+            activePicker?.delegate = nil
+            activePicker?.presentationController?.delegate = nil
+            if let activePicker, activePicker.presentingViewController != nil, !activePicker.isBeingDismissed {
+                activePicker.dismiss(animated: false)
+            }
+            // Representable teardown may occur inside a SwiftUI update.
+            if wasChoosingFile { Task { @MainActor in onCancel() } }
         }
 
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            if let url = urls.first { onPick(url) } else { onCancel() }
+            finish(controller, selection: urls.first)
         }
 
-        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { onCancel() }
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            finish(controller, selection: nil)
+        }
+
+        func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+            guard let picker, picker === presentationController.presentedViewController else { return }
+            finish(picker, selection: nil)
+        }
+
+        private func finish(_ controller: UIDocumentPickerViewController, selection: URL?) {
+            guard picker === controller, !finishing else { return }
+            finishing = true
+            let complete = { [self] in
+                guard picker === controller else { return }
+                if let selection { onPick(selection) } else { onCancel() }
+                picker = nil
+                finishing = false
+            }
+            // The picker may already be closing itself. Deliver its result
+            // after the actual UIKit transition so the Settings stack can push.
+            if controller.isBeingDismissed, let transition = controller.transitionCoordinator,
+               transition.animate(alongsideTransition: nil, completion: { _ in complete() }) {
+                return
+            }
+            if controller.presentingViewController != nil, !controller.isBeingDismissed {
+                controller.dismiss(animated: true, completion: complete)
+            } else {
+                complete()
+            }
+        }
     }
 }
 

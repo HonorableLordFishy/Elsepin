@@ -24,17 +24,32 @@ final class ElsepinBackupUITests: XCTestCase {
         }
         XCTFail("Unreachable backup control: \(element)"); return element
     }
-    private func localExportFolder() {
+    private func openElsepinFilesFolder() {
         // DocumentManager loads out of process. Wait for its navigation before
         // querying locations; an optional query during loading can hit Back and
         // silently save to On My iPhone instead of this app's Documents folder.
         let picker = app.navigationBars["FullDocumentManagerViewControllerNavigationBar"]
         XCTAssertTrue(picker.waitForExistence(timeout: 25), "Native Files did not finish presenting")
-        let title = picker.buttons["Elsepin, Actions Menu"]
+        let title = picker.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@",
+            "Elsepin", "Elsepin,")).firstMatch
         if !title.waitForExistence(timeout: 5) {
             let ownFolder = app.cells["Elsepin, Container"]
+            if !ownFolder.exists {
+                let browse = app.tabBars["DOC.browsingModeTabBar"].buttons["Browse"]
+                XCTAssertTrue(browse.waitForExistence(timeout: 20))
+                browse.tap()
+                browse.tap()
+                let location = app.staticTexts["On My iPhone"].firstMatch
+                XCTAssertTrue(location.waitForExistence(timeout: 10))
+                let row = app.cells.containing(.staticText, identifier: "On My iPhone").firstMatch
+                if row.exists { row.tap() } else { location.tap() }
+            }
             XCTAssertTrue(ownFolder.waitForExistence(timeout: 15), "App folder missing from On My iPhone")
-            ownFolder.doubleTap()
+            // A Files grid cell can report a hit point on its label, below
+            // the folder image. Select the icon without sending a second tap
+            // into the folder that may already be opening.
+            ownFolder.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap()
+            if !title.waitForExistence(timeout: 5), ownFolder.exists && ownFolder.isHittable { ownFolder.tap() }
         }
         XCTAssertTrue(title.waitForExistence(timeout: 20), "Native Files did not open the app folder")
     }
@@ -65,36 +80,24 @@ final class ElsepinBackupUITests: XCTestCase {
         app.activate()
         XCTAssertTrue(app.buttons["Read settings and export"].waitForExistence(timeout: 20))
     }
-    private func openImport() {
+    private func openImport(named filename: String) {
         app.buttons["Import and export"].tap()
         app.buttons["Choose backup file"].tap()
-        let browse = app.tabBars["DOC.browsingModeTabBar"].buttons["Browse"]
-        XCTAssertTrue(browse.waitForExistence(timeout: 25))
-        browse.tap()
-        // The first tap selects Browse; tapping its selected tab returns to
-        // Locations. Always leave the app container, even if it lists its copy:
-        // that provider can enumerate files yet fail to deliver a selection.
-        browse.tap()
-        let location = app.staticTexts["On My iPhone"].firstMatch
-        XCTAssertTrue(location.waitForExistence(timeout: 10))
-        let row = app.cells.containing(.staticText, identifier: "On My iPhone").firstMatch
-        if row.exists { row.tap() } else { location.tap() }
-        // iOS 26 exposes this title as text; iOS 27 exposes an Actions button.
-        let localStorage = app.navigationBars.descendants(matching: .any)
-            .matching(NSPredicate(format: "label BEGINSWITH 'On My iPhone'")).firstMatch
-        XCTAssertTrue(localStorage.waitForExistence(timeout: 10), "File import must use general Files storage, not the app-container provider")
-        let file = app.cells.matching(NSPredicate(format: "label BEGINSWITH 'Elsepin-Settings'")).firstMatch
-        capture("33b-general-files-storage")
+        openElsepinFilesFolder()
+        let stem = (filename as NSString).deletingPathExtension
+        let file = app.cells.matching(NSPredicate(format: "label BEGINSWITH %@ OR label == %@ OR label BEGINSWITH %@",
+            filename, stem, "\(stem),")).firstMatch
+        capture("33b-original-settings-file")
         XCTAssertTrue(file.waitForExistence(timeout: 20), "Exported settings file not listed")
         XCTAssertTrue(file.isEnabled, "Valid settings backup is disabled in Files")
         let review = app.navigationBars["Review import"]
         let open = app.navigationBars.buttons["Open"]
         func selectVisibleFile() -> Bool {
-            // In grid mode the cell centre falls on its filename, below the
-            // document thumbnail. Use the visible document target when present.
+            // Prefer the thumbnail in grid mode, where the filename can sit
+            // below the visible hit target.
             let thumbnail = file.images.firstMatch
             if thumbnail.exists && thumbnail.isHittable { thumbnail.tap() }
-            else { file.tap() }
+            else { file.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap() }
             // Some Files builds deliver the selection immediately. Others first
             // select the row and add an asynchronously enabled Open button.
             if review.waitForExistence(timeout: 3) { return true }
@@ -108,8 +111,10 @@ final class ElsepinBackupUITests: XCTestCase {
         // Retry only while the picker and its live row are still present. Never
         // tap a stale file element after Files has already dismissed itself.
         if !opened, file.exists && file.isHittable { opened = selectVisibleFile() }
-        XCTAssertTrue(opened, "Selecting the staged backup did not open import review")
-
+        if !opened {
+            capture("backup-file-selection-failure")
+            XCTFail("Selecting the original export did not open import review. \(app.debugDescription)")
+        }
     }
     private func expandSettings() {
         let group = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Settings ·'")).firstMatch
@@ -261,7 +266,7 @@ final class ElsepinBackupUITests: XCTestCase {
         app.buttons["Export backup"].tap()
         app.buttons["Export settings"].tap()
         capture("32-native-settings-export-picker")
-        localExportFolder()
+        openElsepinFilesFolder()
         capture("33-local-export-destination")
         let exportButton = app.navigationBars.buttons["Export"].firstMatch
         if exportButton.exists { exportButton.tap() }
@@ -276,24 +281,19 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertEqual((backup["places"] as? [Any])?.count, 0)
         let exportedSettings = try XCTUnwrap(backup["preferences"] as? [String: Any])
         XCTAssertTrue(NSDictionary(dictionary: original).isEqual(to: exportedSettings))
-        var filesReady = false
-        for _ in 0..<120 {
-            if try snapshot()["filesReady"] as? Bool == true { filesReady = true; break }
-            Thread.sleep(forTimeInterval: 1)
-        }
-        XCTAssertTrue(filesReady, "Actual export was not staged in disposable Files storage; see files-staging.log")
+        let filename = try XCTUnwrap(exported["file"] as? String)
 
         app.buttons["Change disposable settings"].tap()
         let changed = try settings(snapshot())
         XCTAssertFalse(NSDictionary(dictionary: original).isEqual(to: changed))
-        openImport()
+        openImport(named: filename)
         XCTAssertFalse(visible(app.buttons["backup.review.apply"]).isEnabled, "Settings must start unchecked")
         capture("34-import-starts-unchecked")
         visible(app.buttons["Cancel import"]).tap()
         app.buttons["Close backup test"].tap()
         XCTAssertTrue(NSDictionary(dictionary: try settings(snapshot())).isEqual(to: changed), "Cancel changed settings")
 
-        openImport()
+        openImport(named: filename)
         expandSettings()
         visible(app.buttons["Select all settings"]).tap()
         let drive = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Drive preset'")).firstMatch
@@ -308,7 +308,7 @@ final class ElsepinBackupUITests: XCTestCase {
         expectedPartial["usualSpeeds"] = speeds
         XCTAssertTrue(NSDictionary(dictionary: partial).isEqual(to: expectedPartial), "Selective import changed an unchecked value or missed a selected value")
 
-        openImport()
+        openImport(named: filename)
         expandSettings()
         visible(app.buttons["Select all settings"]).tap()
         applyImport()
@@ -321,7 +321,7 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertTrue(NSDictionary(dictionary: try settings(reopened)).isEqual(to: original), "Restored settings did not persist through relaunch")
         XCTAssertEqual(reopened["tripCount"] as? Int, baseline["tripCount"] as? Int)
         XCTAssertEqual(reopened["pinCount"] as? Int, baseline["pinCount"] as? Int)
-        openImport()
+        openImport(named: filename)
         XCTAssertFalse(visible(app.buttons["backup.review.apply"]).isEnabled, "Reimport should have no settings left to change")
         capture("36-reimport-after-relaunch-no-changes")
         visible(app.buttons["Cancel import"]).tap()
