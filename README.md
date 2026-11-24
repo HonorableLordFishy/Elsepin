@@ -2,7 +2,7 @@
 
 Development repository for Elsepin, the continuation of Shift.
 
-**Current test build on main is 2.6.1 (95).** Build 95 protects pairing codes, checks saved-trip data before exporting a backup, and keeps recovery and route edits tied to the selection you confirmed. The [build record](docs/BUILD-HISTORY.md) includes the source revision and simulator results.
+**Current test build on main is 2.6.1 (96).** Build 96 imports backups and GPX routes through Files, offers path choices in the leg editor, and uses your usual movement speed on the joystick. The [build record](docs/BUILD-HISTORY.md) includes the verified IPA and simulator results.
 
 **Public release: [2.6.1 (89)](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/v2.6.1).** Build 89 uses the official update channel with build 88's features and fixes. Prism Jumpgate remains the primary icon; the app has eight themes and thirteen icon choices.
 

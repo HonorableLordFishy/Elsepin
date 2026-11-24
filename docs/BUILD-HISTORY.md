@@ -1,5 +1,13 @@
 # Elsepin build history
 
+## Build 96 - 24 November 2026
+
+The [IPA build](https://github.com/HonorableLordFishy/Elsepin/actions/runs/45472841623) packaged revision `35308addd7372bfe0f08eb17feb1b5fa8f5622cd`. The app and Live Activity extension both report 2.6.1 (96). The verified IPA is 19,510,413 bytes. SHA-256 is `c8857b12bb794f78f08c64b91ffee6dd1ed793f1ac5801c4736d78c9d6b303ae`. Both helper archives matched their source files and the package has all 13 icon choices.
+
+The [full native run](https://github.com/HonorableLordFishy/Elsepin/actions/runs/45456329877) passed 665 Swift tests, the production compile, helper and resource checks, and 44 of 45 distinct simulator scenarios. Native Files exported and reopened real JSON and GPX documents. JSON selection persisted after relaunch, and the GPX import created a new route draft. One UI query passed on retry. The last scenario stopped at a subpixel rounding difference between adjacent accessibility rows. The [focused recheck](https://github.com/HonorableLordFishy/Elsepin/actions/runs/45470647933) passed the complete scenario, including mode changes and Back. Only test and CI files changed between validation revisions. All 45 scenarios passed across the two runs on the packaged app code.
+
+The Downloads and Desktop IPA copies matched the artifact digest. The Downloads folder also contains the single-loop and two-section GPX examples. Physical iPhone checks remain for the signing setup, icon switching, live device movement and the user's Files provider.
+
 ## Build 95 - 23 November 2026
 
 **2.6.1 (95)** was built from `de76461562523a5aee1b8b6317df446025372e72`. Independent higher-model review led to rechecking the saved-trip file at export time and checking the session generation throughout a route edit. The first native run exposed a nondeterministic test that used the new log recorder to create an old-format fixture. The passing revision seeds the historical record directly.

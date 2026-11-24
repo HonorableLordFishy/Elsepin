@@ -1,4 +1,9 @@
-# Current update - build 95, 23 November 2026
+# Current update - build 96, 24 November 2026
+
+Build 96 is the current device-test IPA. Files import passed for JSON and GPX on an iPhone 17 simulator. The inline leg path control passed at standard and largest accessibility text sizes. The [build history](BUILD-HISTORY.md) records all 45 UI scenarios, the focused recheck, the package digest and remaining physical-device checks. The official release is 2.6.1 (89).
+
+---
+# Prior update - build 95, 23 November 2026
 
 Build 95 includes the six reviewed fixes for pairing logs and notification expiry, Nearby disconnects, trip backup failures, route replacement during Add stop, and exact-copy recovery. Source `de76461562523a5aee1b8b6317df446025372e72` passed native validation and IPA packaging. See the [build history](BUILD-HISTORY.md) for the runs, counts and artifact digest.
 

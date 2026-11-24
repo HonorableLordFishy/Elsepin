@@ -1,6 +1,6 @@
 # Elsepin changelog
 
-Updated through **23 November 2026**, including test build 95 and official build 89.
+Updated through **24 November 2026**, including test build 96 and official build 89.
 **Public release: [2.6.1 (89)](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/v2.6.1).**
 
 [What's new in 2.6.1](docs/CHANGES-SINCE-2.6.0.md) · [Build history](docs/BUILD-HISTORY.md) · [Setup](SETUP.md)
