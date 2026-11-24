@@ -14,13 +14,12 @@ import UIKit
     @Published var tint: SavedPlaceTint
     @Published var emoji: String
     @Published var usesCustomEmoji: Bool
-    @Published var address: String?
     init(place: SavedPlace?, center: CLLocationCoordinate2D?, selectedCoordinate: CLLocationCoordinate2D? = nil) {
         existing = place; self.center = center; name = place?.name ?? ""
         // Merely centering the map must not create a selected pin.
         coordinate = place?.coordinate ?? selectedCoordinate
         favorite = place?.isFavorite ?? false; symbol = place?.symbol ?? .pin; tint = place?.tint ?? .mint
-        emoji = place?.emoji ?? ""; address = place?.address
+        emoji = place?.emoji ?? ""
         usesCustomEmoji = place?.emoji != nil
     }
     var canSave: Bool {
@@ -188,19 +187,26 @@ struct PinEditor: View {
         if let retainedCamera { position = .camera(retainedCamera) }
     }
     private func select(_ coordinate: CLLocationCoordinate2D) {
-        draft.address = nil; draft.coordinate = coordinate
+        draft.coordinate = coordinate
     }
     private func save() {
         guard draft.canSave, let coordinate = draft.coordinate else { return }
         guard draft.workspaceGeneration == AppDataWorkspace.shared.context.generation else {
             error = "Your library changed. Close this editor and reopen the pin."; return
         }
-        if let existing = draft.existing, !session.savedPins.contains(existing) {
-            error = "This pin changed or was removed. Close the editor and reopen it."; return
+        if var existing = draft.existing {
+            guard let current = session.savedPin(at: existing.coordinate) else {
+                error = "This pin changed or was removed. Close the editor and reopen it."; return
+            }
+            // An address refresh is independent of the fields in this editor.
+            existing.address = current.address
+            guard existing == current else {
+                error = "This pin changed or was removed. Close the editor and reopen it."; return
+            }
         }
         guard session.savePin(name: draft.name, coordinate: coordinate, favorite: draft.favorite,
                               icon: draft.symbol, tint: draft.tint, replaceName: true,
-                              address: draft.address, emoji: draft.emoji, replacingID: draft.existing?.id) else {
+                              emoji: draft.emoji, replacingID: draft.existing?.id) else {
             error = session.lastError ?? "Couldn't save this pin."; return
         }
         if let existing = draft.existing, existing.name != draft.name,

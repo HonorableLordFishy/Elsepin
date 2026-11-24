@@ -16,6 +16,10 @@ struct LibraryBackupView: View {
     @State private var message: String?
     @State private var showingJSONSite = false
 
+    private var inputUnavailable: Bool {
+        input.state.isLoading || input.isChoosingFile || preparingExport != nil || exporting || confirmExport || showingJSONSite
+    }
+
     var body: some View {
         List {
             Section {
@@ -24,29 +28,27 @@ struct LibraryBackupView: View {
                         ShiftSettingsIcon(symbol: "doc")
                         Text("Choose backup file").foregroundStyle(.primary)
                     }.frame(minHeight: 44)
-                }.disabled(input.state.isLoading || preparingExport != nil)
+                }.disabled(inputUnavailable)
                 HStack(spacing: 12) {
                     ShiftSettingsIcon(symbol: "doc.on.clipboard")
                     Text("Paste backup text")
                     Spacer(minLength: 8)
-                    PasteButton(payloadType: String.self) { strings in message = nil; input.paste(strings) }
-                        .labelStyle(.titleOnly).accessibilityLabel("Paste backup text")
-                        .accessibilityHint("Analyze copied JSON and review individual changes before importing.")
-                        .disabled(input.state.isLoading || input.isChoosingFile || preparingExport != nil)
+                    BackupPasteControl { provider in message = nil; input.paste(provider) }
+                        .disabled(inputUnavailable)
                 }.frame(minHeight: 44)
                 if input.state.isLoading { ProgressView("Analyzing backup…") }
                 if input.state.preview != nil {
                     Button("Review selected backup") { reviewing = true }.frame(minHeight: 44)
-                        .disabled(input.state.isLoading || preparingExport != nil)
+                        .disabled(inputUnavailable)
                 }
             } header: { Text("Import settings, routes & areas") } footer: {
-                Text("Open [json.site](https://json.site), copy the JSON, then tap Done and Paste here.")
+                Text("Choose a backup from Files or paste its JSON. [Optional online JSON viewer](https://json.site).")
                     .font(.footnote).foregroundStyle(.secondary)
                     // Intercept only this help link. Safari never receives backup
                     // contents from the app; choosing a file and copying are manual.
                     .environment(\.openURL, OpenURLAction { url in
                         guard url == BackupJSONBrowser.siteURL else { return .systemAction }
-                        guard !input.state.isLoading, !input.isChoosingFile, !exporting, !confirmExport, preparingExport == nil else { return .handled }
+                        guard !inputUnavailable else { return .handled }
                         showingJSONSite = true
                         return .handled
                     })
@@ -78,7 +80,7 @@ struct LibraryBackupView: View {
                         ShiftSettingsIcon(symbol: "square.and.arrow.up")
                         Text("Export backup").foregroundStyle(.primary)
                     }.frame(minHeight: 44)
-                }.disabled(preparingExport != nil)
+                }.disabled(inputUnavailable)
                 if preparingExport != nil { ProgressView("Preparing backup…") }
             } header: { Text("Export a backup") } footer: {
                 Text("Save everything together, or choose settings or your saved library.")
@@ -111,20 +113,17 @@ struct LibraryBackupView: View {
                 message = nil
                 preparingExport = exportScope
             }
-        } message: { Text("This readable file can include the selected settings, saved locations, routes and area boundaries. Pairing files and helper keys are excluded.") }
+        } message: { Text("Anyone with this file can read the settings and places you include. Pairing files and helper keys stay private.") }
         .fileExporter(isPresented: $exporting, document: document, contentType: .json, defaultFilename: exportName) { result in
             switch result {
             case .success: message = "Backup exported."
             case .failure(let error): message = error.localizedDescription
             }
         }
-        // Native presentation owns the Files lifecycle. Accept file items even
-        // when a provider does not classify JSON as public.data; the bounded
-        // content validator still rejects folders and unrelated/invalid files.
-        .fileImporter(isPresented: $input.isFilePickerPresented, allowedContentTypes: [.item],
-            allowsMultipleSelection: false, onCompletion: input.picked,
-            onCancellation: input.cancelledFileSelection)
-        .fileDialogBrowserOptions(.displayFileExtensions)
+        .sheet(isPresented: $input.isFilePickerPresented, onDismiss: input.filePickerDidDismiss) {
+            BackupDocumentPicker(onPick: input.picked, onCancel: input.dismissFilePicker)
+                .ignoresSafeArea()
+        }
         .sheet(isPresented: $showingJSONSite) {
             BackupJSONBrowser()
         }

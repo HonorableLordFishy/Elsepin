@@ -9,6 +9,14 @@ Earlier entries describe their original development checkpoints. A later build m
 supersede a pending check or an intermediate behavior. The build history records
 successful packages separately from failed attempts and simulator/device evidence.
 
+## Build 96 - phone feedback (23 November 2026)
+
+- Hold the current teleport marker to choose its symbol. Joystick movement starts at the usual speed for its mode. An address can use more lines when it wraps.
+- Starting a route focuses its start or checkpoint. Fit toggles back to detail. Along-route search samples both ends and the middle and makes room for matches across the trip.
+- Import using Files or paste JSON, review the additions, and confirm from the Import button. The solid tab bar reserves space for the last control on pushed screens.
+- Icon changes account for delayed system updates. Leg movement shows the old and new mode. Reset review separates what is erased from what you keep.
+- Try the [single-loop GPX](Samples/GPX/Garden-loop.gpx) and [two-section GPX](Samples/GPX/Waterfront-sections.gpx) from Files.
+
 ## Build 95 - pairing privacy, backups and route editing (23 November 2026)
 
 - Pairing notification logs keep delivery metadata. Diagnostic exports also redact PINs from earlier pairing notifications. PIN notification cleanup runs independently of Live Activities and checks for stale alerts when the app reopens.

@@ -15,6 +15,9 @@ final class SessionPreferences: ObservableObject {
     @Published var showLife360Status: Bool { didSet { save(showLife360Status, "showLife360Status") } }
     @Published var showSavedPinsOnMap: Bool { didSet { save(showSavedPinsOnMap, "showSavedPinsOnMap") } }
     @Published var showNamedAreasOnMap: Bool { didSet { save(showNamedAreasOnMap, "showNamedAreasOnMap") } }
+    @Published var heldLocationSymbol: HeldLocationSymbol {
+        didSet { defaults.set(heldLocationSymbol.rawValue, forKey: HeldLocationSymbol.preferenceKey) }
+    }
     @Published var mapPinSize: Double {
         didSet {
             let value = MapPinSize.bounded(mapPinSize)
@@ -128,6 +131,7 @@ final class SessionPreferences: ObservableObject {
         showLife360Status = defaults.bool(forKey: "locus.showLife360Status")
         showSavedPinsOnMap = defaults.bool(forKey: "locus.showSavedPinsOnMap")
         showNamedAreasOnMap = defaults.bool(forKey: "locus.showNamedAreasOnMap")
+        heldLocationSymbol = HeldLocationSymbol.stored(in: defaults)
         mapPinSize = MapPinSize.bounded((defaults.object(forKey: "locus.mapPinSize") as? Double) ?? MapPinSize.defaultValue)
         mapPinVisibilityMiles = SavedPinVisibility.boundedMiles((defaults.object(forKey: "locus.mapPinVisibilityMiles") as? Double) ?? SavedPinVisibility.defaultMiles)
         connectionAlerts = defaults.bool(forKey: "locus.connectionAlerts")
@@ -154,6 +158,7 @@ final class SessionPreferences: ObservableObject {
         islandProgress = fresh.islandProgress; islandTimer = fresh.islandTimer
         showFindMyStatus = fresh.showFindMyStatus; showLife360Status = fresh.showLife360Status
         showSavedPinsOnMap = fresh.showSavedPinsOnMap; showNamedAreasOnMap = fresh.showNamedAreasOnMap
+        heldLocationSymbol = fresh.heldLocationSymbol
         mapPinSize = fresh.mapPinSize
         mapPinVisibilityMiles = fresh.mapPinVisibilityMiles
         appearanceOverrides = fresh.appearanceOverrides; connectionAlerts = fresh.connectionAlerts

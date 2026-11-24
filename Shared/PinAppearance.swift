@@ -1,5 +1,36 @@
 import Foundation
 
+enum HeldLocationSymbol: String, CaseIterable, Identifiable {
+    case automatic, location, person, walking, star
+
+    static let preferenceKey = "locus.heldLocationSymbol"
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .automatic: return "Automatic"
+        case .location: return "Location arrow"
+        case .person: return "Person"
+        case .walking: return "Walking figure"
+        case .star: return "Star"
+        }
+    }
+
+    func icon(travelMode: TravelMode) -> String {
+        switch self {
+        case .automatic: return travelMode.icon
+        case .location: return "location.fill"
+        case .person: return "person.fill"
+        case .walking: return "figure.walk"
+        case .star: return "star.fill"
+        }
+    }
+
+    static func stored(in defaults: UserDefaults) -> Self {
+        defaults.string(forKey: preferenceKey).flatMap(Self.init(rawValue:)) ?? .automatic
+    }
+}
+
 enum PinAppearance {
     /// Reject invalid edits before the native text field displays them. Choosing
     /// another emoji replaces the current symbol instead of appending a second.

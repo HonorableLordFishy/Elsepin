@@ -129,6 +129,11 @@ struct ShiftIconSelection: Codable, Equatable, Hashable, Identifiable, Sendable 
     static var all: [Self] {
         ShiftIconDesign.allCases.flatMap { design in design.finishes.map { Self(design: design, finish: $0) } }
     }
+    // UIKit's completion and SpringBoard's installed-name read can arrive in either order.
+    func changeSucceeded(reportedError: Bool, installedName: String?) -> Bool {
+        !reportedError || Self.installed(named: installedName) == self
+    }
+
     static func installed(named name: String?) -> Self? {
         guard let name else { return Self() }
         return all.first { $0.assetName == name }

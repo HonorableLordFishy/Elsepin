@@ -402,10 +402,10 @@ private struct DeviceOriginSheet: View {
             List {
                 Section {
                     Text(session.hasSession
-                         ? "Your phone may report the fake location while spoofing. This option uses the device location saved before you started. It might be old—check the time below."
+                         ? "During spoofing, use the location recorded before you started. Check its age below."
                          : "Uses the latest location your phone reports.")
                     if session.hasSession {
-                        Text("This only chooses where the route starts. It doesn't stop or move your current spoof. You can also search for your real starting address.")
+                        Text("Choosing a start leaves your current session running.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     ForegroundTimeline { context in
@@ -428,7 +428,7 @@ private struct DeviceOriginSheet: View {
                                 }.buttonStyle(.borderless)
                             }
                         } else if session.hasSession {
-                            Text("No earlier device location was saved. Go back and search for your starting address instead.")
+                            Text("No earlier location is available. Search for your starting address.")
                                 .foregroundStyle(.secondary)
                         } else if waitedForFix {
                             Text("Your phone hasn't sent a fresh location yet. Allow Location access for Elsepin in iPhone settings, or search for your address.")

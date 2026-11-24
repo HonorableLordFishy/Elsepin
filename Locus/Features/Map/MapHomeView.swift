@@ -52,6 +52,7 @@ struct MapHomeView: View {
     @State private var drawTool = DrawTool.points
     @State private var followMovement = true
     @State private var lastCameraUpdate = Date.distantPast
+    @State private var routeOverview: (detail: MapCameraPosition, followedLocation: Bool)?
     @State private var selection: RouteSeek?
     // Correlates discrete diagnostic events only; never drives route movement.
     @State private var markerTrace: RouteDiagnosticAttempt?
@@ -69,6 +70,7 @@ struct MapHomeView: View {
 #if ELSEPIN_UI_TESTING
     // Only the small test overlay observes this object, never the map itself.
     @State private var pinVisibilityProbe = ValidationPinVisibilityProbe()
+    @State private var validationRouteCamera = ""
 #endif
 
     private var visualUpdatesEnabled: Bool {
@@ -112,24 +114,46 @@ struct MapHomeView: View {
         session.activeRoute != nil && !planner.isDrawing && session.canEditRouteMovement && !session.status.isDropped
     }
     private var canAdjustPin: Bool {
-        session.pin != nil && session.journey == nil && planner.preparedRoute == nil && !planner.isDrawing && !session.isBusy
+        guard let pin = session.pin else { return false }
+        return !overlapsHeldLocation(pin) && session.journey == nil && planner.preparedRoute == nil && !planner.isDrawing && !session.isBusy
     }
     private var canPlacePin: Bool {
         MapPinPlacement.allowed(hasJourney: session.journey != nil, hasPreparedRoute: planner.preparedRoute != nil,
                                 drawing: planner.isDrawing, adjusting: pinAdjusting)
     }
     private var shownPin: CLLocationCoordinate2D? { adjustedPin ?? session.pin }
+
+    private var heldLocation: CLLocationCoordinate2D? {
+        guard visualUpdatesEnabled, session.isSpoofing, session.journey == nil, !session.joystickActive else { return nil }
+        return session.simulated
+    }
+
+    private func overlapsHeldLocation(_ coordinate: CLLocationCoordinate2D) -> Bool {
+        guard let heldLocation else { return false }
+        return RoutePoint(coordinate).distance(to: RoutePoint(heldLocation)) < 1
+    }
+
+    private var displayedSavedPins: [SavedPlace] {
+        guard let heldLocation else { return visibleSavedPins }
+        let heldPoint = RoutePoint(heldLocation)
+        return visibleSavedPins.filter { RoutePoint($0.coordinate).distance(to: heldPoint) >= 1 }
+    }
+
+    private func hasVisibleSavedSymbol(at coordinate: CLLocationCoordinate2D) -> Bool {
+        guard preferences.showSavedPinsOnMap else { return false }
+        let point = RoutePoint(coordinate)
+        return displayedSavedPins.contains { RoutePoint($0.coordinate).distance(to: point) < 1 }
+    }
+
     private func pinStyle(at coordinate: CLLocationCoordinate2D) -> SavedPlace? {
         session.savedPins.first { RoutePoint($0.coordinate).distance(to: RoutePoint(coordinate)) <= 5 }
     }
 
     private func pinAdjustmentGesture(onSavedSymbol: Bool = false) -> MapPinAdjustmentGesture {
         // Use the same visibility/distance rule as the selected marker below.
-        let usesSavedSymbol = preferences.showSavedPinsOnMap && session.pin.map { coordinate in
-            visibleSavedPins.contains { RoutePoint($0.coordinate).distance(to: RoutePoint(coordinate)) < 1 }
-        } == true
+        let usesSavedSymbol = session.pin.map { hasVisibleSavedSymbol(at: $0) } == true
         return MapPinAdjustmentGesture(enabled: canAdjustPin && usesSavedSymbol == onSavedSymbol, pin: session.pin,
-            savedSymbolSize: usesSavedSymbol ? preferences.mapPinSize : nil,
+            savedSymbolSize: usesSavedSymbol ? preferences.mapPinSize : nil, heldLocation: heldLocation,
             onBegan: {
                 pinAdjustmentCamera = sketchViewport.camera?.copy() as? MKMapCamera
                 pinAdjusting = true
@@ -163,7 +187,7 @@ struct MapHomeView: View {
         }
         if visualUpdatesEnabled { UserAnnotation() }
         if preferences.showSavedPinsOnMap, !planner.isDrawing {
-            ForEach(visibleSavedPins) { pin in
+            ForEach(displayedSavedPins) { pin in
                 Annotation("", coordinate: pin.coordinate, anchor: .center) {
                     SavedPinMapIcon(pin: pin, selected: selectedSavedPin == pin.id,
                         pinSize: preferences.mapPinSize,
@@ -204,8 +228,8 @@ struct MapHomeView: View {
                 Marker("Route start", systemImage: "circle", coordinate: route.origin.coordinate).tint(.secondary)
             }
         }
-        // Hiding saved pins must never hide the currently selected destination.
-        if let pin = shownPin, (!preferences.showSavedPinsOnMap || !visibleSavedPins.contains(where: { RoutePoint($0.coordinate).distance(to: RoutePoint(pin)) < 1 })), (session.pinIsPreview || (session.journey == nil && planner.preparedRoute == nil)), !planner.isDrawing {
+        if let pin = shownPin, !overlapsHeldLocation(pin), !hasVisibleSavedSymbol(at: pin),
+           (session.pinIsPreview || (session.journey == nil && planner.preparedRoute == nil)), !planner.isDrawing {
             Marker("", systemImage: pinStyle(at: pin)?.symbol.rawValue ?? "mappin",
                    coordinate: pin).tint(pinStyle(at: pin)?.tint.swatch ?? LocusTheme.accentSecondary)
         }
@@ -214,13 +238,48 @@ struct MapHomeView: View {
                 .tint(.secondary)
         }
         if let simulated = session.simulated {
-            Annotation("Last simulated location", coordinate: simulated) {
-                Image(systemName: session.travelMode.icon)
-                    .font(.headline).foregroundStyle(LocusTheme.onAccent)
-                    .frame(width: 38, height: 38).background(LocusTheme.accent, in: Circle())
-                    .overlay(Circle().stroke(.white, lineWidth: 3)).shadow(radius: 3)
+            Annotation("Last simulated location", coordinate: simulated, anchor: .center) {
+                if let heldLocation {
+                    heldLocationMarker(at: heldLocation)
+                } else {
+                    simulatedMarker(icon: session.travelMode.icon)
+                }
             }
         }
+    }
+
+    private func simulatedMarker(icon: String) -> some View {
+        Image(systemName: icon)
+            .font(.headline).foregroundStyle(LocusTheme.onAccent)
+            .frame(width: 38, height: 38).background(LocusTheme.accent, in: Circle())
+            .overlay(Circle().stroke(.white, lineWidth: 3)).shadow(radius: 3)
+    }
+
+    private func heldLocationMarker(at coordinate: CLLocationCoordinate2D) -> some View {
+        let selected = preferences.heldLocationSymbol
+        let mode = session.travelMode
+        let generation = session.commandGeneration
+        let workspace = AppDataWorkspace.shared.context.generation
+        return simulatedMarker(icon: selected.icon(travelMode: mode))
+            .frame(width: MapPinHitArea.heldLocationSide, height: MapPinHitArea.heldLocationSide)
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Held location marker")
+            .accessibilityValue(selected.title)
+            .accessibilityHint("Touch and hold to change the symbol.")
+            .accessibilityIdentifier("map.heldLocationMarker")
+            .contextMenu {
+                ForEach(HeldLocationSymbol.allCases) { symbol in
+                    Button {
+                        guard session.commandGeneration == generation,
+                              AppDataWorkspace.shared.context.generation == workspace,
+                              let current = heldLocation, RoutePoint(current) == RoutePoint(coordinate) else { return }
+                        preferences.heldLocationSymbol = symbol
+                    } label: {
+                        Label(symbol.title, systemImage: selected == symbol ? "checkmark" : symbol.icon(travelMode: mode))
+                    }
+                }
+            }
     }
 
     private var baseMap: some View {
@@ -246,6 +305,10 @@ struct MapHomeView: View {
                 refreshSavedPins(session.savedPins)
 #if ELSEPIN_UI_TESTING
                 if ValidationFixture.scenario == "map-pins" { pinVisibilityProbe.didSettle() }
+                if ValidationFixture.scenario == "route-camera", context.camera.distance.isFinite {
+                    let offset = RoutePoint(context.camera.centerCoordinate).distance(to: RoutePoint(ValidationFixture.points[0]))
+                    validationRouteCamera = "\(offset),\(context.camera.distance)"
+                }
 #endif
                 DeveloperLogStore.shared.record("map_viewport_settled", [
                     "style": String(session.mapStyleIndex), "distance": String(context.camera.distance),
@@ -276,6 +339,10 @@ struct MapHomeView: View {
                         Text(session.simulated == nil ? "No location sent" : "Location sent")
                             .accessibilityIdentifier("validation.pinCommand")
                     }.font(.caption).padding(.top, 280).allowsHitTesting(false)
+                } else if ValidationFixture.scenario == "route-camera" {
+                    Text(validationRouteCamera).font(.caption)
+                        .accessibilityIdentifier("validation.routeCamera")
+                        .padding(.top, 210).allowsHitTesting(false)
                 }
             }
             .overlay(alignment: .topLeading) {
@@ -346,7 +413,7 @@ struct MapHomeView: View {
     }
 
     private var pinTapGesture: MapPinTapGesture {
-        MapPinTapGesture(enabled: canPlacePin) { coordinate in
+        MapPinTapGesture(enabled: canPlacePin, heldLocation: heldLocation) { coordinate in
             guard canPlacePin else { return }
             followMovement = false
             DeveloperLogStore.shared.record("map_pin_input", ["projection": "native map"])
@@ -524,15 +591,24 @@ struct MapHomeView: View {
             routeTouchMap.map = nil
             markerDragging = false
             snapIndex = session.activeRoute.map { (routeID: $0.id, index: RouteSnapIndex(track: $0.track)) }
-            if id != nil { followMovement = true; centerOnLocation() }
+            if id != nil {
+                routeOverview = nil
+                followMovement = true
+                centerOnLocation()
+            }
         }
         .onChange(of: session.commandGeneration) { _, _ in dismissStaleRouteSearch() }
         .onChange(of: canSelectRouteMarker) { _, allowed in
             if !allowed { selection = nil; markerDragging = false; routeTouchMap.map = nil }
         }
-        .onChange(of: displayedRoute?.id, initial: true) { _, id in
+        .onChange(of: displayedRoute?.id, initial: true) { _, _ in
             activePolyline = displayedRoute.map { MKPolyline(coordinates: $0.coordinates, count: $0.coordinates.count) }
-            if id != nil, session.journey == nil { previewRoute() }
+            if session.journey == nil {
+                routeOverview = nil
+                if let route = displayedRoute {
+                    showRouteOverview(returningTo: routeDetailPosition(route.track.point(at: 0).coordinate))
+                }
+            }
         }
         .onChange(of: session.journey?.travelledMetres) { _, _ in
             guard visualUpdatesEnabled, followMovement, session.routeActive,
@@ -542,9 +618,11 @@ struct MapHomeView: View {
         .onChange(of: visualUpdatesEnabled) { _, enabled in
             guard enabled else { return }
             refreshSavedPins(session.savedPins)
-            if followMovement, session.routeActive { centerOnLocation() }
+            if followMovement, session.activeRoute != nil { centerOnLocation() }
         }
-        .onChange(of: position.positionedByUser) { _, isUser in if isUser { followMovement = false } }
+        .onChange(of: position.positionedByUser) { _, isUser in
+            if isUser { followMovement = false; routeOverview = nil }
+        }
         .onChange(of: drawTool) { _, _ in drawing.endStroke() }
     }
 
@@ -619,7 +697,7 @@ struct MapHomeView: View {
                 Button("Hold location and add stop") { beginBrowseStopEdit() }
                 Button("Cancel", role: .cancel) { pendingBrowseStop = nil }
             } message: {
-                Text("This ends travel and holds your last sent location. The stop is added to a full route preview, not inserted into live playback. Movement does not restart until you review and start again from the route's chosen start.")
+                Text("Travel stops at your last location. Review the added stop, then tap Start to travel again from the route’s start.")
             }
         .onChange(of: session.journey == nil) { _, stopped in
             if stopped { finishBrowseStopEditIfReady() }
@@ -721,7 +799,12 @@ struct MapHomeView: View {
                                 .accessibilityIdentifier("map.routeSearch")
                         }
                         undoJumpButton
-                        Button { followMovement = true; selection = nil; centerOnLocation() } label: {
+                        Button {
+                            routeOverview = nil
+                            followMovement = true
+                            selection = nil
+                            centerOnLocation()
+                        } label: {
                             Image(systemName: followMovement ? "location.fill" : "location").font(.system(size: 20)).frame(width: 46, height: 46).contentShape(Rectangle())
                         }
                         .buttonStyle(.plain).locusGlass(.interactive, in: Circle())
@@ -757,7 +840,9 @@ struct MapHomeView: View {
             }
             MapOptionsMenu()
             if displayedRoute != nil {
-                mapButton("arrow.up.left.and.arrow.down.right", label: "Route overview") { previewRoute() }
+                mapButton(routeOverview == nil ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left",
+                          label: routeOverview == nil ? "Route overview" : "Return to route detail") { toggleRouteOverview() }
+                    .accessibilityIdentifier("map.routeOverview")
             } else {
                 mapButton("pencil.tip", label: "Draw a route") { beginDrawing() }
             }
@@ -983,23 +1068,57 @@ struct MapHomeView: View {
         Button(action: action) { Image(systemName: icon).font(.system(size: 20)).frame(width: 44, height: 44).contentShape(Rectangle()) }
             .buttonStyle(.plain).accessibilityLabel(label)
     }
-    private func previewRoute() {
+    private func toggleRouteOverview() {
         guard let route = displayedRoute else { return }
+        if let overview = routeOverview {
+            routeOverview = nil
+            followMovement = overview.followedLocation
+            lastCameraUpdate = Date()
+            position = overview.detail
+            return
+        }
+        let detail: MapCameraPosition
+        if let camera = sketchViewport.camera {
+            detail = .camera(MapCamera(centerCoordinate: camera.centerCoordinate,
+                distance: camera.centerCoordinateDistance, heading: camera.heading, pitch: camera.pitch))
+        } else {
+            let point = route.track.point(at: session.journey?.travelledMetres ?? 0)
+            detail = routeDetailPosition(point.coordinate)
+        }
+        showRouteOverview(returningTo: detail)
+    }
+
+    private func showRouteOverview(returningTo detail: MapCameraPosition) {
+        guard let rect = activePolyline?.boundingMapRect, !rect.isNull else { return }
+        routeOverview = (detail, followMovement && session.journey != nil)
         followMovement = false
-        let rect = MKPolyline(coordinates: route.coordinates, count: route.coordinates.count).boundingMapRect
         position = .rect(rect.insetBy(dx: -max(rect.size.width * 0.2, 200), dy: -max(rect.size.height * 0.3, 200)))
     }
+
+    private func routeDetailPosition(_ coordinate: CLLocationCoordinate2D) -> MapCameraPosition {
+        .region(MKCoordinateRegion(center: coordinate, latitudinalMeters: 1000, longitudinalMeters: 1000))
+    }
+
     private func previewPlace(_ place: RoutePlace) {
+        routeOverview = nil
         followMovement = false
         let region = MKCoordinateRegion(center: place.coordinate, latitudinalMeters: 1600, longitudinalMeters: 1600)
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.35)) { position = .region(region) }
     }
     private func centerOnLocation() {
-        guard visualUpdatesEnabled, let coordinate = session.simulated ?? session.realCoordinate else { return }
+        guard visualUpdatesEnabled else { return }
+        let coordinate: CLLocationCoordinate2D
+        if let route = session.activeRoute, let journey = session.journey {
+            // The previous location can still be un-cleared while the first
+            // route write is pending. Use this journey's start or progress.
+            coordinate = route.track.point(at: journey.travelledMetres).coordinate
+        } else if let latest = session.simulated ?? session.realCoordinate {
+            coordinate = latest
+        } else { return }
         lastCameraUpdate = Date()
-        let region = MKCoordinateRegion(center: coordinate, latitudinalMeters: 1000, longitudinalMeters: 1000)
-        if reduceMotion { position = .region(region) }
-        else { withAnimation(.linear(duration: 0.4)) { position = .region(region) } }
+        let detail = routeDetailPosition(coordinate)
+        if reduceMotion { position = detail }
+        else { withAnimation(.linear(duration: 0.4)) { position = detail } }
     }
 }
 
@@ -1116,8 +1235,9 @@ private struct RouteMarkerTouchLayer: UIViewRepresentable {
 /// The map owns both coordinate spaces; no SwiftUI converter is retained.
 private struct MapPinTapGesture: UIGestureRecognizerRepresentable {
     var enabled: Bool
+    var heldLocation: CLLocationCoordinate2D?
     var onTap: (CLLocationCoordinate2D) -> Void
-    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator(heldLocation: heldLocation) }
     func makeUIGestureRecognizer(context: Context) -> PinTapRecognizer {
         let tap = PinTapRecognizer()
         tap.numberOfTouchesRequired = 1
@@ -1130,6 +1250,7 @@ private struct MapPinTapGesture: UIGestureRecognizerRepresentable {
         return tap
     }
     func updateUIGestureRecognizer(_ tap: PinTapRecognizer, context: Context) {
+        context.coordinator.heldLocation = heldLocation
         if tap.isEnabled != enabled { tap.isEnabled = enabled }
     }
     func handleUIGestureRecognizerAction(_ tap: PinTapRecognizer, context: Context) {
@@ -1137,11 +1258,19 @@ private struct MapPinTapGesture: UIGestureRecognizerRepresentable {
         onTap(coordinate)
     }
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var heldLocation: CLLocationCoordinate2D?
+        init(heldLocation: CLLocationCoordinate2D?) { self.heldLocation = heldLocation }
+
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
             var view = touch.view
             while let candidate = view {
                 if candidate is UIControl || candidate is MKAnnotationView { return false }
-                if candidate is MKMapView { break }
+                if let map = candidate as? MKMapView {
+                    let finger = touch.location(in: map)
+                    if let heldLocation, let anchor = NativeRouteTouch(map: map, point: finger).project(heldLocation),
+                       MapPinHitArea.heldLocationBounds(anchor: anchor).contains(finger) { return false }
+                    break
+                }
                 view = candidate.superview
             }
             return true

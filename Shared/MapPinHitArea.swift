@@ -6,6 +6,13 @@ import CoreGraphics
 /// Match centered saved symbols to their actual frame; native pointed markers
 /// retain their above-coordinate touch area.
 enum MapPinHitArea {
+    static let heldLocationSide: CGFloat = 44
+
+    static func heldLocationBounds(anchor: CGPoint) -> CGRect {
+        CGRect(x: anchor.x - heldLocationSide / 2, y: anchor.y - heldLocationSide / 2,
+               width: heldLocationSide, height: heldLocationSide)
+    }
+
     static func savedIconSide(symbolSize: Double) -> Double {
         max(44, symbolSize + 8)
     }

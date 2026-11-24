@@ -15,28 +15,51 @@ final class RouteSearchCorridorTests: XCTestCase {
     }
 
     func testSearchRegionsAreBoundedAndCoverShortAndLongPaths() throws {
-        for end in [0.001, 0.2, 2.0] {
+        for end in [0.001, 0.2, 2.0, 9.0, 18.0] {
             let track = try XCTUnwrap(RouteTrack([RoutePoint(latitude: 0, longitude: 0), RoutePoint(latitude: 0, longitude: end)]))
             let corridor = RouteSearchCorridor(track: track)
-            XCTAssertTrue((1...4).contains(corridor.regions.count))
-            XCTAssertTrue(corridor.regions.allSatisfy { $0.center.isValid && $0.diameter.isFinite && $0.diameter > 0 })
-            for fraction in [0.0, 0.25, 0.5, 0.75, 1.0] {
-                let point = track.point(at: track.length * fraction)
+            XCTAssertFalse(corridor.samplesLongRoute)
+            XCTAssertTrue((1...11).contains(corridor.regions.count))
+            XCTAssertTrue(corridor.regions.allSatisfy { $0.center.isValid && $0.diameter > 0 && $0.diameter <= 200_000 })
+            for step in 0...100 {
+                let point = track.point(at: track.length * Double(step) / 100)
                 XCTAssertTrue(corridor.regions.contains { $0.center.distance(to: point) <= $0.diameter / 2 })
             }
         }
     }
 
     func testVeryLongRouteUsesSafeSizedSamplingRegions() throws {
-        let track = try XCTUnwrap(RouteTrack([RoutePoint(latitude: 0, longitude: 0), RoutePoint(latitude: 0, longitude: 20)]))
+        let track = try XCTUnwrap(RouteTrack([RoutePoint(latitude: 0, longitude: 0), RoutePoint(latitude: 0, longitude: 42)]))
         let corridor = RouteSearchCorridor(track: track)
         XCTAssertTrue(corridor.samplesLongRoute)
-        XCTAssertEqual(corridor.regions.count, 4)
+        XCTAssertEqual(corridor.regions.count, 11)
         XCTAssertTrue(corridor.regions.allSatisfy { $0.diameter <= 200_000 })
-        XCTAssertEqual(try XCTUnwrap(corridor.regions.first).center.distance(to: track.point(at: 0)), 0, accuracy: 1)
-        XCTAssertEqual(try XCTUnwrap(corridor.regions.last).center.distance(to: track.point(at: track.length)), 0, accuracy: 1)
+        for (window, fraction) in zip(corridor.prioritizedRegions, [0.0, 1.0, 0.5]) {
+            let point = track.point(at: track.length * fraction)
+            XCTAssertLessThanOrEqual(window.center.distance(to: point), window.diameter / 2 - corridor.width + 1)
+        }
         XCTAssertGreaterThan(corridor.regions[0].center.distance(to: corridor.regions[1].center), 200_000,
                              "Very long routes must be represented honestly as sampled, not exhaustive coverage")
+    }
+
+    func testDenseStartCannotDisplaceMatchesFromLaterInTheRoute() throws {
+        let track = try XCTUnwrap(RouteTrack([RoutePoint(latitude: 0, longitude: 0), RoutePoint(latitude: 0, longitude: 9)]))
+        let corridor = RouteSearchCorridor(track: track)
+        var matches = (0..<40).map { RouteSearchCorridor.Match(metresAlong: Double($0) * 1_000, metresAway: 100) }
+        let closerStart = matches.count
+        matches.append(.init(metresAlong: 12_000, metresAway: 40))
+        let middle = matches.count
+        matches.append(.init(metresAlong: track.length / 2, metresAway: 2_000))
+        let destination = matches.count
+        matches.append(.init(metresAlong: track.length, metresAway: 3_000))
+
+        XCTAssertEqual(Set(corridor.representativeIndices(for: matches, limit: 3)), [closerStart, middle, destination])
+        let indices = corridor.representativeIndices(for: matches)
+        XCTAssertEqual(indices.count, 30)
+        XCTAssertTrue(indices.contains(middle))
+        XCTAssertEqual(indices.last, destination)
+        let positions = indices.map { matches[$0].metresAlong }
+        XCTAssertEqual(positions, positions.sorted())
     }
 
     func testDateLineResultsAndInsertionKeepExistingStopOrder() throws {

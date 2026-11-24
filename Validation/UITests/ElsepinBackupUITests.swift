@@ -116,12 +116,75 @@ final class ElsepinBackupUITests: XCTestCase {
         visible(group).tap()
     }
     private func applyImport() {
-        visible(app.buttons["Import selected changes"]).tap()
-        let confirm = app.sheets.buttons["Import selected changes"]
+        visible(app.buttons["backup.review.apply"]).tap()
+        let confirm = importConfirmation
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Import complete.'")).firstMatch.waitForExistence(timeout: 10))
         app.buttons["Close backup test"].tap()
+    }
+
+    private var importConfirmation: XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@",
+            "Import selected changes", "backup.review.apply")).firstMatch
+    }
+
+    func testSolidTabsLeaveSettingsAndPastedBackupReviewReachable() {
+        app = XCUIApplication()
+        app.launchArguments = ["--elsepin-ui-test"]
+        app.launchEnvironment["ELSEPIN_TEST_SCENARIO"] = "home-solid-backup"
+        app.launch()
+        let settingsTab = app.buttons["navigation.settings"]
+        XCTAssertTrue(settingsTab.waitForExistence(timeout: 20))
+        settingsTab.tap()
+
+        func bottomControl(_ label: String) -> XCUIElement {
+            let button = app.buttons[label]
+            for _ in 0..<8 {
+                if button.exists && button.isHittable && button.frame.maxY <= settingsTab.frame.minY { return button }
+                app.swipeUp()
+            }
+            XCTFail("\(label) must scroll fully above solid navigation")
+            return button
+        }
+
+        bottomControl("About Elsepin").tap()
+        XCTAssertTrue(app.navigationBars["About Elsepin"].waitForExistence(timeout: 10))
+        _ = bottomControl("Licenses & acknowledgments")
+        app.navigationBars.buttons.firstMatch.tap()
+
+        bottomControl("Advanced & experimental").tap()
+        XCTAssertTrue(app.navigationBars["Advanced & experimental"].waitForExistence(timeout: 10))
+        _ = bottomControl("Wipe everything…")
+        app.navigationBars.buttons.firstMatch.tap()
+
+        app.swipeDown()
+        visible(app.buttons["Import & export"]).tap()
+        let paste = app.buttons["backup.paste"]
+        XCTAssertTrue(paste.waitForExistence(timeout: 10))
+        XCTAssertTrue(paste.isEnabled)
+        paste.tap()
+        let review = app.navigationBars["Review import"]
+        XCTAssertTrue(review.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Added"].exists)
+        _ = bottomControl("Cancel import")
+        bottomControl("backup.review.apply").tap()
+        XCTAssertTrue(importConfirmation.waitForExistence(timeout: 5))
+        capture("backup-confirmation-above-solid-tabs")
+        importConfirmation.tap()
+        XCTAssertTrue(app.staticTexts["Import complete. 1 pin."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Import & export"].exists)
+
+        paste.tap()
+        XCTAssertTrue(review.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["backup.review.apply"].isEnabled)
+        bottomControl("Cancel import").tap()
+        XCTAssertTrue(app.navigationBars["Import & export"].exists)
+
+        app.buttons["navigation.library"].tap()
+        XCTAssertTrue(app.buttons["Options for New backup pin"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Options for Test botanical garden walking route beside the riverside observatory and community orchard"].exists)
+        XCTAssertFalse(app.buttons["Options for Incoming duplicate pin"].exists)
     }
 
     func testUnreadableTripsBlockBothTripExportsButAllowSettings() throws {
@@ -224,7 +287,7 @@ final class ElsepinBackupUITests: XCTestCase {
         let changed = try settings(snapshot())
         XCTAssertFalse(NSDictionary(dictionary: original).isEqual(to: changed))
         openImport()
-        XCTAssertFalse(visible(app.buttons["Import selected changes"]).isEnabled, "Settings must start unchecked")
+        XCTAssertFalse(visible(app.buttons["backup.review.apply"]).isEnabled, "Settings must start unchecked")
         capture("34-import-starts-unchecked")
         visible(app.buttons["Cancel import"]).tap()
         app.buttons["Close backup test"].tap()
@@ -259,7 +322,7 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertEqual(reopened["tripCount"] as? Int, baseline["tripCount"] as? Int)
         XCTAssertEqual(reopened["pinCount"] as? Int, baseline["pinCount"] as? Int)
         openImport()
-        XCTAssertFalse(visible(app.buttons["Import selected changes"]).isEnabled, "Reimport should have no settings left to change")
+        XCTAssertFalse(visible(app.buttons["backup.review.apply"]).isEnabled, "Reimport should have no settings left to change")
         capture("36-reimport-after-relaunch-no-changes")
         visible(app.buttons["Cancel import"]).tap()
         app.buttons["Close backup test"].tap()
@@ -269,7 +332,7 @@ final class ElsepinBackupUITests: XCTestCase {
         app.buttons["Change disposable settings"].tap()
         app.buttons["Copy exported backup text"].tap()
         app.buttons["Import and export"].tap()
-        let paste = app.buttons["Paste backup text"]
+        let paste = app.buttons["backup.paste"]
         XCTAssertTrue(paste.waitForExistence(timeout: 5))
         XCTAssertTrue(paste.isEnabled)
         paste.tap()

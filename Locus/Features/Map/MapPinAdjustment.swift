@@ -6,6 +6,7 @@ struct MapPinAdjustmentGesture: UIGestureRecognizerRepresentable {
     var enabled: Bool
     var pin: CLLocationCoordinate2D?
     var savedSymbolSize: Double? = nil
+    var heldLocation: CLLocationCoordinate2D? = nil
     var onBegan: () -> Void
     var onMoved: (CLLocationCoordinate2D) -> Void
     var onEnded: (CLLocationCoordinate2D?, Bool) -> Void
@@ -123,6 +124,8 @@ struct MapPinAdjustmentGesture: UIGestureRecognizerRepresentable {
             guard parent.enabled, gestureRecognizer.numberOfTouches == 1,
                   let pin = parent.pin, let anchor = projected(pin),
                   let finger = pointer(gestureRecognizer) else { return false }
+            if let heldLocation = parent.heldLocation, let heldAnchor = projected(heldLocation),
+               MapPinHitArea.heldLocationBounds(anchor: heldAnchor).contains(finger) { return false }
 #if ELSEPIN_UI_TESTING
             ValidationGestureTrace.record("anchor=\(anchor) finger=\(finger) saved=\(String(describing: parent.savedSymbolSize))")
 #endif

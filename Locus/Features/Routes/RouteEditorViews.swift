@@ -293,20 +293,21 @@ struct RouteSectionChoiceSheet: View {
                         if RouteLegPathPolicy.needsChoice(from: original.mode, to: mode, exactPath: keepsExactPath) { confirmRoadChange = true }
                         else { save(.keepCurrent) }
                     }
+                    .loggedConfirmationDialog("\(original.mode.title) → \(mode.title)", isPresented: $confirmRoadChange, titleVisibility: .visible) {
+                        Button("Keep current path") { save(.keepCurrent) }
+                        Button("Recalculate directions") { save(.recalculate) }
+                        Button("Cancel", role: .cancel) { }
+                    } message: {
+                        Text(keepsExactPath
+                            ? "Keep the saved path or find new directions through the same stops. Your Library copy changes only when you save."
+                            : "Keep this path at the new speed or find directions for \(mode.title).")
+                    }
                 }
             }
             .onChange(of: mode) { _, new in
                 speed = new == original.mode ? original.speedMPH : session.usualSpeedMPH(for: new)
             }
-            .loggedConfirmationDialog("Which path?", isPresented: $confirmRoadChange, titleVisibility: .visible) {
-                Button("Keep current path") { save(.keepCurrent) }
-                Button("Recalculate directions") { save(.recalculate) }
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                Text(keepsExactPath
-                    ? "Keep this exact path, or find new directions through the same places. A drawn or imported path may change. Your Library copy stays unchanged until you save."
-                    : "Keep the path and change movement only, or find directions for the new mode.")
-            }
+
         }
     }
     private func save(_ path: RouteLegPathChoice) {

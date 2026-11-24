@@ -406,32 +406,37 @@ private final class RouteStopSearchModel: ObservableObject {
         guard scope != .mapArea || chosenArea?.searchBounds.isValid == true else {
             message = "Choose a map area first."; return
         }
-        let regions: [MKCoordinateRegion?] = alongRoute ? corridor.regions.map {
+        let regions: [MKCoordinateRegion?] = alongRoute ? corridor.prioritizedRegions.map {
             MKCoordinateRegion(center: $0.center.coordinate, latitudinalMeters: $0.diameter, longitudinalMeters: $0.diameter)
         } : [chosenArea]
-        isSearching = true; message = nil
+        isSearching = true; results = []; message = nil
         task = Task { @MainActor [weak self] in
             guard let self else { return }
             var found: [Result] = []
             var failures = 0
+            var completed = 0
+            let deadline = ProcessInfo.processInfo.systemUptime + (alongRoute ? 24 : 5)
             for region in regions {
                 guard !Task.isCancelled, ticket == generation else { return }
+                let timeLeft = deadline - ProcessInfo.processInfo.systemUptime
+                guard timeLeft > 0 else { break }
                 let request = MKLocalSearch.Request()
                 PlaceSearchRequest.configure(request, query: text)
                 if let region {
                     request.region = region
-                    if chosenArea != nil { request.regionPriority = .required }
+                    request.regionPriority = .required
                 }
                 let search = PlaceSearchRequest(request)
                 activeSearch = search
+                completed += 1
                 do {
-                    let response = try await search.start(seconds: 5)
+                    let response = try await search.start(seconds: min(5, timeLeft))
                     guard !Task.isCancelled, ticket == generation else { return }
                     for item in response.mapItems {
                         let point = RoutePoint(item.placemark.coordinate)
                         guard point.isValid else { continue }
                         guard chosenArea?.containsPlace(point.coordinate) ?? true else { continue }
-                        let match = corridor.match(point)
+                        let match = alongRoute ? corridor.match(point) : nil
                         guard !alongRoute || match != nil else { continue }
                         let name = item.name ?? text
                         guard !found.contains(where: {
@@ -439,22 +444,31 @@ private final class RouteStopSearchModel: ObservableObject {
                         }) else { continue }
                         let street = [item.placemark.subThoroughfare, item.placemark.thoroughfare].compactMap { $0 }.joined(separator: " ")
                         let address = [street, item.placemark.locality, item.placemark.administrativeArea].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
-                        found.append(Result(place: RoutePlace(name: name, coordinate: point.coordinate), address: address, match: alongRoute ? match : nil))
+                        found.append(Result(place: RoutePlace(name: name, coordinate: point.coordinate), address: address, match: match))
                     }
-                    results = Array(found.prefix(30))
+                    if alongRoute {
+                        // Every place admitted along the route has a corridor match.
+                        let indices = corridor.representativeIndices(for: found.compactMap(\.match))
+                        results = indices.map { found[$0] }
+                    } else {
+                        results = Array(found.prefix(30))
+                    }
                 } catch {
                     guard !Task.isCancelled, ticket == generation else { return }
+                    if (error as? MKError)?.code == .placemarkNotFound { continue }
                     failures += 1
                     DeveloperLogStore.shared.record("route_stop_search_failed", ["domain": (error as NSError).domain, "code": String((error as NSError).code)])
+                    if (error as? MKError)?.code == .loadingThrottled { break }
                 }
             }
             guard !Task.isCancelled, ticket == generation else { return }
-            if alongRoute { found.sort { ($0.match?.metresAlong ?? 0) < ($1.match?.metresAlong ?? 0) } }
-            results = Array(found.prefix(30))
             activeSearch = nil; task = nil; isSearching = false
-            if failures == regions.count { message = "Search couldn't connect. Try again when you're online." }
-            else if failures > 0 { message = "Some areas couldn't be searched. These results may be incomplete; search again to retry." }
-            else if alongRoute && corridor.samplesLongRoute { message = "This long route is sampled in four areas, including its start and destination. Choose Map area to search a specific section in detail." }
+            if failures == completed { message = "Map search couldn't finish. Try again, or choose a smaller Map area." }
+            else if failures > 0 || completed < regions.count { message = "Some areas couldn't be searched. Choose Map area to search a specific section, or try again." }
+            else if alongRoute && corridor.samplesLongRoute {
+                message = found.isEmpty ? "No matches in the sampled areas. Try another category or choose Map area to search a specific section."
+                    : "Results are from sampled sections of this long route. Choose Map area to search a specific section in detail."
+            }
             else if found.isEmpty {
                 message = chosenArea != nil ? "No matches in this map area. Try another category or choose a larger area."
                     : alongRoute ? "No matches near this path. Try another category or search Everywhere." : "No matches. Try adding a city or a more specific address."

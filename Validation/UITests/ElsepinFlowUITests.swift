@@ -32,7 +32,7 @@ final class ElsepinFlowUITests: XCTestCase {
             let button = springboard.buttons[label]
             if button.exists { button.tap() }
         }
-        if scenario.hasPrefix("route-identity-") || ["moving", "paused", "connecting", "failed", "map-pins", "route-search-replacement"].contains(scenario) {
+        if scenario.hasPrefix("route-identity-") || ["moving", "paused", "connecting", "failed", "map-pins", "route-search-replacement", "route-camera"].contains(scenario) {
             let start = app.buttons["validation.start"]
             if !start.isEnabled, springboard.buttons["Allow"].waitForExistence(timeout: 5) {
                 springboard.buttons["Allow"].tap()
@@ -48,6 +48,23 @@ final class ElsepinFlowUITests: XCTestCase {
         add(attachment)
         let tree = XCTAttachment(string: app.debugDescription)
         tree.name = name + "-accessibility-tree"; tree.lifetime = .keepAlways; add(tree)
+    }
+
+    func testResetReviewShowsLossAndRetentionBeforeConfirming() {
+        launch("reset-review", dark: true, narrow: false)
+        app.buttons["Wipe everything…"].tap()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Wipe data, keep setup")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Pins, routes, areas, history and Recently Deleted."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Pairing, tunnel address and setup progress."].exists)
+        capture("reset-review-keep-setup")
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(app.navigationBars["Wipe everything"].waitForExistence(timeout: 5))
+    }
+
+    func testJoystickUsesUsualSpeedsBetweenEditsAndRestarts() {
+        launch("joystick-presets")
+        XCTAssertTrue(app.staticTexts["Joystick presets passed"].waitForExistence(timeout: 20),
+                      app.debugDescription)
     }
 
     private func launchRoutes() {
@@ -154,6 +171,8 @@ final class ElsepinFlowUITests: XCTestCase {
         capture("27-custom-drive-leg")
         app.buttons["Done"].tap()
         XCTAssertTrue(app.buttons["Recalculate directions"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Walk → Drive"].exists)
+        capture("leg-walk-to-drive")
         app.buttons["Keep current path"].tap()
         capture("27b-kept-path-before-second-leg")
         routeControl(app.buttons["Movement to Test pond"]).tap()
@@ -336,6 +355,48 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["validation.pinCommand"].label, "No location sent")
         capture("32-pin-lower-edge-adjustment")
     }
+
+    func testHeldLocationMarkerChangesSymbolWithoutPreparingOrSendingAnotherLocation() {
+        launch("held-location", narrow: false)
+        let teleport = app.buttons["Teleport"]
+        XCTAssertTrue(teleport.waitForExistence(timeout: 10))
+        teleport.tap()
+        XCTAssertTrue(app.staticTexts["Holding location"].waitForExistence(timeout: 10))
+        app.buttons["map.follow"].tap()
+
+        let marker = app.descendants(matching: .any)["map.heldLocationMarker"].firstMatch
+        XCTAssertTrue(marker.waitForExistence(timeout: 10))
+        XCTAssertTrue(marker.isHittable)
+        XCTAssertEqual(marker.value as? String, "Automatic")
+        let generation = app.staticTexts["validation.commandGeneration"].label
+        marker.press(forDuration: 0.7)
+        let star = app.buttons["Star"]
+        XCTAssertTrue(star.waitForExistence(timeout: 5))
+        star.tap()
+
+        XCTAssertEqual(marker.value as? String, "Star")
+        XCTAssertTrue(app.staticTexts["Holding location"].exists)
+        XCTAssertFalse(teleport.exists)
+        XCTAssertEqual(app.staticTexts["validation.commandGeneration"].label, generation)
+        capture("held-location-marker-star")
+    }
+
+    func testSelectedCustomPinRefreshesItsSavedAndRecentAddresses() {
+        launch("pin-address-refresh", narrow: false)
+        XCTAssertTrue(app.staticTexts["12 Main Street, New York, NY 10019"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["My saved destination"].exists)
+        app.buttons["Check saved address refresh"].tap()
+        XCTAssertEqual(app.staticTexts["validation.pinAddressReport"].label, "Saved and recent addresses refreshed")
+
+        app.buttons["Edit pin from old snapshot"].tap()
+        let save = app.navigationBars["Edit pin"].buttons["Save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        save.tap()
+        let check = app.buttons["Check saved address refresh"]
+        XCTAssertTrue(check.waitForExistence(timeout: 5))
+        check.tap()
+        XCTAssertEqual(app.staticTexts["validation.pinAddressReport"].label, "Saved and recent addresses refreshed")
+    }
     func testIdleTraySitsAboveSolidNavigation() {
         checkIdleTray(solid: true)
     }
@@ -370,6 +431,38 @@ final class ElsepinFlowUITests: XCTestCase {
         app.buttons["session.stop"].tap()
         XCTAssertTrue(app.staticTexts["Where do you want to go?"].waitForExistence(timeout: 10))
         capture("03-cleared-test-session")
+    }
+
+    func testRouteCameraStartsAtTheRouteAndRestoresDetailAfterFit() throws {
+        launch("route-camera", narrow: false)
+        let startRoute = app.buttons["validation.startCameraRoute"]
+        XCTAssertTrue(startRoute.waitForExistence(timeout: 10))
+        let camera = app.staticTexts["validation.routeCamera"]
+        func cameraValues() -> [Double] { camera.label.split(separator: ",").compactMap { Double($0) } }
+        func waitForCamera(_ predicate: @escaping (Double, Double) -> Bool) {
+            let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                let values = cameraValues()
+                return values.count == 2 && predicate(values[0], values[1])
+            }, object: camera)
+            XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 8), .completed, camera.label)
+        }
+
+        app.buttons["map.follow"].tap()
+        waitForCamera { offset, _ in offset > 1_000_000 }
+        startRoute.tap()
+        waitForCamera { offset, _ in offset < 250 }
+        XCTAssertEqual(app.staticTexts["validation.routeCameraLocation"].label, "Previous location held")
+        let detailDistance = try XCTUnwrap(cameraValues().last)
+
+        let overview = app.buttons["map.routeOverview"]
+        XCTAssertEqual(overview.label, "Route overview")
+        overview.tap()
+        XCTAssertEqual(overview.label, "Return to route detail")
+        waitForCamera { offset, distance in offset > 400 && distance > detailDistance }
+        overview.tap()
+        XCTAssertEqual(overview.label, "Route overview")
+        waitForCamera { offset, distance in offset < 250 && abs(distance - detailDistance) < detailDistance * 0.1 }
+        capture("route-camera-fit-round-trip")
     }
 
     func testRouteSearchUpdatesSavedIdentityAndMetadata() throws {

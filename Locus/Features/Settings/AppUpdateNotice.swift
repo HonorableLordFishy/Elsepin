@@ -67,7 +67,7 @@ struct AppUpdateStatusSection: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         } header: { Text("Software updates") } footer: {
-            Text("Automatic checks run once a day while the app is open. Check manually anytime. Official releases only; nothing downloads automatically.")
+            Text("Checks official releases daily while Elsepin is open. You choose when to download.")
         }
         .shiftSettingsRows()
     }

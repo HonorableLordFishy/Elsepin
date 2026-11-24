@@ -1,5 +1,15 @@
 # Import and export — official 2.5.7
 
+## Build 96 import and review follow-up
+
+Choose backup file opens the UIKit Files picker in copy mode, with JSON, text
+and generic file types enabled. The selected copy goes through the existing
+regular-file, size and backup-format checks after Files dismisses. Paste backup
+text uses the native iOS paste control. Either input opens the same review in
+Settings. The confirmation points to Import selected changes, and the solid tab
+bar reserves room for the last rows of the review and other Settings screens.
+Check these interactions on an iPhone with local and cloud file providers.
+
 ## Build 88 native file-picker repair (phone acceptance pending)
 
 File import uses the system SwiftUI file importer with file-item selection, so a

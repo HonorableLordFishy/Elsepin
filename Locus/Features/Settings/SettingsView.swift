@@ -283,8 +283,6 @@ private struct LocusAboutSettingsView: View {
             }.shiftSettingsRows()
             AppUpdateStatusSection()
             Section("Built on open source") {
-                Text("Includes open-source components. Original authors and terms are listed in Licenses.")
-                    .font(.subheadline).foregroundStyle(.secondary)
                 NavigationLink { ShiftAcknowledgmentsView() } label: { Label("Licenses & acknowledgments", systemImage: "text.document") }
             }.shiftSettingsRows()
         }.shiftSettingsScreen().loggedNavigationTitle("About Elsepin").navigationBarTitleDisplayMode(.inline)

@@ -28,4 +28,12 @@ final class MapPinHitAreaTests: XCTestCase {
         XCTAssertEqual(MapPinHitArea.bounds(anchor: anchor, savedSymbolSize: nil),
                        CGRect(x: 72, y: 86, width: 56, height: 80))
     }
+
+    func testHeldLocationUsesOnlyItsCenteredTouchTarget() {
+        let area = MapPinHitArea.heldLocationBounds(anchor: anchor)
+        XCTAssertEqual(area, CGRect(x: 78, y: 128, width: 44, height: 44))
+        XCTAssertTrue(area.contains(CGPoint(x: 100, y: 171)))
+        XCTAssertFalse(area.contains(CGPoint(x: 100, y: 120)))
+        XCTAssertFalse(area.contains(CGPoint(x: 123, y: 150)))
+    }
 }

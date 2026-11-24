@@ -11,16 +11,11 @@ enum AppResetScope: String, CaseIterable, Identifiable {
         case .full: return "Wipe everything & restart setup"
         }
     }
-    var detail: String {
-        let settings = "Restores appearance, icon, speeds, controls, privacy, notifications, widgets and experimental settings to their defaults. App lock turns off; enabled app lock requires device authentication first."
-        let limits = "Exports in Files, accounts on your helper server, installed Home Screen widgets, iOS permissions, Developer Mode, host trust and LocalDevVPN are not removed."
+    var keptSummary: String {
         switch self {
-        case .settings:
-            return settings + " Keeps saved places, routes, areas, history, recovery, helper connections, pairing and setup. " + limits
-        case .keepSetup:
-            return settings + " Permanently deletes saved places, routes, areas, edit history, Recently Deleted, recents, recovery, diagnostics and this app's helper credentials. Keeps this iPhone's pairing file, tunnel address and current setup progress. " + limits
-        case .full:
-            return settings + " Permanently deletes all of the same local data and helper credentials, then removes Elsepin's pairing file and opens the initial setup checklist. You must pair again or import a pairing file. " + limits
+        case .settings: return "Library, history, recovery, helper connections and pairing."
+        case .keepSetup: return "Pairing, tunnel address and setup progress."
+        case .full: return "Exported files and accounts on your helper server."
         }
     }
     var stages: [AppResetStage] {
@@ -81,7 +76,7 @@ enum AppResetRules {
         "appLockEnabled", "hideInAppSwitcher", "saveRecentLocations", "recentHistoryRetention", "panelShortcuts",
         "modeSpeeds", "usualSpeeds", "eBikeSpeedMPH", "smoothMovement", "preferWalkingPaths", "tripRecovery", "tripRecoveryAutoResume",
         "keepTroubleshootingEvents", "developerLogEnabled", "widget.selected", "widget.primary", "remoteFindMy.enabled", "remoteFindMy.alerts"
-    ].map { "locus." + $0 } + ["shift.speedUnit", "shift.connectionCheckSeconds", "shift.visualStyle", AppearanceOverrides.defaultsKey, "shift.appearancePresetMigration.v1", "shift.cloud.findMy", "shift.cloud.life360", "shift.computerChecks.enabled"])
+    ].map { "locus." + $0 } + ["shift.speedUnit", "shift.connectionCheckSeconds", "shift.visualStyle", AppearanceOverrides.defaultsKey, HeldLocationSymbol.preferenceKey, "shift.appearancePresetMigration.v1", "shift.cloud.findMy", "shift.cloud.life360", "shift.computerChecks.enabled"])
 
     static func canReset(hasSession: Bool, busy: Bool, setupWorkerRunning: Bool, iconChanging: Bool) -> Bool {
         !hasSession && !busy && !setupWorkerRunning && !iconChanging

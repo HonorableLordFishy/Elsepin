@@ -29,6 +29,7 @@ final class ShiftIconController: ObservableObject {
     @Published var error: String?
     private var completionReceived = false
     private var completionFailed = false
+    private var lastFailedChoice: ShiftIconSelection?
     private var failureDescription: String?
     private var resetCompletion: CheckedContinuation<Void, Error>?
     var changing: Bool { pending != nil }
@@ -38,10 +39,13 @@ final class ShiftIconController: ObservableObject {
         // iOS may deactivate the scene while its icon confirmation is visible.
         // Keep global appearance/navigation stable until that transition ends.
         guard UIApplication.shared.applicationState == .active else { return }
+        let name = UIApplication.shared.alternateIconName
+        var observed = ShiftIconSelection.installed(named: name)
         if let requested = pending {
             guard completionReceived else { return }
-            let actual = ShiftIconSelection.installed(named: UIApplication.shared.alternateIconName)
-            let failed = completionFailed || actual != requested
+            let failed = !requested.changeSucceeded(reportedError: completionFailed, installedName: name)
+            if !failed { observed = requested }
+            lastFailedChoice = failed ? requested : nil
             if failed {
                 error = failureDescription ?? "iOS did not confirm the new icon. Reopen Elsepin and try again."
             }
@@ -56,10 +60,11 @@ final class ShiftIconController: ObservableObject {
                 else { continuation.resume() }
             }
         }
-        guard let actual = ShiftIconSelection.installed(named: UIApplication.shared.alternateIconName) else {
-            error = "This installation uses an unrecognized icon. Choose a Elsepin icon to replace it."
+        guard let actual = observed else {
+            error = "This installation uses an unrecognized icon. Choose an Elsepin icon to replace it."
             return
         }
+        if lastFailedChoice == actual { error = nil; lastFailedChoice = nil }
         if selected != actual { selected = actual }
         SessionPreferences.shared.confirmIcon(actual)
     }
@@ -79,6 +84,7 @@ final class ShiftIconController: ObservableObject {
             }
         }
         pending = choice
+        lastFailedChoice = nil
         completionReceived = false
         completionFailed = false
         error = nil
@@ -92,11 +98,13 @@ final class ShiftIconController: ObservableObject {
                         "icon": choice.alternateName ?? "primary"])
                     self.failureDescription = native.domain == NSPOSIXErrorDomain && native.code == 35
                         ? "iOS is busy changing the Home Screen. Dismiss any system prompt, then try again."
-                        : "iOS declined this icon change (code \(native.code)). Reopen Elsepin and try again. If it keeps failing, check that your signer preserves alternate icons."
-                } else {
-                    // Let SpringBoard's icon transition settle before comparing the
-                    // installed name. Scene activation may arrive before this callback.
-                    try? await Task.sleep(nanoseconds: 350_000_000)
+                        : "iOS couldn’t apply this icon (code \(native.code)). Try again after dismissing the system prompt."
+                    // A sideloaded installation can report a transient error while
+                    // SpringBoard is applying the requested icon. Never resubmit it.
+                    for _ in 0..<8 {
+                        if UIApplication.shared.alternateIconName == choice.alternateName { break }
+                        try? await Task.sleep(nanoseconds: 250_000_000)
+                    }
                 }
                 self.completionReceived = true
                 self.completionFailed = failure != nil

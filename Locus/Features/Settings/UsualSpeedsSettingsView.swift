@@ -15,7 +15,7 @@ struct UsualSpeedsSettingsView: View {
                 Text("Applies throughout Elsepin. Switching units keeps your actual speed and saved trips unchanged.")
             }.shiftSettingsRows()
             Section {
-                Text("Used for new routes, switching travel modes and Reset speed. Saved and active trips keep their assigned speeds.").font(.footnote).foregroundStyle(.secondary)
+                Text("Your presets set the speed for new routes and the joystick. Saved routes keep their speeds.").font(.footnote).foregroundStyle(.secondary)
             }.shiftSettingsRows()
             ForEach(TravelMode.allCases) { mode in
                 Section {

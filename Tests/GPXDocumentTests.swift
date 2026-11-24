@@ -18,6 +18,18 @@ final class GPXDocumentTests: XCTestCase {
         return "<trk><trkseg>\(trackPoints)</trkseg></trk>"
     }
 
+    func testDownloadableExamplesPreviewAsOneLoopAndTwoSeparatedSections() throws {
+        let samples = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Samples/GPX")
+        let loop = try GPXDocument.parse(Data(contentsOf: samples.appendingPathComponent("Garden-loop.gpx")))
+        XCTAssertEqual(loop.kind, .route)
+        XCTAssertEqual(loop.points.first, loop.points.last)
+        XCTAssertEqual(loop.points.count, 5)
+        let sections = try GPXDocument.parse(Data(contentsOf: samples.appendingPathComponent("Waterfront-sections.gpx")))
+        XCTAssertEqual(sections.segmentCount, 2)
+        XCTAssertTrue(sections.paths[0].hasGaps)
+    }
+
     func testTrackAttributesWorkInEitherOrderAndQuotes() throws {
         let data = gpx("""
         <trk><trkseg>

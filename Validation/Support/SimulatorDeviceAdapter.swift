@@ -28,6 +28,11 @@ enum LocationEngine {
             try? await Task.sleep(for: .seconds(300))
             return .failure(.tunnelUnreachable)
         }
+        if ValidationFixture.scenario == "route-camera", latitude > 40 {
+            // Keep the previous synthetic location visible until the test has
+            // checked the new route's camera before its first accepted write.
+            try? await Task.sleep(for: .seconds(25))
+        }
         try? await Task.sleep(for: .milliseconds(60))
         // Fail after one accepted test command so recovery includes a location
         // that may remain, rather than the separate never-started case.

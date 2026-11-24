@@ -51,7 +51,7 @@ struct RouteModeMenu: View {
             }
             Button("Cancel", role: .cancel) { proposed = nil }
         } message: {
-            Text("Keep this path and use one mode for the remaining route. Your saved trip is unchanged. Speed-only edits apply to the current section without replacing later sections.")
+            Text("Switch modes for all remaining sections on this path. To adjust just this section, change its speed. Your saved trip stays the same.")
         }
         .loggedConfirmationDialog("Change to \(proposed?.title ?? "another mode")?", isPresented: $showRouteChoice, titleVisibility: .visible) {
             if let proposed {
@@ -60,7 +60,7 @@ struct RouteModeMenu: View {
             }
             Button("Cancel", role: .cancel) { proposed = nil }
         } message: {
-            Text("A different path is needed for matching directions. Find a new route from your current spoofed location, or explicitly keep this path and only change speed. Either choice replaces remaining section settings with the chosen mode.")
+            Text("Find directions from your current location or keep this path at the new speed. Both choices apply the mode to all remaining sections.")
         }
     }
 }
@@ -115,7 +115,7 @@ struct MovementSpeedControl: View {
                 Text("This route only.").font(.caption).foregroundStyle(.secondary)
             }
             if session.routeSectionSettingsEnabled {
-                Text("Section settings are on. Speed changes apply to this section only. Choosing a different mode replaces the remaining section settings with that one mode.")
+                Text("Speed changes affect this section. Switching modes applies to all remaining sections.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if session.journey != nil {

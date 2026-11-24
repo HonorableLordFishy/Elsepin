@@ -20,13 +20,13 @@ struct DevModeSection: View {
             .disabled(demo.switching)
             .accessibilityIdentifier("settings.devMode")
         } header: { Text("Testing tools") } footer: {
-            Text("Your real library and app preferences are safe and return when you turn this off. Edits made while Dev Mode is on are discarded the next time you turn it on. Pairing, connected accounts, security and the Home Screen icon remain device-wide.")
+            Text("Turn off Dev Mode to return to your library and preferences. Each new demo starts fresh. Pairing, accounts, security and the app icon are shared.")
         }.shiftSettingsRows()
         .loggedAlert("Use demo data?", isPresented: $confirm) {
             Button("Cancel", role: .cancel) { }
             Button("Enable Dev Mode") { switchMode(true) }
         } message: {
-            Text("Load demo pins, routes, areas and deleted items. Nothing starts spoofing automatically. Cloud checks still need a real configured helper.")
+            Text("Explore sample pins, routes and areas. Movement starts only when you choose. Cloud checks use your configured helper.")
         }
         .loggedAlert("Dev Mode", isPresented: Binding(get: { demo.error != nil }, set: { if !$0 { demo.error = nil } })) {
             Button("OK", role: .cancel) { demo.error = nil }

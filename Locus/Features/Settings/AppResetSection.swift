@@ -12,7 +12,7 @@ struct AppResetSection: View {
                 Label("Wipe everything…", systemImage: "trash").foregroundStyle(.red)
             }.frame(minHeight: 44)
         } header: { Text("Reset Elsepin") } footer: {
-            Text(AppDataWorkspace.shared.isDemo ? "Turn off Dev Mode before resetting the app." : "Review what will be removed before confirming. Stop spoofing completely first. Pairing and connection checks must also finish.")
+            Text(AppDataWorkspace.shared.isDemo ? "Turn off Dev Mode before resetting the app." : "Stop spoofing and finish pairing or connection checks before resetting.")
         }.shiftSettingsRows()
         .disabled(reset.isResetting || session.hasSession || session.isBusy || AppDataWorkspace.shared.isDemo)
         .sheet(item: $reviewing) { AppResetReview(scope: $0) }
@@ -26,7 +26,7 @@ private struct AppWipeChoicesView: View {
             Section {
                 choice(.full, detail: "Remove local data, settings and pairing. Start setup again.")
                 choice(.keepSetup, detail: "Remove local data and settings. Keep device pairing, the tunnel address and setup progress.")
-            } footer: { Text("Both choices permanently delete saved routes, places, areas and Recently Deleted. Neither choice changes iOS settings or deletes exports in Files.") }.shiftSettingsRows()
+            } footer: { Text("Both wipes permanently erase your library and Recently Deleted. Files exports and iOS settings stay in place.") }.shiftSettingsRows()
         }.shiftSettingsScreen().loggedNavigationTitle("Wipe everything").navigationBarTitleDisplayMode(.inline)
         .sheet(item: $reviewing) { AppResetReview(scope: $0) }
     }
@@ -53,14 +53,27 @@ private struct AppResetReview: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Review reset") {
-                    Text(scope.title).font(.headline)
-                    Text(scope.detail).font(.subheadline)
-                    Text(scope.wipesData
-                        ? "Open drafts will close. Deleted data cannot be recovered. Export a backup first if you want to keep it."
-                        : "Open drafts will close. Your saved library and connection setup will stay available.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                Section(scope.wipesData ? "Permanently erased" : "Restored to defaults") {
+                    if scope.wipesData {
+                        Text("Pins, routes, areas, history and Recently Deleted.")
+                        Text("Recovery copies, diagnostics and saved helper sign-ins.")
+                        if scope == .full { Text("Device pairing and setup. You’ll need to pair again.") }
+                    } else {
+                        Text("Appearance, icon, speeds, controls, privacy, notifications and widgets.")
+                    }
                 }.shiftSettingsRows()
+                Section("What you keep") {
+                    Text(scope.keptSummary)
+                }.shiftSettingsRows()
+                Section {
+                    if scope.wipesData { Text("Export a backup first. This wipe is permanent.") }
+                    Text("Open drafts close. If App Lock is on, you’ll authenticate before it turns off.")
+                    DisclosureGroup("More details") {
+                        if scope.wipesData { Text("App preferences and experimental settings return to their defaults.") }
+                        else { Text("Experimental settings also return to their defaults.") }
+                        Text("Files, server accounts, installed widgets, iOS permissions, Developer Mode, host trust and LocalDevVPN stay in place.")
+                    }
+                }.font(.subheadline).shiftSettingsRows()
                 Section {
                     Button(scope.title, role: .destructive) {
                         dismiss()
@@ -69,7 +82,7 @@ private struct AppResetReview: View {
                                 preferences: preferences, library: library, privacy: privacy, updates: updates)
                         }
                     }.frame(minHeight: 44).disabled(reset.isResetting || session.hasSession || session.isBusy || AppDataWorkspace.shared.isDemo)
-                } footer: { Text("If a reset step fails, Elsepin stops and tells you which steps already finished. Pairing and setup are removed last.") }.shiftSettingsRows()
+                }.shiftSettingsRows()
             }.shiftSettingsScreen().loggedNavigationTitle("Confirm reset").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
         }

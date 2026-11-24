@@ -3,6 +3,9 @@ import Foundation
 /// Search regions are hints to the provider. Filter actual returned coordinates
 /// against the path; proximity is never presented as a driving/cycling detour.
 struct RouteSearchCorridor {
+    private static let maxRegions = 11
+    private static let maxDiameter = 200_000.0
+
     struct Region {
         let center: RoutePoint
         let diameter: Double
@@ -23,26 +26,70 @@ struct RouteSearchCorridor {
         self.width = width.isFinite ? max(100, min(20_000, width)) : 5_000
     }
 
-    var samplesLongRoute: Bool { track.length / 4 + width * 2 > 200_000 }
+    private var maxSpan: Double { Self.maxDiameter - width * 2 }
+    private var regionCount: Int { max(1, Int(ceil(min(track.length / 20_000, Double(Self.maxRegions))))) }
+    var samplesLongRoute: Bool { track.length > maxSpan * Double(Self.maxRegions) }
 
     var regions: [Region] {
-        // At most four explicit requests per submitted search, not per keypress.
-        let count = min(4, max(1, Int(ceil(min(track.length, 80_000) / 20_000))))
+        let count = regionCount
         let span = track.length / Double(count)
-        // Centre each region in its span so neighbours overlap by twice the corridor
-        // width. Bucket-start centres would leave the end of the route outside every
-        // region, silently dropping along-route results there.
-        if samplesLongRoute, count > 1 {
-            // Keep the provider request budget finite. Very long routes are sampled,
-            // but always include both endpoints; Map area provides explicit detail.
-            return (0..<count).map { sample in
-                Region(center: track.point(at: track.length * Double(sample) / Double(count - 1)),
-                       diameter: 200_000)
+        if samplesLongRoute {
+            // Move the outside centres inward by half a usable window so each
+            // endpoint still has corridor padding and little coverage is wasted.
+            let step = (track.length - maxSpan) / Double(count - 1)
+            return (0..<count).map { index in
+                Region(center: track.point(at: maxSpan / 2 + Double(index) * step), diameter: Self.maxDiameter)
             }
         }
         return (0..<count).map { bucket in
             Region(center: track.point(at: (Double(bucket) + 0.5) * span),
                    diameter: span + width * 2)
+        }
+    }
+
+    /// Search both ends and the middle first, so a deadline or cancellation
+    /// still gives widely spaced sections a chance to return results.
+    var prioritizedRegions: [Region] {
+        let windows = regions
+        var order = [windows.startIndex]
+        var remaining = Array(windows.indices.dropFirst())
+        while !remaining.isEmpty {
+            let next = remaining.indices.max { left, right in
+                let leftGap = order.map { abs(remaining[left] - $0) }.min() ?? 0
+                let rightGap = order.map { abs(remaining[right] - $0) }.min() ?? 0
+                return leftGap < rightGap
+            } ?? remaining.startIndex
+            order.append(remaining.remove(at: next))
+        }
+        return order.map { windows[$0] }
+    }
+
+    /// Prefer nearby places within each section. Take turns between populated
+    /// sections before sorting the selected results in itinerary order.
+    func representativeIndices(for matches: [Match], limit: Int = 30) -> [Int] {
+        guard limit > 0 else { return [] }
+        let sectionCount = min(regionCount, limit)
+        var sections = Array(repeating: [Int](), count: sectionCount)
+        let ranked = matches.indices.sorted {
+            let left = matches[$0].metresAway, right = matches[$1].metresAway
+            return left == right ? $0 < $1 : left < right
+        }
+        for index in ranked {
+            let fraction = min(1, max(0, matches[index].metresAlong / track.length))
+            let section = min(sectionCount - 1, Int(fraction * Double(sectionCount)))
+            sections[section].append(index)
+        }
+
+        var selected: [Int] = []
+        let rounds = min(limit, sections.map(\.count).max() ?? 0)
+        for round in 0..<rounds {
+            for section in sections where section.indices.contains(round) && selected.count < limit {
+                selected.append(section[round])
+            }
+        }
+        return selected.sorted {
+            let left = matches[$0].metresAlong, right = matches[$1].metresAlong
+            return left == right ? $0 < $1 : left < right
         }
     }
 

@@ -2,6 +2,16 @@ import XCTest
 @testable import SessionPresentation
 
 final class ShiftAppearanceTests: XCTestCase {
+    func testIconCompletionReconcilesLateSystemReadAndTransientError() {
+        let alternate = ShiftIconSelection(design: .glacier)
+        let primary = ShiftIconSelection()
+        XCTAssertTrue(alternate.changeSucceeded(reportedError: false, installedName: nil))
+        XCTAssertTrue(alternate.changeSucceeded(reportedError: true, installedName: alternate.assetName))
+        XCTAssertFalse(alternate.changeSucceeded(reportedError: true, installedName: nil))
+        XCTAssertTrue(primary.changeSucceeded(reportedError: true, installedName: nil))
+        XCTAssertFalse(primary.changeSucceeded(reportedError: true, installedName: alternate.assetName))
+    }
+
     func testEveryIconResolvesFromItsInstalledName() {
         XCTAssertEqual(ShiftIconSelection.all.count, 13)
         XCTAssertEqual(Set(ShiftIconSelection.all.map(\.assetName)).count, 13)

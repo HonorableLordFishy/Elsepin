@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<gpx version="1.1" creator="Elsepin" xmlns="http://www.topografix.com/GPX/1/1">
+  <rte>
+    <name>Garden loop</name>
+    <rtept lat="37.7694" lon="-122.4661" />
+    <rtept lat="37.7701" lon="-122.4655" />
+    <rtept lat="37.7704" lon="-122.4643" />
+    <rtept lat="37.7698" lon="-122.4642" />
+    <rtept lat="37.7694" lon="-122.4661" />
+  </rte>
+</gpx>

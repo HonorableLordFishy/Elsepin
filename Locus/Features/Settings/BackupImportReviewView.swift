@@ -54,7 +54,7 @@ struct BackupImportReviewView: View {
                         }
                     }
                 } header: { Text("Settings changes") } footer: {
-                    Text("Unchecked settings stay as they are. Overview shows the final selected values.")
+                    Text("Only checked settings change.")
                 }.shiftSettingsRows()
             }
             if !backup.trips.isEmpty {
@@ -110,21 +110,23 @@ struct BackupImportReviewView: View {
                 }
                 .frame(minHeight: 44)
                 .disabled((plan?.count ?? 0) == 0 || plan?.needsStoppedSession(hasSession: session.hasSession, isBusy: session.isBusy) == true)
+                .accessibilityIdentifier("backup.review.apply")
+                .loggedConfirmationDialog("Apply selected changes?", isPresented: $confirmation, titleVisibility: .visible) {
+                    Button("Import selected changes") { apply() }
+                        .accessibilityIdentifier("backup.review.confirmApply")
+                    Button("Keep reviewing", role: .cancel) { }
+                } message: {
+                    Text((plan?.summary ?? "No changes selected") + ". Unchecked items stay unchanged.")
+                }
                 Button("Cancel import", role: .cancel) { finished("Import canceled. Nothing was changed.") }
             } footer: {
                 if plan?.needsStoppedSession(hasSession: session.hasSession, isBusy: session.isBusy) == true {
-                    Text("Stop spoofing to apply selected settings that affect movement and session controls. You can import only library items while spoofing.")
+                    Text("Stop spoofing to change movement settings, or import library items only.")
                 }
             }.shiftSettingsRows()
             if let message { Section { Text(message).font(.footnote) }.shiftSettingsRows() }
         }
         .shiftSettingsScreen().loggedNavigationTitle("Review import").navigationBarTitleDisplayMode(.inline)
-        .loggedConfirmationDialog("Apply selected changes?", isPresented: $confirmation, titleVisibility: .visible) {
-            Button("Import selected changes") { apply() }
-            Button("Keep reviewing", role: .cancel) { }
-        } message: {
-            Text((plan?.summary ?? "No changes selected") + ". Unchecked items stay unchanged.")
-        }
     }
 
     @ViewBuilder private func overview(_ plan: BackupImportPlan, review: BackupImportReview) -> some View {
@@ -135,9 +137,9 @@ struct BackupImportReviewView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Added").font(.subheadline.weight(.semibold))
                     VStack(spacing: 6) {
-                        if !plan.places.isEmpty { LabeledContent("Pins", value: "\(plan.places.count)") }
-                        if !plan.trips.isEmpty { LabeledContent("Routes", value: "\(plan.trips.count)") }
-                        if !plan.areas.isEmpty { LabeledContent("Areas", value: "\(plan.areas.count)") }
+                        if !plan.places.isEmpty { addition("Pins", count: plan.places.count) }
+                        if !plan.trips.isEmpty { addition("Routes", count: plan.trips.count) }
+                        if !plan.areas.isEmpty { addition("Areas", count: plan.areas.count) }
                     }.padding(.leading, 16)
                 }
             }
@@ -160,6 +162,17 @@ struct BackupImportReviewView: View {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    private func addition(_ title: String, count: Int) -> some View {
+        LabeledContent {
+            Text(count.formatted())
+        } label: {
+            HStack(spacing: 8) {
+                Circle().fill(.secondary).frame(width: 5, height: 5).accessibilityHidden(true)
+                Text(title)
             }
         }
     }

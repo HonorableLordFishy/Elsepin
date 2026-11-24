@@ -64,10 +64,16 @@ struct RootView: View {
     }
 
     private var navigationTabs: some View {
-        tabs
         // Keep one TabView alive. Solid navigation replaces only its chrome, never
-        // the map or session. OS-owned menus and alerts still follow iOS settings.
-        .modifier(ShiftTabBarBehavior())
+        // the map or session. Give the entire TabView a separate layout region
+        // so pushed navigation destinations also end above the solid tab bar.
+        VStack(spacing: 0) {
+            tabs.modifier(ShiftTabBarBehavior())
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if solidNavigation && (selectedTab != .map || !planner.isDrawing) {
+                solidTabBar
+            }
+        }
         .background(ShiftCanvas())
         .tint(ShiftPalette.color(.accent, style: visualStyle))
         .environmentObject(planner)
@@ -142,24 +148,15 @@ struct RootView: View {
                     isVisible: selectedTab == .map && !planner.isPresented && !showSessionDetails && privacy.canOpenContent,
                     isDrawing: planner.isDrawing, showNotice: showNotice)
                     .toolbar(planner.isDrawing || solidNavigation ? .hidden : .visible, for: .tabBar)
-                    .safeAreaInset(edge: .bottom, spacing: 0) {
-                        if solidNavigation && !planner.isDrawing { solidTabBar }
-                    }
             }
             Tab("Library", systemImage: "square.stack.fill", value: RootTab.library) {
                 PlacesView(isRoot: true, onTrip: openSavedTrip, onPlace: openSavedPin,
                            onFindPlace: findPlace, onCreateRoute: createRoute)
                     .toolbar(solidNavigation ? .hidden : .visible, for: .tabBar)
-                    .safeAreaInset(edge: .bottom, spacing: 0) {
-                        if solidNavigation { solidTabBar }
-                    }
             }
             Tab("Settings", systemImage: "gearshape.fill", value: RootTab.settings) {
                 SettingsView(isRoot: true)
                     .toolbar(solidNavigation ? .hidden : .visible, for: .tabBar)
-                    .safeAreaInset(edge: .bottom, spacing: 0) {
-                        if solidNavigation { solidTabBar }
-                    }
             }
         }
     }
@@ -306,7 +303,7 @@ private struct MapTabContent: View {
                     }
                     .padding(.horizontal, 16)
                     // Preserve the map attribution/legal strip below the tray.
-                    // Each tab's inset already reduces this geometry's height.
+                    // The tab shell already reserves space below this geometry.
                     // Subtracting it again would float the tray too high and
                     // squeeze the large-text details into an unusable sliver.
                     .padding(.bottom, 30)
@@ -745,8 +742,15 @@ struct BottomControlsView: View {
                         Text(session.isStopping ? "Stopping session" : session.pinIsPreview ? session.pin.map { session.suggestedFavoriteName(for: $0) } ?? "Dropped pin" : session.isSpoofing ? "Holding location" : session.hasSession || session.lastError != nil ? session.statusTitle : "Where to next?")
                             .font(.subheadline.weight(.semibold))
                         if let point = session.pinIsPreview ? session.pin : session.simulated {
-                            Text(session.pinIsPreview ? session.selectedPinAddress ?? String(format: "%.5f, %.5f", point.latitude, point.longitude) : session.suggestedFavoriteName(for: point)).font(.caption).foregroundStyle(.secondary)
-                                .lineLimit(2)
+                            if session.pinIsPreview, let address = session.selectedPinAddress {
+                                if address != session.suggestedFavoriteName(for: point) {
+                                    Text(address).font(.caption).foregroundStyle(.secondary)
+                                        .lineLimit(4)
+                                }
+                            } else {
+                                Text(session.pinIsPreview ? String(format: "%.5f, %.5f", point.latitude, point.longitude) : session.suggestedFavoriteName(for: point))
+                                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                            }
                         } else {
                             Text("Search or draw a route.").font(.caption).foregroundStyle(.secondary)
                         }

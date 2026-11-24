@@ -161,6 +161,7 @@ final class SpoofSession: ObservableObject {
     private var routeWorkerID = UUID()
     private var preparedRouteConfirmation: (id: UUID, didStart: () -> Void)?
     private var backgroundTask = UIBackgroundTaskIdentifier.invalid
+    @Published private var joystickSpeedOverride: Double?
     private var joystickVector: CGVector = .zero
     // Camera changes don't publish session/UI updates or start a movement timer.
     private var joystickMapHeading: Double = 0
@@ -351,6 +352,9 @@ final class SpoofSession: ObservableObject {
             SavedPlace.save(savedPins, key: favoritesKey)
         }
         if let settings {
+            if joystickActive, usualSpeedMPH(for: travelMode) != UsualSpeedRules.value(for: travelMode, stored: settings.usualSpeeds) {
+                joystickSpeedOverride = nil
+            }
             usualSpeeds = settings.usualSpeeds
             if let material = settings.material { preferences.appearanceOverrides.material = material }
             else { preferences.glassPanel = settings.glassPanel }
@@ -436,8 +440,18 @@ final class SpoofSession: ObservableObject {
         locationKeeper.requestPreciseFix()
     }
     func cancelDeviceLocationRefresh() { locationKeeper.cancelPreciseFix() }
-    @Published private(set) var selectedPinAddress: String?
+    @Published private var resolvedPinAddress: (point: RoutePoint, address: String)?
     private var pinLookupTask: Task<Void, Never>?
+
+    var selectedPinAddress: String? {
+        guard let pin else { return nil }
+        return resolvedAddress(at: pin) ?? savedPin(at: pin)?.address
+    }
+
+    private func resolvedAddress(at coordinate: CLLocationCoordinate2D) -> String? {
+        guard let resolvedPinAddress, resolvedPinAddress.point == RoutePoint(coordinate) else { return nil }
+        return resolvedPinAddress.address
+    }
 
     func selectPin(_ coordinate: CLLocationCoordinate2D, name: String? = nil) {
         if automaticRecoveryPending {
@@ -451,7 +465,7 @@ final class SpoofSession: ObservableObject {
         if let name { rememberPlaceName(name, at: coordinate) }
         previewSpotName = previewSpotName.flatMap { $0.point.distance(to: RoutePoint(coordinate)) <= 5 ? $0 : nil }
         pinSelectionID = UUID()
-        selectedPinAddress = savedPin(at: coordinate)?.address
+        resolvedPinAddress = nil
         pinLookupTask?.cancel()
         let selection = pinSelectionID
         let workspace = AppDataWorkspace.shared.context.generation
@@ -459,15 +473,25 @@ final class SpoofSession: ObservableObject {
             do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
             guard let details = await PinLocationLookup.resolve(coordinate), !Task.isCancelled,
                   let self, self.pinSelectionID == selection,
+                  self.pin.map({ RoutePoint($0) == RoutePoint(coordinate) }) == true,
                   AppDataWorkspace.shared.context.generation == workspace else { return }
-            self.selectedPinAddress = details.address
+            let point = RoutePoint(coordinate)
+            if let address = details.address { self.resolvedPinAddress = (point, address) }
             if self.placeName(at: coordinate) == nil { self.rememberPlaceName(details.name, at: coordinate) }
-            if let saved = self.savedPin(at: coordinate), Self.isGenericFavoriteName(saved.name) {
-                _ = self.savePin(name: details.name, coordinate: coordinate, address: details.address)
+            if let index = self.savedPins.firstIndex(where: { RoutePoint($0.coordinate) == point }) {
+                var saved = self.savedPins[index]
+                if Self.isGenericFavoriteName(saved.name), !Self.isGenericFavoriteName(details.name) {
+                    saved.name = details.name
+                }
+                if let address = details.address { saved.address = address }
+                if saved != self.savedPins[index] {
+                    self.savedPins[index] = saved
+                    SavedPlace.save(self.savedPins, key: self.favoritesKey)
+                }
             }
             if let index = self.recents.firstIndex(where: { $0.id == "\(coordinate.latitude),\(coordinate.longitude)" }) {
                 if Self.isGenericFavoriteName(self.recents[index].name) { self.recents[index].name = self.suggestedFavoriteName(for: coordinate) }
-                self.recents[index].address = details.address
+                if let address = details.address { self.recents[index].address = address }
                 self.recents = SavedPlace.saveRecents(self.recents, retention: self.preferences.recentHistoryRetention,
                     saveEnabled: self.preferences.saveRecentLocations)
             }
@@ -693,6 +717,7 @@ final class SpoofSession: ObservableObject {
         // cancellation is allowed just because the joystick was opened.
         let ticket = epoch
         joystickVector = .zero
+        joystickSpeedOverride = nil
         joystickActive = true
         joystickTimer?.invalidate()
         joystickTimer = nil
@@ -723,6 +748,7 @@ final class SpoofSession: ObservableObject {
     }
     func stopJoystick() {
         joystickActive = false
+        joystickSpeedOverride = nil
         joystickVector = .zero
         joystickTimer?.invalidate()
         joystickTimer = nil
@@ -748,6 +774,7 @@ final class SpoofSession: ObservableObject {
         }
         // This explicit second Start is the first point at which a draft can
         // change the current session's mode, speed, joystick, or location.
+        stopJoystick()
         changeTravelMode(prepared.mode, keepCurrentPath: true)
         setSpeedMPH(prepared.speedMPH, for: prepared.mode)
         arrivalChoice = prepared.arrival
@@ -1028,9 +1055,13 @@ final class SpoofSession: ObservableObject {
     func setUsualSpeedMPH(_ value: Double, for mode: TravelMode) {
         guard value.isFinite else { return }
         usualSpeeds[mode.rawValue] = mode.clampedSpeedMPH(value)
+        if joystickActive, mode == travelMode { joystickSpeedOverride = nil }
     }
     func resetToUsualSpeed(for mode: TravelMode) { setSpeedMPH(usualSpeedMPH(for: mode), for: mode) }
-    func restoreStartingUsualSpeeds() { usualSpeeds = [:] }
+    func restoreStartingUsualSpeeds() {
+        usualSpeeds = [:]
+        joystickSpeedOverride = nil
+    }
 
     func setCurrentRouteSmoothing(_ enabled: Bool) {
         guard canEditRouteMovement else { return }
@@ -1049,12 +1080,17 @@ final class SpoofSession: ObservableObject {
     }
 
     func speedMPH(for mode: TravelMode) -> Double {
+        if joystickActive, mode == travelMode { return joystickSpeedOverride ?? usualSpeedMPH(for: mode) }
         if let section = currentPlannedSection, section.mode == mode {
             return mode.clampedSpeedMPH(sectionSpeedOverrides[section.id] ?? section.speedMPH)
         }
         return mode == .eBike ? EBikeSpeed.clamped(eBikeSpeedMPH) : mode.clampedSpeedMPH(modeSpeeds[mode.rawValue] ?? usualSpeedMPH(for: mode))
     }
     func setSpeedMPH(_ value: Double, for mode: TravelMode) {
+        if joystickActive, mode == travelMode {
+            joystickSpeedOverride = mode.clampedSpeedMPH(value)
+            return
+        }
         DeveloperLogStore.shared.record("speed_selected", ["mph": String(value), "mode": mode.rawValue])
         speedRevision += 1
         if let section = currentPlannedSection, section.mode == mode {
@@ -1083,7 +1119,10 @@ final class SpoofSession: ObservableObject {
         appliedSectionID = nil
         travelMode = mode
         if let preserveSpeed { setSpeedMPH(preserveSpeed, for: mode) }
-        else if changedMode { setSpeedMPH(usualSpeedMPH(for: mode), for: mode) }
+        else if changedMode {
+            if joystickActive { joystickSpeedOverride = nil }
+            else { setSpeedMPH(usualSpeedMPH(for: mode), for: mode) }
+        }
         speedRevision += 1
         publishActivity(force: true)
     }
@@ -1729,8 +1768,7 @@ final class SpoofSession: ObservableObject {
         // inherit address metadata from the old coordinate or another preview.
         if moved { place.address = address }
         else {
-            place.address = address ?? existing?.address ??
-                (pin.map { RoutePoint($0) == RoutePoint(coordinate) } == true ? selectedPinAddress : nil)
+            place.address = address ?? existing?.address ?? resolvedAddress(at: coordinate)
         }
         if let emoji {
             guard emoji.isEmpty || PinAppearance.isSingleEmoji(emoji) else { return false }
@@ -1844,7 +1882,7 @@ final class SpoofSession: ObservableObject {
             AppDataWorkspace.defaults.removeObject(forKey: key)
         }
         savedPinRecoveryCount = 0; recentPinRecoveryCount = 0
-        pinSelectionID = UUID(); pin = nil; pinIsPreview = false
+        pinSelectionID = UUID(); pin = nil; pinIsPreview = false; resolvedPinAddress = nil
         previewSpotName = nil; sessionSpotName = nil; activeSavedTripID = nil
         epoch += 1
         cancelRoute(clearJourney: false)
@@ -1869,7 +1907,7 @@ final class SpoofSession: ObservableObject {
         preparedRouteConfirmation = nil; routeSmoothMovement = nil
         activeRoute = nil; activeSavedTripID = nil; journey = nil
         chosenNames = []; previewSpotName = nil; sessionSpotName = nil
-        pin = nil; pinIsPreview = false; pinSelectionID = UUID()
+        pin = nil; pinIsPreview = false; pinSelectionID = UUID(); resolvedPinAddress = nil
         simulated = nil; lastConfirmedAt = nil; startedAt = nil
         stopProgress = RouteStopProgress(); lastError = nil
         routeSectionSettingsEnabled = false; sectionSpeedOverrides = [:]; appliedSectionID = nil
@@ -2024,8 +2062,7 @@ final class SpoofSession: ObservableObject {
             longitude: coordinate.longitude,
             visitedAt: Date()
         )
-        place.address = savedPin(at: coordinate)?.address ??
-            (pin.map { RoutePoint($0) == RoutePoint(coordinate) } == true ? selectedPinAddress : nil)
+        place.address = resolvedAddress(at: coordinate) ?? savedPin(at: coordinate)?.address
         recents.removeAll {
             abs($0.latitude - place.latitude) < 0.00015 && abs($0.longitude - place.longitude) < 0.00015
         }

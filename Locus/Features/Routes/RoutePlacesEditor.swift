@@ -40,10 +40,10 @@ struct RoutePlacesEditor: View {
                         }
                     }
                     Button { addStop = true } label: { Label("Add stop", systemImage: "plus.circle") }.disabled(places.count >= 10)
-                } footer: { Text("Tap a place to change its name, location, or wait. Names stay with this trip. Moving a place or removing a stop finds new directions; names and waits alone keep the exact path.") }
+                } footer: { Text("Names and waits keep this path. Moving or removing a stop finds new directions.") }
                 Section {
                     Toggle("Also save these places", isOn: $savePlaces)
-                } footer: { Text("Adds the start, stops, and destination to Saved, or updates names at those exact saved points. Leave off for names used only in this trip. Save changes to trip afterward to keep the updated route in your library.") }
+                } footer: { Text("Adds these places to Saved and updates matching pin names. Turn off for trip-only names. Save the trip afterward to keep your edits.") }
             }
             .shiftScreen().loggedNavigationTitle("Places & stops").navigationBarTitleDisplayMode(.inline)
             .toolbar {

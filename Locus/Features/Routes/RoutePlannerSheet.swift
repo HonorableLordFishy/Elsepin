@@ -50,6 +50,8 @@ struct RoutePlannerSheet: View {
     @State private var previewLine: (id: UUID, line: MKPolyline)?
     @State private var previewPosition: MapCameraPosition = .automatic
     @State private var previewRegion: MKCoordinateRegion?
+    @State private var previewCamera: MapCamera?
+    @State private var previewDetail: (position: MapCameraPosition, region: MKCoordinateRegion?)?
     @State private var endpointSearchArea: MKCoordinateRegion?
     @State private var confirmStoredRecalculation = false
     @State private var swapBeforeRecalculation = false
@@ -592,7 +594,10 @@ struct RoutePlannerSheet: View {
                         searchEndpoint = planner.origin == nil ? .origin : .destination
                     }
                 }
-                Button("Fit", systemImage: "arrow.up.left.and.arrow.down.right") { fitPreview(route) }
+                Button(previewDetail == nil ? "Fit route" : "Return to route detail",
+                       systemImage: previewDetail == nil ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left") {
+                    togglePreviewFit(route)
+                }
                     .labelStyle(.iconOnly).frame(width: 44, height: 44)
             }.buttonStyle(.borderless).padding(.horizontal, 12)
             Map(position: $previewPosition, interactionModes: [.pan, .zoom]) {
@@ -624,7 +629,13 @@ struct RoutePlannerSheet: View {
             .frame(height: 220)
             .onMapCameraChange(frequency: .onEnd) { context in
                 if context.region.searchBounds.isValid { previewRegion = context.region }
+                if MapViewportSafety.validCamera(latitude: context.camera.centerCoordinate.latitude,
+                    longitude: context.camera.centerCoordinate.longitude, distance: context.camera.distance,
+                    pitch: context.camera.pitch, heading: context.camera.heading) {
+                    previewCamera = context.camera
+                }
             }
+            .onChange(of: previewPosition.positionedByUser) { _, isUser in if isUser { previewDetail = nil } }
             .overlay(alignment: .topTrailing) {
                 if route != nil {
                 Button { showPractice = true } label: {
@@ -639,23 +650,42 @@ struct RoutePlannerSheet: View {
         }
         .listRowInsets(EdgeInsets())
         .listRowBackground(Color.clear)
-        .onAppear { fitPreview(route) }
-        .onChange(of: route?.id) { _, _ in fitPreview(route) }
-        .onChange(of: planner.origin.map { RoutePoint($0.coordinate) }) { _, _ in if route == nil { fitPreview(nil) } }
-        .onChange(of: planner.destination.map { RoutePoint($0.coordinate) }) { _, _ in if route == nil { fitPreview(nil) } }
+        .onChange(of: route?.id, initial: true) { _, _ in resetPreviewFit(route) }
+        .onChange(of: planner.origin.map { RoutePoint($0.coordinate) }) { _, _ in if route == nil { resetPreviewFit(nil) } }
+        .onChange(of: planner.destination.map { RoutePoint($0.coordinate) }) { _, _ in if route == nil { resetPreviewFit(nil) } }
     }
 
-    private func fitPreview(_ route: PlannedRoute?) {
+    private func resetPreviewFit(_ route: PlannedRoute?) {
+        previewCamera = nil
+        previewDetail = nil
+        fitPreview(route, preserveCamera: false)
+    }
+
+    private func togglePreviewFit(_ route: PlannedRoute?) {
+        if let detail = previewDetail {
+            previewDetail = nil
+            previewPosition = detail.position
+            previewRegion = detail.region
+        } else {
+            fitPreview(route, preserveCamera: true)
+        }
+    }
+
+    private func fitPreview(_ route: PlannedRoute?, preserveCamera: Bool) {
         if let route {
             if previewLine?.id != route.id {
                 previewLine = (route.id, MKPolyline(coordinates: route.coordinates, count: route.coordinates.count))
             }
-            if let rect = previewLine?.line.boundingMapRect { fitPreviewRect(rect) }
+            let metres = hasJourney ? session.journey?.travelledMetres ?? 0 : 0
+            if let rect = previewLine?.line.boundingMapRect {
+                fitPreviewRect(rect, detailCenter: route.track.point(at: metres).coordinate, preserveCamera: preserveCamera)
+            }
         } else {
             previewLine = nil
             let points = [planner.origin?.coordinate, planner.destination?.coordinate].compactMap { $0 }
-            if points.count > 1 {
-                fitPreviewRect(MKPolyline(coordinates: points, count: points.count).boundingMapRect)
+            if points.count > 1, let center = points.first {
+                fitPreviewRect(MKPolyline(coordinates: points, count: points.count).boundingMapRect,
+                               detailCenter: center, preserveCamera: preserveCamera)
             } else if let center = points.first ?? session.pin ?? session.defaultRouteOrigin?.coordinate ?? session.realCoordinate {
                 let region = MKCoordinateRegion(center: center, latitudinalMeters: 2000, longitudinalMeters: 2000)
                 previewPosition = .region(region); previewRegion = region
@@ -663,8 +693,14 @@ struct RoutePlannerSheet: View {
         }
     }
 
-    private func fitPreviewRect(_ rect: MKMapRect) {
+    private func fitPreviewRect(_ rect: MKMapRect, detailCenter: CLLocationCoordinate2D, preserveCamera: Bool) {
         guard !rect.isNull, rect.size.width.isFinite, rect.size.height.isFinite else { return }
+        if preserveCamera, let camera = previewCamera {
+            previewDetail = (.camera(camera), previewRegion)
+        } else {
+            let detail = MKCoordinateRegion(center: detailCenter, latitudinalMeters: 2000, longitudinalMeters: 2000)
+            previewDetail = (.region(detail), detail)
+        }
         let fitted = rect.insetBy(dx: -max(rect.size.width * 0.18, 1000), dy: -max(rect.size.height * 0.18, 1000))
         previewPosition = .rect(fitted)
         previewRegion = MKCoordinateRegion(fitted)
