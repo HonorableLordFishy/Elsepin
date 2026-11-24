@@ -162,7 +162,7 @@ jobs:
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testDeletedSelectionAfterLongListScroll")
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testSavedPinLowerEdgeHoldOnlyMovesPreview")
           elif [[ "$UI_FOCUS" == routes ]]; then
-            for test_name in testUsualSpeedsApplyToNewRoutesAndPersist testSavedLegModeAndCustomSpeedsSurviveReopening testRecalculateSavedRouteRetainsStopsAndSavesNewSpeed; do
+            for test_name in testUsualSpeedsApplyToNewRoutesAndPersist testSavedLegModeAndCustomSpeedsSurviveReopening testInlineLegPathChoiceResetsAndBackDiscardsAtLargestText testInlineNewLegDirectionsRecalculatesOnceAndPreservesSavedStops testRecalculateSavedRouteRetainsStopsAndSavesNewSpeed; do
               test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$test_name")
             done
           elif [[ "$UI_FOCUS" == route-search ]]; then

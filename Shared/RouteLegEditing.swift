@@ -1,6 +1,6 @@
 import Foundation
 
-enum RouteLegPathChoice: Equatable { case keepCurrent, recalculate }
+enum RouteLegPathChoice: Hashable { case keepCurrent, recalculate }
 
 enum RouteLegPathPolicy {
     static func needsChoice(from old: TravelMode, to new: TravelMode, exactPath: Bool) -> Bool {

@@ -195,6 +195,7 @@ struct ValidationRouteHarness: View {
     @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var preferences: SessionPreferences
     @EnvironmentObject private var library: TripLibrary
+    @Environment(\.dynamicTypeSize) private var typeSize
     @StateObject private var driver = ValidationRouteDriver()
     @State private var started = false
     @State private var showPlanner = false
@@ -210,7 +211,8 @@ struct ValidationRouteHarness: View {
         let trip = disk.trips.first { $0.id == id }
         var value: [String: Any] = ["loadError": disk.error ?? "", "count": disk.trips.count,
             "usualWalk": session.usualSpeedMPH(for: .walk), "usualDrive": session.usualSpeedMPH(for: .drive),
-            "draftSpeed": driver.planner.draftSpeedMPH, "draftMode": driver.planner.draftMode.rawValue]
+            "draftSpeed": driver.planner.draftSpeedMPH, "draftMode": driver.planner.draftMode.rawValue,
+            "directionsRequests": driver.requests.count]
         if let trip, let data = try? JSONEncoder().encode(trip),
            let object = try? JSONSerialization.jsonObject(with: data) { value["saved"] = object }
         if let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
@@ -274,6 +276,7 @@ struct ValidationRouteHarness: View {
             }) {
                 RoutePlannerSheet().environmentObject(driver.planner)
                     .environment(\.shiftEditorEmbedded, true)
+                    .environment(\.dynamicTypeSize, ValidationFixture.largeText ? .accessibility5 : typeSize)
             }
             .task {
                 guard !started else { return }; started = true

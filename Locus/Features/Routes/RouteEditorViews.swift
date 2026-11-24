@@ -245,6 +245,7 @@ struct RouteSectionChoiceSheet: View {
     @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var preferences: SessionPreferences
     @Environment(\.shiftEditorEmbedded) private var embedded
+    @Environment(\.dynamicTypeSize) private var typeSize
     let title: String
     let original: RouteLegChoice
     let onSave: (RouteLegChoice, RouteLegPathChoice) -> Void
@@ -252,7 +253,12 @@ struct RouteSectionChoiceSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var mode: TravelMode
     @State private var speed: Double
-    @State private var confirmRoadChange = false
+    @State private var pathChoice = RouteLegPathChoice.keepCurrent
+    @State private var didSave = false
+
+    private var needsPathChoice: Bool {
+        RouteLegPathPolicy.needsChoice(from: original.mode, to: mode, exactPath: keepsExactPath)
+    }
 
     init(title: String, choice: RouteLegChoice, keepsExactPath: Bool = false,
          onSave: @escaping (RouteLegChoice, RouteLegPathChoice) -> Void) {
@@ -267,7 +273,7 @@ struct RouteSectionChoiceSheet: View {
                     Text(title).font(.subheadline).foregroundStyle(.secondary)
                     VStack(spacing: 0) {
                         ForEach(TravelMode.allCases) { item in
-                            Button { mode = item } label: {
+                            Button { selectMode(item) } label: {
                                 HStack(spacing: 12) {
                                     Label(item.title, systemImage: item.icon)
                                     Spacer()
@@ -275,6 +281,10 @@ struct RouteSectionChoiceSheet: View {
                                 }.frame(minHeight: 44).contentShape(Rectangle())
                             }.buttonStyle(.plain).accessibilityAddTraits(mode == item ? .isSelected : [])
                         }
+                    }
+                    if needsPathChoice {
+                        Divider()
+                        pathOptions
                     }
                     Divider()
                     HStack {
@@ -289,29 +299,60 @@ struct RouteSectionChoiceSheet: View {
             .toolbar {
                 if !embedded { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        if RouteLegPathPolicy.needsChoice(from: original.mode, to: mode, exactPath: keepsExactPath) { confirmRoadChange = true }
-                        else { save(.keepCurrent) }
-                    }
-                    .loggedConfirmationDialog("\(original.mode.title) → \(mode.title)", isPresented: $confirmRoadChange, titleVisibility: .visible) {
-                        Button("Keep current path") { save(.keepCurrent) }
-                        Button("Recalculate directions") { save(.recalculate) }
-                        Button("Cancel", role: .cancel) { }
-                    } message: {
-                        Text(keepsExactPath
-                            ? "Both options keep your stops. Save to update your Library copy."
-                            : "Keep this path at the new speed or find directions for \(mode.title).")
-                    }
+                    Button("Done", action: save).disabled(didSave)
                 }
             }
-            .onChange(of: mode) { _, new in
-                speed = new == original.mode ? original.speedMPH : session.usualSpeedMPH(for: new)
-            }
-
         }
     }
-    private func save(_ path: RouteLegPathChoice) {
-        onSave(RouteLegChoice(mode: mode, speedMPH: mode.clampedSpeedMPH(speed)), path)
+
+    private var pathOptions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            let headingLayout = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                : AnyLayout(HStackLayout(spacing: 8))
+            headingLayout {
+                Text("Route path").font(.subheadline.weight(.semibold)).accessibilityAddTraits(.isHeader)
+                Text("\(original.mode.title) → \(mode.title)").font(.subheadline).foregroundStyle(.secondary)
+            }
+            if typeSize.isAccessibilitySize {
+                VStack(spacing: 0) {
+                    pathOption("Keep path", choice: .keepCurrent)
+                    pathOption("New directions", choice: .recalculate)
+                }
+            } else {
+                Picker("Route path", selection: $pathChoice) {
+                    Text("Keep path").tag(RouteLegPathChoice.keepCurrent)
+                    Text("New directions").tag(RouteLegPathChoice.recalculate)
+                }.pickerStyle(.segmented)
+            }
+        }
+    }
+
+    private func pathOption(_ title: String, choice: RouteLegPathChoice) -> some View {
+        Button { pathChoice = choice } label: {
+            HStack(spacing: 12) {
+                Text(title).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 12)
+                if pathChoice == choice {
+                    Image(systemName: "checkmark").foregroundStyle(LocusTheme.accent).accessibilityHidden(true)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityAddTraits(pathChoice == choice ? .isSelected : [])
+    }
+
+    private func selectMode(_ newMode: TravelMode) {
+        guard mode != newMode else { return }
+        mode = newMode
+        speed = newMode == original.mode ? original.speedMPH : session.usualSpeedMPH(for: newMode)
+        pathChoice = .keepCurrent
+    }
+
+    private func save() {
+        guard !didSave else { return }
+        didSave = true
+        onSave(RouteLegChoice(mode: mode, speedMPH: mode.clampedSpeedMPH(speed)), needsPathChoice ? pathChoice : .keepCurrent)
         dismiss()
     }
 }
