@@ -33,9 +33,9 @@ struct PlannedRoute: Identifiable {
         if !travelSections.isEmpty { return RouteTravelSection.valid(travelSections, length: track.length) }
         return source.supports(mode) || storedMode == mode
     }
-    func movingEstimate(mode: TravelMode, speed: Double, smooth: Bool, from metres: Double = 0) -> Double {
+    func movingEstimate(mode: TravelMode, speed: Double, smooth: Bool, from metres: Double = 0, progress: RouteStopProgress? = nil) -> Double {
         timingCache.profile(routeID: id, track: track, mode: mode, speed: speed,
-                            smooth: smooth, stops: stops, sections: travelSections).remaining(from: metres)
+                            smooth: smooth, stops: progress?.timingStops(in: stops) ?? stops, sections: travelSections).remaining(from: metres)
     }
     func estimate(mode: TravelMode, speed: Double, smooth: Bool) -> Double {
         movingEstimate(mode: mode, speed: speed, smooth: smooth) + stops.reduce(0) { $0 + $1.estimatedWait }

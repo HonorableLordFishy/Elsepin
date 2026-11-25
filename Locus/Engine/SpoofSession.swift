@@ -557,7 +557,7 @@ final class SpoofSession: ObservableObject {
         guard let journey, let route = activeRoute, effectivePhase == .active,
               journey.state == .moving || journey.state == .waiting else { return nil }
         let moving = route.movingEstimate(mode: travelMode, speed: cruiseSpeed(for: travelMode),
-                                         smooth: currentSmoothMovement, from: journey.travelledMetres)
+                                         smooth: currentSmoothMovement, from: journey.travelledMetres, progress: stopProgress)
         return moving + stopProgress.remainingWait(in: route.stops)
     }
 

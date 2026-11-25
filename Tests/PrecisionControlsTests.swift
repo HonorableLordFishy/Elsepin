@@ -34,6 +34,23 @@ final class PrecisionControlsTests: XCTestCase {
         }
     }
 
+    func testWritesAroundOneSecondDoNotBurstAfterAQuickConfirmation() {
+        let speed = SpeedConversion.metresPerSecond(mph: 60)
+        for interval in [MovementPlaybackClock.routeInterval, MovementPlaybackClock.joystickInterval] {
+            for latency in [0.999, 1.000, 1.001] {
+                var clock = MovementPlaybackClock(now: 0, interval: interval)
+                _ = clock.advance(now: interval)
+                let acknowledgment = interval + latency
+                clock.confirm(now: acknowledgment)
+                let delay = clock.delay(now: acknowledgment)
+                XCTAssertGreaterThanOrEqual(delay, interval - 0.00101)
+                let step = speed * clock.advance(now: acknowledgment + delay)
+                XCTAssertEqual(step, speed * interval, accuracy: 0.00001)
+                XCTAssertLessThanOrEqual(step / (delay + 0.05), speed)
+            }
+        }
+    }
+
     func testResumeAndJumpResetPriorConfirmationTiming() {
         var clock = MovementPlaybackClock(now: 0)
         _ = clock.advance(now: 0.5); clock.confirm(now: 0.7)

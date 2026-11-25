@@ -45,6 +45,20 @@ final class RouteTimingTests: XCTestCase {
         XCTAssertEqual(progress.remainingWait(in: [stop]), 0)
     }
 
+    func testResolvedGreenRemovesBrakingAndWaitFromLiveEstimate() throws {
+        let route = try track([.init(latitude: 0, longitude: 0), .init(latitude: 0, longitude: 0.01)])
+        let light = RouteStop(name: "Light", metres: route.length / 2, waitSeconds: 0, signal: .enabled)
+        for wait in [0.0, 20.0] {
+            var progress = RouteStopProgress()
+            _ = progress.nextMovementBoundary(in: [light], sample: { wait })
+            let moving = profile(route, smooth: true, stops: progress.timingStops(in: [light])).seconds
+            let uninterrupted = profile(route, smooth: true).seconds
+            if wait == 0 { XCTAssertEqual(moving, uninterrupted) }
+            else { XCTAssertGreaterThan(moving, uninterrupted) }
+            XCTAssertEqual(progress.remainingWait(in: [light]), wait)
+        }
+    }
+
     func testDifferentSectionSpeedsSurviveSeeks() throws {
         let route = try track([.init(latitude: 0, longitude: 0), .init(latitude: 0, longitude: 0.01)])
         let sections = [RouteTravelSection(id: UUID(), startMetres: 0, endMetres: route.length / 2, mode: .walk, speedMPH: 3),

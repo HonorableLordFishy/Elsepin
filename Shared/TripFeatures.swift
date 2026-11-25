@@ -90,6 +90,11 @@ struct RouteStopProgress: Equatable, Codable {
         return remainingSeconds == 0
     }
 
+    func timingStops(in stops: [RouteStop]) -> [RouteStop] {
+        guard let signalWaits else { return stops }
+        return stops.filter { $0.signal == nil || signalWaits[$0.id] != 0 }
+    }
+
     func next(in stops: [RouteStop]) -> RouteStop? { stops.first { !completed.contains($0.id) } }
     /// Resolve upcoming lights through the next stopping point. Green lights
     /// create no motion boundary. The decision stays with the checkpoint.
@@ -257,7 +262,13 @@ struct MovementPlaybackClock {
     mutating func confirm(now: Double) {
         // Ordinary writes consume part of the interval between dispatches.
         // After a stall, wait a full tick and drop accumulated travel time.
-        if now.isFinite, now - lastDispatch > Self.maximumWriteTime { reset(now: now) }
+        let duration = now - lastDispatch
+        let ordinaryLimit = Self.maximumWriteTime / 2
+        guard now.isFinite, duration > ordinaryLimit else { return }
+        // Gradually discard timing debt as a write approaches a stall.
+        // This avoids a full second of catch-up immediately after a slow write.
+        let retained = max(0, Self.maximumWriteTime - duration)
+        lastDispatch = now - retained
     }
     static func travelTime(for elapsed: Double, interval: Double) -> Double {
         guard elapsed.isFinite, elapsed > 0 else { return 0 }
