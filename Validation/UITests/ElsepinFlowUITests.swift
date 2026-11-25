@@ -1243,7 +1243,8 @@ extension ElsepinFlowUITests {
         let teleport = app.buttons["Teleport"]
         let mapTab = app.buttons["navigation.map"]
         let shortAddress = app.staticTexts["12 Oak Street"]
-        let longAddress = app.staticTexts["1842 North Observatory Promenade, Riverside Botanical Garden, West Conservatory Entrance, Lower Hudson River Waterfront, New York, NY 10019"]
+        let longLabel = "1842 North Observatory Promenade, Riverside Botanical Garden, West Conservatory Entrance, Lower Hudson River Waterfront, New York, NY 10019"
+        let longAddress = app.staticTexts.matching(NSPredicate(format: "label == %@", longLabel)).firstMatch
 
         app.buttons["Select short address"].tap()
         XCTAssertTrue(shortAddress.waitForExistence(timeout: 10))
@@ -1271,13 +1272,14 @@ extension ElsepinFlowUITests {
     private func checkAddressOnlyPinScrolls() {
         let address = "940 North Observatory Promenade, Riverside Botanical Garden, Lower Hudson Waterfront, Reservoir Service Trail, North Arboretum Conservatory, Garden Education Annex, North River Research Campus, Manhattan Waterfront District, New York, NY 10019, Wren Gate"
         let details = app.scrollViews["map.pinAddressDetails"]
-        let title = details.staticTexts[address]
+        let exactAddress = NSPredicate(format: "label == %@", address)
+        let title = details.staticTexts.matching(exactAddress).firstMatch
         let teleport = app.buttons["Teleport"]
 
         app.buttons["Select address only"].tap()
         XCTAssertTrue(details.waitForExistence(timeout: 10))
         XCTAssertTrue(title.waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts.matching(identifier: address).count, 1)
+        XCTAssertEqual(app.staticTexts.matching(exactAddress).count, 1)
         let initialBottom = title.frame.maxY
         XCTAssertGreaterThan(initialBottom, details.frame.maxY + 12, "Wren Gate should start below the viewport")
         XCTAssertTrue(teleport.isHittable)

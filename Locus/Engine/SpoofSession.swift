@@ -457,7 +457,8 @@ final class SpoofSession: ObservableObject {
         guard let pin else { return false }
         let point = RoutePoint(pin)
         guard previewSpotName?.point != point, sessionSpotName?.point != point,
-              let remembered = chosenNames.first(where: { $0.spot.point == point }), remembered.usesAddress else { return false }
+              let remembered = chosenNames.first(where: { $0.spot.point == point }),
+              remembered.usesAddress else { return false }
         if let savedName = savedPin(at: pin)?.name, !Self.isGenericFavoriteName(savedName) {
             return savedName == remembered.updatedSavedName
         }
@@ -494,7 +495,8 @@ final class SpoofSession: ObservableObject {
             let point = RoutePoint(coordinate)
             if let address = details.address { self.resolvedPinAddress = (point, address) }
             if self.placeName(at: coordinate) == nil {
-                let updatesSavedName = self.savedPin(at: coordinate).map { Self.isGenericFavoriteName($0.name) } ?? false
+                let savedName = self.savedPin(at: coordinate)?.name
+                let updatesSavedName = details.nameUsesAddress && savedName.map(Self.isGenericFavoriteName) == true
                 self.rememberPlaceName(details.name, at: coordinate, usesAddress: details.nameUsesAddress,
                                        updatedSavedName: updatesSavedName ? details.name : nil)
             }

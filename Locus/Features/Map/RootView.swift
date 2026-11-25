@@ -504,6 +504,7 @@ struct BottomControlsView: View {
                         .padding(.top, 0)
                 }
                 .padding(.bottom, 4)
+                .fixedSize(horizontal: false, vertical: address != nil)
                 .layoutPriority(address == nil ? 0 : 1)
             }
             .padding(.horizontal, 14).padding(.top, 12)
