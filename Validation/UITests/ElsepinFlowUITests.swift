@@ -17,13 +17,15 @@ final class ElsepinFlowUITests: XCTestCase {
             restoreAccessibility = false
         }
     }
-    private func launch(_ scenario: String, large: Bool = false, dark: Bool = false, fallback: Bool = false, narrow: Bool = true) {
+    private func launch(_ scenario: String, large: Bool = false, dark: Bool = false, fallback: Bool = false,
+                        narrow: Bool = true, cellular: Bool? = nil) {
         app = XCUIApplication()
         app.launchArguments = ["--elsepin-ui-test"]
         if narrow { app.launchArguments.append("--narrow") }
         if large { app.launchArguments.append("--large-text") }
         if dark { app.launchArguments.append("--dark") }
         if fallback { app.launchArguments.append("--accessibility-fallback") }
+        if let cellular { app.launchArguments.append(cellular ? "--stop-cellular" : "--stop-wifi") }
         app.launchEnvironment["ELSEPIN_TEST_SCENARIO"] = scenario
         app.launch()
         XCTAssertTrue(app.staticTexts["validation.banner"].waitForExistence(timeout: 20))
@@ -551,7 +553,7 @@ final class ElsepinFlowUITests: XCTestCase {
         capture(solid ? "16-idle-solid-tray-spacing" : "17-idle-glass-tray-spacing")
     }
     func testMovingPauseResumeAndStop() {
-        launch("moving")
+        launch("moving", cellular: false)
         reachable("session.pause"); reachable("session.stop")
         reachable("map.routeSearch"); reachable("map.follow")
         reachable("Route details")
@@ -565,7 +567,69 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier == 'session.pause' AND label CONTAINS 'Pause'")).firstMatch.waitForExistence(timeout: 10))
         app.buttons["session.stop"].tap()
         XCTAssertTrue(app.staticTexts["Where do you want to go?"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.alerts["Stop spoofing?"].exists)
         capture("03-cleared-test-session")
+    }
+
+    func testCellularStopFromMovingRouteKeepsThenClearsSession() {
+        launch("moving", narrow: false, cellular: true)
+        keepThenStopCellularSession(activeStatus: "Following route")
+    }
+
+    func testCellularStopFromHeldPinKeepsThenClearsSession() {
+        launch("held-location", narrow: false, cellular: true)
+        let teleport = app.buttons["Teleport"]
+        XCTAssertTrue(teleport.waitForExistence(timeout: 10))
+        teleport.tap()
+        let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow"]
+        if allow.waitForExistence(timeout: 3) { allow.tap() }
+        keepThenStopCellularSession(activeStatus: "Holding location")
+    }
+
+    private func keepThenStopCellularSession(activeStatus: String) {
+        let active = app.staticTexts[activeStatus]
+        XCTAssertTrue(active.waitForExistence(timeout: 10))
+        let stop = app.buttons["session.stop"]
+        XCTAssertTrue(stop.isHittable)
+        stop.tap()
+
+        let confirmation = app.alerts["Stop spoofing?"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+        XCTAssertTrue(confirmation.staticTexts["You’re on cellular. Starting again may require Wi-Fi or a hotspot."].exists)
+        XCTAssertEqual(confirmation.frame.midX, app.frame.midX, accuracy: app.frame.width * 0.1)
+        XCTAssertEqual(confirmation.frame.midY, app.frame.midY, accuracy: app.frame.height * 0.1)
+        capture("cellular-stop-confirmation-" + activeStatus)
+        confirmation.buttons["Keep spoofing"].tap()
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(active.exists)
+        XCTAssertTrue(stop.isHittable)
+
+        stop.tap()
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+        confirmation.buttons["Stop spoofing"].tap()
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(stop.waitForNonExistence(timeout: 10))
+        XCTAssertFalse(active.exists)
+        capture("cellular-session-stopped-" + activeStatus)
+    }
+
+    func testCellularStopConfirmationDoesNotFollowReplacementRoute() {
+        launch("route-search-replacement", narrow: false, cellular: true)
+        let following = app.staticTexts["Following route"]
+        XCTAssertTrue(following.waitForExistence(timeout: 10))
+        let stop = app.buttons["session.stop"]
+        stop.tap()
+        let confirmation = app.alerts["Stop spoofing?"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+
+        let request = CFNotificationName(rawValue: "com.n3mostudio.elsepin.validation.replace-route" as CFString)
+        CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), request, nil, nil, true)
+
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Test replacement destination"].waitForExistence(timeout: 10))
+        XCTAssertTrue(following.waitForExistence(timeout: 10))
+        XCTAssertTrue(stop.isHittable)
+        capture("cellular-replacement-route-still-active")
     }
 
     func testSavedRouteStartsFromPreviewAndReconnectsPaused() {
@@ -942,11 +1006,16 @@ final class ElsepinFlowUITests: XCTestCase {
         reachable("session.stop")
     }
     func testFailedStateOffersRecovery() {
-        launch("failed")
+        launch("failed", cellular: true)
         if app.alerts.firstMatch.waitForExistence(timeout: 5) { app.alerts.buttons["OK"].tap() }
         XCTAssertTrue(app.buttons["Retry connection"].waitForExistence(timeout: 10))
         reachable("session.stop")
         capture("08-failed-test-only")
+        let clear = app.buttons["session.stop"]
+        XCTAssertEqual(clear.label, "Try clearing location")
+        clear.tap()
+        XCTAssertTrue(clear.waitForNonExistence(timeout: 10))
+        XCTAssertFalse(app.alerts["Stop spoofing?"].exists)
     }
 
     func testFirstLaunchCanDeferSetupAndSaveASearchedPin() {

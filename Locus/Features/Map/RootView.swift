@@ -865,7 +865,7 @@ struct BottomControlsView: View {
     }
 
     private var stopSpoofing: some View {
-        Button { session.stop(pairing: pairing) } label: {
+        StopSpoofingButton(isVisible: controlsEnabled) {
             HStack(spacing: 6) {
                 if session.isStopping { ProgressView().controlSize(.small) }
                 else { Image(systemName: "stop.circle").font(typeSize.isAccessibilitySize ? .system(size: 20) : .subheadline) }

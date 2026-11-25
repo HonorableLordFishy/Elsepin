@@ -5,6 +5,7 @@ import Combine
 import CoreFoundation
 import SwiftUI
 import MapKit
+import Network
 import UIKit
 
 enum ValidationFixture {
@@ -19,6 +20,16 @@ enum ValidationFixture {
     static var firstLaunch: Bool { scenario == "first-launch" }
     static var drawnRoute: Bool { scenario == "drawn-route" }
     static var routeReconnect: Bool { scenario == "route-reconnect" }
+    static var stopNetworkPath: StopNetworkPath? {
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--stop-cellular") {
+            return StopNetworkPath(status: .satisfied, usesCellular: true, usesWiFi: false, usesEthernet: false)
+        }
+        if arguments.contains("--stop-wifi") {
+            return StopNetworkPath(status: .satisfied, usesCellular: false, usesWiFi: true, usesEthernet: false)
+        }
+        return nil
+    }
     static let reconnectTripName = "Test park loop"
     static let routeReplacementRequest = Notification.Name("com.n3mostudio.elsepin.validation.replace-route")
     static let unreadableTrips = Data("corrupt disposable trips".utf8)
@@ -315,6 +326,7 @@ private struct ValidationHost: View {
             .environmentObject(library)
             .environment(\.shiftVisualStyle, preferences.visualStyle)
             .environment(\.shiftIconDesign, preferences.iconSelection.design)
+            .environment(\.stopNetworkPathOverride, ValidationFixture.stopNetworkPath)
             .environment(\.dynamicTypeSize, ValidationFixture.largeText ? .accessibility5 : .large)
             .preferredColorScheme(ValidationFixture.dark ? .dark : .light)
             .tint(ShiftPalette.color(.accent, style: preferences.visualStyle))

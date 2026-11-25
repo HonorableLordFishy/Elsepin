@@ -1,3 +1,4 @@
+import Network
 import SwiftUI
 
 struct JourneyCard: View {
@@ -65,7 +66,6 @@ struct JourneyCard: View {
 /// Shared labels and behavior on the map and in the route sheet.
 struct RoutePlaybackControls: View {
     @EnvironmentObject private var session: SpoofSession
-    @EnvironmentObject private var pairing: PairingStore
     @Environment(\.dynamicTypeSize) private var typeSize
     var compact = false
     var includeStopSpoofing = false
@@ -112,7 +112,7 @@ struct RoutePlaybackControls: View {
                 .buttonStyle(ShiftActionStyle(kind: .secondary))
                 .disabled(session.isBusy || session.routeStopping)
                 if includeStopSpoofing && session.hasSession {
-                    Button { session.stop(pairing: pairing) } label: {
+                    StopSpoofingButton {
                         Label(session.stopButtonTitle, systemImage: "location.slash")
                             .font(.caption.weight(.semibold)).frame(maxWidth: .infinity, minHeight: 46).contentShape(Rectangle())
                     }
@@ -131,5 +131,106 @@ struct RoutePlaybackControls: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+}
+
+struct StopNetworkPath: Sendable {
+    let status: NWPath.Status
+    let usesCellular: Bool
+    let usesWiFi: Bool
+    let usesEthernet: Bool
+
+    var usesCellularAlone: Bool {
+        status == .satisfied && usesCellular && !usesWiFi && !usesEthernet
+    }
+}
+
+#if ELSEPIN_UI_TESTING && targetEnvironment(simulator)
+private struct StopNetworkPathOverrideKey: EnvironmentKey {
+    static let defaultValue: StopNetworkPath? = nil
+}
+
+extension EnvironmentValues {
+    var stopNetworkPathOverride: StopNetworkPath? {
+        get { self[StopNetworkPathOverrideKey.self] }
+        set { self[StopNetworkPathOverrideKey.self] = newValue }
+    }
+}
+#endif
+
+struct StopSpoofingButton<Label: View>: View {
+    @EnvironmentObject private var session: SpoofSession
+    @EnvironmentObject private var pairing: PairingStore
+    @Environment(\.scenePhase) private var scenePhase
+    #if ELSEPIN_UI_TESTING && targetEnvironment(simulator)
+    @Environment(\.stopNetworkPathOverride) private var pathOverride
+    #else
+    private let pathOverride: StopNetworkPath? = nil
+    #endif
+    @State private var monitor: NWPathMonitor?
+    @State private var pendingStop: Int?
+    let isVisible: Bool
+    let label: () -> Label
+
+    init(isVisible: Bool = true, @ViewBuilder label: @escaping () -> Label) {
+        self.isVisible = isVisible
+        self.label = label
+    }
+
+    private var observesNetwork: Bool {
+        isVisible && scenePhase == .active && session.hasSession && pathOverride == nil
+    }
+
+    private var canWarn: Bool {
+        isVisible && scenePhase == .active && session.isSpoofing && session.simulated != nil && !session.joystickActive
+    }
+
+    private var cellularPath: Bool {
+        if let pathOverride { return pathOverride.usesCellularAlone }
+        guard let path = monitor?.currentPath else { return false }
+        return StopNetworkPath(status: path.status, usesCellular: path.usesInterfaceType(.cellular),
+                               usesWiFi: path.usesInterfaceType(.wifi),
+                               usesEthernet: path.usesInterfaceType(.wiredEthernet)).usesCellularAlone
+    }
+
+    var body: some View {
+        Button {
+            if canWarn && cellularPath { pendingStop = session.commandGeneration }
+            else { session.stop(pairing: pairing) }
+        } label: { label() }
+        .alert("Stop spoofing?", isPresented: Binding(
+            get: { pendingStop != nil },
+            set: { if !$0 { pendingStop = nil } }
+        ), presenting: pendingStop) { generation in
+            Button("Keep spoofing", role: .cancel) { pendingStop = nil }
+            Button("Stop spoofing", role: .destructive) {
+                pendingStop = nil
+                guard session.commandGeneration == generation, session.hasSession, !session.isStopping else { return }
+                session.stop(pairing: pairing)
+            }
+        } message: { _ in
+            Text("You’re on cellular. Starting again may require Wi-Fi or a hotspot.")
+        }
+        .onAppear { updateMonitor() }
+        .onChange(of: observesNetwork) { _, _ in updateMonitor() }
+        .onChange(of: session.commandGeneration) { _, _ in pendingStop = nil }
+        .onChange(of: canWarn) { _, canWarn in if !canWarn { pendingStop = nil } }
+        .onDisappear {
+            pendingStop = nil
+            monitor?.cancel()
+            monitor = nil
+        }
+    }
+
+    private func updateMonitor() {
+        guard observesNetwork else {
+            monitor?.cancel()
+            monitor = nil
+            return
+        }
+        guard monitor == nil else { return }
+        let monitor = NWPathMonitor()
+        monitor.start(queue: DispatchQueue(label: "locus.stop.network", qos: .utility))
+        self.monitor = monitor
     }
 }
