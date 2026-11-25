@@ -311,6 +311,14 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertTrue(save.waitForExistence(timeout: 10))
         save.buttons["Save"].tap()
         XCTAssertTrue(app.buttons["Save changes"].waitForExistence(timeout: 30))
+        closeGPXPlanner()
+        openGPXLibraryRoute(named: "Test botanical garden walking route")
+        XCTAssertTrue(visible(app.buttons["Save changes"]).isEnabled)
+        closeGPXPlanner()
+        openGPXLibraryRoute(named: "QA small source", subtitle: "Path start → Path end")
+        visible(app.buttons["Save changes"]).tap()
+        XCTAssertTrue(save.waitForExistence(timeout: 10))
+        XCTAssertEqual(save.textFields.firstMatch.value as? String, "QA small source")
         capture("native-gpx-valid-after-malformed-saved")
     }
 

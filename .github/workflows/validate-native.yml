@@ -101,7 +101,8 @@ jobs:
       fail-fast: false
       matrix:
         suite: ${{ fromJSON((!inputs.ui_focus || inputs.ui_focus == 'all') && '["flows","other"]' || '["focused"]') }}
-    timeout-minutes: ${{ matrix.suite == 'flows' && 90 || 55 }}
+    # Both full suites exercise slow first boots and can include XCTest retries.
+    timeout-minutes: ${{ matrix.suite == 'focused' && 55 || 90 }}
     steps:
       - uses: actions/checkout@v4
       - name: Portable Swift regressions
