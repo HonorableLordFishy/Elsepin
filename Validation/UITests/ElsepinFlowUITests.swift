@@ -235,12 +235,13 @@ final class ElsepinFlowUITests: XCTestCase {
         let signal = app.buttons["Wait at Test cafe, Simulated traffic light"]
         let waitEditor = app.navigationBars["Wait at stop"]
         let toggle = app.switches["Simulate traffic light"]
+        let thumb = toggle.switches.firstMatch
 
         app.buttons["Open saved route"].tap()
         routeControl(fixed).tap()
         XCTAssertTrue(waitEditor.waitForExistence(timeout: 5))
         XCTAssertEqual(toggle.value as? String, "0")
-        toggle.tap()
+        thumb.tap()
         XCTAssertEqual(toggle.value as? String, "1")
         capture("traffic-light-enabled-in-stop-draft")
         waitEditor.buttons["Cancel"].tap()
@@ -249,7 +250,7 @@ final class ElsepinFlowUITests: XCTestCase {
         routeControl(fixed).tap()
         XCTAssertTrue(waitEditor.waitForExistence(timeout: 5))
         XCTAssertEqual(toggle.value as? String, "0")
-        toggle.tap()
+        thumb.tap()
         waitEditor.buttons["Done"].tap()
         XCTAssertTrue(signal.waitForExistence(timeout: 5))
         capture("traffic-light-on-route-stop")
