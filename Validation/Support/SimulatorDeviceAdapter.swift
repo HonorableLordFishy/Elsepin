@@ -10,8 +10,13 @@ import UniformTypeIdentifiers
 enum LocationEngine {
     private static let lock = NSLock()
     private static var acceptedWrites = 0
-    private static func shouldFailWrite() -> Bool {
+    private static var reconnectFailureSent = false
+    private static func shouldFailWrite(explicit: Bool) -> Bool {
         lock.lock(); defer { lock.unlock() }
+        if ValidationFixture.routeReconnect, acceptedWrites > 0, !explicit, !reconnectFailureSent {
+            reconnectFailureSent = true
+            return true
+        }
         let fail = ValidationFixture.scenario == "failed" && acceptedWrites > 0
         if !fail { acceptedWrites += 1 }
         return fail
@@ -36,7 +41,7 @@ enum LocationEngine {
         try? await Task.sleep(for: .milliseconds(60))
         // Fail after one accepted test command so recovery includes a location
         // that may remain, rather than the separate never-started case.
-        if shouldFailWrite() { return .failure(.tunnelUnreachable) }
+        if shouldFailWrite(explicit: explicit) { return .failure(.tunnelUnreachable) }
         return Result.success(()) // TEST ONLY: UI command acceptance, not device spoofing.
     }
     static func clear(pairingPath: String, deviceIP: String) async -> Result<Void, LocationEngineError> {
@@ -48,7 +53,7 @@ enum LocationEngine {
 }
 
 @MainActor final class PairingStore: ObservableObject {
-    @Published private(set) var hasPairingFile = ValidationFixture.enabled
+    @Published private(set) var hasPairingFile = ValidationFixture.enabled && !ValidationFixture.firstLaunch
     @Published private(set) var revision = UUID()
     @Published var lastError: String?
     static let fileName = "NO-REAL-PAIRING-IN-UI-TESTS"

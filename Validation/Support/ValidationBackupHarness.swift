@@ -20,6 +20,13 @@ struct ValidationBackupHarness: View {
             .appendingPathComponent("ValidationSettingsExport.json")
     }
 
+    static func stageMalformedBackup() throws {
+        let documents = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: true)
+        let file = documents.appendingPathComponent("Malformed-Validation-Backup.json")
+        try Data("{\"format\":\"Shift library\",\"version\":".utf8).write(to: file, options: .atomic)
+    }
+
     private struct ObservedExport: Decodable {
         let filename: String
         let text: String

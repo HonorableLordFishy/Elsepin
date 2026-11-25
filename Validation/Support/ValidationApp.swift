@@ -14,6 +14,11 @@ enum ValidationFixture {
     static var dark: Bool { ProcessInfo.processInfo.arguments.contains("--dark") }
     static var fallback: Bool { ProcessInfo.processInfo.arguments.contains("--accessibility-fallback") }
     static var routeIdentityScenario: Bool { scenario.hasPrefix("route-identity-") }
+    static var nativeGPXScenario: Bool { scenario.hasPrefix("home-solid-gpx-") }
+    static var firstLaunch: Bool { scenario == "first-launch" }
+    static var drawnRoute: Bool { scenario == "drawn-route" }
+    static var routeReconnect: Bool { scenario == "route-reconnect" }
+    static let reconnectTripName = "Test park loop"
     static let routeReplacementRequest = Notification.Name("com.n3mostudio.elsepin.validation.replace-route")
     static let unreadableTrips = Data("corrupt disposable trips".utf8)
     static let longName = "Test botanical garden walking route beside the riverside observatory and community orchard"
@@ -49,6 +54,12 @@ enum ValidationFixture {
             }, routeReplacementRequest.rawValue as CFString, nil, .deliverImmediately)
         }
         if scenario == "backup-settings", ProcessInfo.processInfo.arguments.contains("--preserve-backup-test-data") { return }
+        if nativeGPXScenario {
+            if ProcessInfo.processInfo.arguments.contains("--preserve-gpx-test-data") { return }
+            do { try ValidationNativeGPX.prepare(includeSamples: scenario == "home-solid-gpx-sizes") }
+            catch { preconditionFailure("Could not seed disposable Files GPX: \(error)") }
+        }
+        if firstLaunch || drawnRoute, ProcessInfo.processInfo.arguments.contains("--preserve-everyday-test-data") { return }
         // The validation bundle has its own sandbox and no App Group entitlement.
         // Every launch clears only that disposable sandbox, never the shipping app.
         if scenario == "backup-settings" {
@@ -58,6 +69,8 @@ enum ValidationFixture {
                 do { try manager.removeItem(at: observation) }
                 catch { preconditionFailure("Could not clear the old export observation: \(error)") }
             }
+            do { try ValidationBackupHarness.stageMalformedBackup() }
+            catch { preconditionFailure("Could not stage malformed backup: \(error)") }
         }
         UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -70,7 +83,12 @@ enum ValidationFixture {
                     latitude: points[1].latitude, longitude: points[1].longitude)))
             }
         }
-        if scenario != "empty" {
+        if routeReconnect {
+            guard TripLibrary().save(route: route, name: reconnectTripName, mode: .walk,
+                                     speed: 1.4, smooth: false, favorite: true) else {
+                preconditionFailure("Could not seed the disposable reconnect route")
+            }
+        } else if scenario != "empty" && !firstLaunch && !drawnRoute {
             SavedPlace.save([SavedPlace(name: longName, latitude: points[1].latitude,
                 longitude: points[1].longitude, favorite: true)], key: "locus.favorites")
             _ = TripLibrary().save(route: route, name: longName, mode: .walk,
@@ -140,6 +158,8 @@ private struct ValidationHost: View {
     @StateObject private var updates = AppUpdateController()
     @StateObject private var reset = AppResetController()
     @StateObject private var library = TripLibrary()
+    @AppStorage(SetupGate.defaultsKey) private var setupComplete = false
+    @AppStorage(SetupGate.deferredKey) private var setupDeferred = false
     @State private var shortcut: LocusShortcut?
     @State private var details = false
     @State private var showSearch = false
@@ -147,6 +167,7 @@ private struct ValidationHost: View {
     @State private var runSession = false
     @State private var permissionsReady = false
     @State private var routeLibrarySnapshot = ""
+    @State private var nativeGPXDiskReport = ""
     @State private var pinAddressReport = ""
     @State private var stalePinDraft: PinDraft?
 
@@ -186,6 +207,16 @@ private struct ValidationHost: View {
             else if ValidationFixture.scenario == "import-review" { ValidationImportHarness() }
             else if ValidationFixture.scenario.hasPrefix("backup-") { ValidationBackupHarness() }
             else if ValidationFixture.scenario == "deleted-selection" { NavigationStack { RecentlyDeletedView() } }
+            else if ValidationFixture.firstLaunch && !setupComplete && !setupDeferred {
+                SetupFlowView(initialStep: SetupGate.initialStep(hasPairingFile: pairing.hasPairingFile), onFinished: {
+                    SetupGate.markComplete()
+                    setupComplete = true
+                    setupDeferred = false
+                }, onSkip: {
+                    SetupGate.markDeferred()
+                    setupDeferred = true
+                })
+            }
             else { RootView(incomingShortcut: $shortcut, incomingSessionDetails: $details) }
         }
             .modifier(AppearancePresentation())
@@ -211,6 +242,14 @@ private struct ValidationHost: View {
                         try? Data(ValidationImportHarness.valid.utf8).write(to:url)
                         NotificationCenter.default.post(name:.locusImportGPX,object:url)
                     }.accessibilityIdentifier("validation.openGPX")
+                }
+                if ValidationFixture.scenario == "home-solid-gpx-sizes" {
+                    Button("Read GPX routes from disk") {
+                        do { nativeGPXDiskReport = try ValidationNativeGPX.diskReport() }
+                        catch { nativeGPXDiskReport = error.localizedDescription }
+                    }.accessibilityIdentifier("validation.readGPXDiskReport")
+                    Text(nativeGPXDiskReport).lineLimit(1)
+                        .accessibilityIdentifier("validation.gpxDiskReport")
                 }
                 if ValidationFixture.scenario == "held-location" {
                     Text("\(session.commandGeneration)")
@@ -276,7 +315,7 @@ private struct ValidationHost: View {
                 preferences.glassPanel = !ValidationFixture.scenario.hasPrefix("home-solid")
                 // Settle the real system permission before timing the synthetic
                 // connecting state. This never changes production permission flow.
-                if sessionScenario {
+                if sessionScenario || ValidationFixture.routeReconnect {
                     _ = await SessionNotifications.shared.requestPermission()
                     permissionsReady = true
                 }
@@ -289,7 +328,8 @@ private struct ValidationHost: View {
                         preview: true, context: session.namingContext)
                     precondition(namedNeighbor)
                     session.selectPin(destination)
-                } else if !sessionScenario && !ValidationFixture.scenario.hasPrefix("home-") {
+                } else if !sessionScenario && !ValidationFixture.firstLaunch && !ValidationFixture.routeReconnect
+                            && !ValidationFixture.scenario.hasPrefix("home-") {
                     session.selectPin(ValidationFixture.points[0], name: "Test garden entrance")
                 }
                 if ValidationFixture.scenario == "pin-adjustment" {

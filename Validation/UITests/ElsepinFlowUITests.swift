@@ -568,6 +568,109 @@ final class ElsepinFlowUITests: XCTestCase {
         capture("03-cleared-test-session")
     }
 
+    func testSavedRouteStartsFromPreviewAndReconnectsPaused() {
+        launch("route-reconnect", narrow: false)
+        openLibrary()
+        let trip = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Test park loop")).firstMatch
+        XCTAssertTrue(trip.waitForExistence(timeout: 10))
+        XCTAssertTrue(trip.isHittable)
+        trip.tap()
+
+        let planner = app.navigationBars["Plan a route"]
+        XCTAssertTrue(planner.waitForExistence(timeout: 10))
+        let showRoute = app.buttons["Show route"]
+        XCTAssertTrue(showRoute.waitForExistence(timeout: 10))
+        showRoute.tap()
+
+        let start = app.buttons["Start route"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        XCTAssertTrue(start.isHittable && start.isEnabled)
+        XCTAssertFalse(app.buttons["session.stop"].exists)
+        capture("saved-route-preview-before-start")
+        start.tap()
+
+        let failure = app.alerts["Session needs attention"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 20))
+        let warning = failure.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "The last location may still be set")).firstMatch
+        XCTAssertTrue(warning.exists)
+        failure.buttons["OK"].tap()
+        let retry = app.buttons["Retry connection"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10))
+        reachable("session.stop")
+        capture("saved-route-connection-lost")
+        retry.tap()
+
+        let resume = app.buttons.matching(NSPredicate(format: "identifier == 'session.pause' AND label == 'Resume'")).firstMatch
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND enabled == true"), object: resume)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed)
+        let following = app.staticTexts["Following route"]
+        XCTAssertFalse(following.exists)
+        XCTAssertFalse(retry.exists)
+        capture("saved-route-reconnected-and-paused")
+
+        resume.tap()
+        XCTAssertTrue(following.waitForExistence(timeout: 10))
+        app.buttons["session.stop"].tap()
+        XCTAssertTrue(app.staticTexts["Where do you want to go?"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["session.stop"].waitForNonExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["session.pause"].exists)
+        capture("saved-route-stopped-after-reconnect")
+    }
+
+    func testDrawnRouteAndCustomLegSurviveRelaunch() throws {
+        launch("drawn-route", narrow: false)
+        let draw = app.buttons["Draw a route"]
+        XCTAssertTrue(draw.waitForExistence(timeout: 10))
+        draw.tap()
+        XCTAssertTrue(app.staticTexts["Tap for exact points. Two fingers move or zoom the map."].waitForExistence(timeout: 15))
+        let review = app.buttons["Review route"]
+        XCTAssertFalse(review.isEnabled)
+        for point in [CGVector(dx: 0.35, dy: 0.35), CGVector(dx: 0.55, dy: 0.44), CGVector(dx: 0.65, dy: 0.53)] {
+            app.coordinate(withNormalizedOffset: point).tap()
+        }
+        XCTAssertTrue(review.isEnabled)
+        capture("new-route-map-drawing")
+        review.tap()
+
+        let planner = app.navigationBars["Plan a route"]
+        let movement = app.buttons["Movement to Path end"]
+        XCTAssertTrue(planner.waitForExistence(timeout: 10))
+        routeControl(movement).tap()
+        app.buttons["Drive"].tap()
+        XCTAssertTrue(routeControl(app.buttons["Keep path"]).isSelected)
+        let speed = try setVisibleSpeed("Drive", position: 0.5)
+        XCTAssertGreaterThan(speed, 1)
+        XCTAssertLessThan(speed, 85)
+        app.buttons["Done"].tap()
+
+        routeControl(app.buttons["Save route"]).tap()
+        let save = app.alerts["Save trip"]
+        XCTAssertTrue(save.waitForExistence(timeout: 10))
+        save.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["Trip saved with its place names and stops."].waitForExistence(timeout: 10))
+        capture("new-drawn-route-saved")
+        planner.buttons["Cancel"].tap()
+        XCTAssertTrue(planner.waitForNonExistence(timeout: 10))
+
+        relaunchWithEverydayData()
+        openLibrary()
+        let routes = app.buttons["Routes"].firstMatch
+        XCTAssertTrue(routes.waitForExistence(timeout: 10))
+        routes.tap()
+        let saved = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Drawn path")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        XCTAssertTrue(saved.isHittable)
+        saved.tap()
+        XCTAssertTrue(planner.waitForExistence(timeout: 10))
+        routeControl(movement).tap()
+        let driveSpeed = routeControl(app.sliders["Drive speed in miles per hour"])
+        let value = try XCTUnwrap(driveSpeed.value as? String)
+        let persistedSpeed = try XCTUnwrap(Double(value.components(separatedBy: " ")[0]))
+        XCTAssertEqual(persistedSpeed, speed, accuracy: 0.11)
+        XCTAssertFalse(app.buttons["session.stop"].exists)
+        capture("new-route-custom-leg-after-relaunch")
+    }
+
     func testRouteCameraStartsAtTheRouteAndRestoresDetailAfterFit() throws {
         launch("route-camera", narrow: false)
         let startRoute = app.buttons["validation.startCameraRoute"]
@@ -845,6 +948,81 @@ final class ElsepinFlowUITests: XCTestCase {
         reachable("session.stop")
         capture("08-failed-test-only")
     }
+
+    func testFirstLaunchCanDeferSetupAndSaveASearchedPin() {
+        exerciseFirstLaunchAndPinSearch(large: false)
+    }
+
+    func testFirstLaunchCanDeferSetupAndSaveASearchedPinAtLargestText() {
+        exerciseFirstLaunchAndPinSearch(large: true)
+    }
+
+    private func exerciseFirstLaunchAndPinSearch(large: Bool) {
+        launch("first-launch", large: large, narrow: false)
+        let deferSetup = app.buttons["Set up later"]
+        let search = app.staticTexts["Where do you want to go?"]
+        XCTAssertTrue(deferSetup.waitForExistence(timeout: 10))
+        XCTAssertTrue(deferSetup.isHittable)
+        XCTAssertFalse(search.exists)
+        capture("first-launch-setup")
+        deferSetup.tap()
+
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        search.tap()
+        let field = app.textFields["route.searchField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        field.typeText("cafe\n")
+
+        let name = "Test cafe result for cafe"
+        let result = app.staticTexts[name]
+        XCTAssertTrue(result.waitForExistence(timeout: 10))
+        XCTAssertTrue(result.isHittable)
+        result.tap()
+        let savePin = app.buttons["Save pin"].firstMatch
+        XCTAssertTrue(savePin.waitForExistence(timeout: 10))
+        savePin.tap()
+
+        let editor = app.navigationBars["Save pin"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        XCTAssertEqual(app.textFields["Pin name"].value as? String, name)
+        let favorite = app.switches["Favorite"]
+        XCTAssertTrue(favorite.isHittable)
+        favorite.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        XCTAssertEqual(favorite.value as? String, "1")
+        capture("first-launch-save-searched-pin")
+        editor.buttons["Save"].tap()
+
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
+        let searchBar = app.navigationBars["Where to?"]
+        let cancelSearch = searchBar.buttons["Cancel"]
+        XCTAssertTrue(cancelSearch.waitForExistence(timeout: 10))
+        cancelSearch.tap()
+        XCTAssertTrue(searchBar.waitForNonExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["session.stop"].exists)
+        openLibrary()
+        let savedFavorite = app.buttons["Unfavorite \(name)"]
+        XCTAssertTrue(savedFavorite.waitForExistence(timeout: 10))
+        capture("first-launch-saved-pin-in-library")
+        app.buttons[name].tap()
+        XCTAssertTrue(app.buttons["Teleport"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["session.stop"].exists)
+
+        relaunchWithEverydayData()
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        XCTAssertFalse(deferSetup.exists)
+        openLibrary()
+        XCTAssertTrue(savedFavorite.waitForExistence(timeout: 10))
+        capture("first-launch-saved-pin-after-relaunch")
+    }
+
+    private func relaunchWithEverydayData() {
+        app.terminate()
+        app.launchArguments.append("--preserve-everyday-test-data")
+        app.launch()
+        XCTAssertTrue(app.staticTexts["validation.banner"].waitForExistence(timeout: 20))
+    }
+
     func testSearchSubmitFailureAndRetry() {
         launch("search")
         let field = app.textFields["route.searchField"]

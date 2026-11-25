@@ -58,6 +58,23 @@ final class ElsepinBackupUITests: XCTestCase {
         navigation.descendants(matching: .any).matching(NSPredicate(format: "identifier != 'BackButton' AND (label == %@ OR label BEGINSWITH %@)",
             "On My iPhone", "On My iPhone,")).firstMatch
     }
+    private func openValidationDocuments() {
+        openLocalFilesStorage()
+        // The simulator target inherits the shipping display name and Files
+        // sharing settings. Some runtimes display the simulator product name.
+        let name = NSPredicate(format: "label == %@ OR label == %@ OR label BEGINSWITH %@ OR label BEGINSWITH %@",
+            "Elsepin", "ElsepinValidation", "Elsepin,", "ElsepinValidation,")
+        let folder = app.cells.matching(name).firstMatch
+        XCTAssertTrue(folder.waitForExistence(timeout: 20), "The validation app folder is missing in Files")
+        let thumbnail = folder.images.firstMatch
+        if thumbnail.exists && thumbnail.isHittable { thumbnail.tap() }
+        else { folder.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap() }
+        let picker = app.navigationBars["FullDocumentManagerViewControllerNavigationBar"]
+        let title = picker.descendants(matching: .any).matching(NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "identifier != 'BackButton'"), name
+        ])).firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 20), "Files did not open the validation app folder")
+    }
     private func snapshot() throws -> [String: Any] {
         app.buttons["Read settings and export"].tap()
         let text = app.staticTexts["validation.backupSnapshot"].label
@@ -90,29 +107,42 @@ final class ElsepinBackupUITests: XCTestCase {
         app.buttons["Choose backup file"].tap()
         selectFile(named: filename, captureName: "33b-original-settings-file", until: app.navigationBars["Review import"])
     }
-    private func selectFile(named filename: String, captureName: String, until review: XCUIElement) {
+    private func selectFile(named filename: String, captureName: String, until result: XCUIElement) {
         openLocalFilesStorage()
+        _ = selectVisibleFile(named: filename, captureName: captureName, until: result)
+    }
+
+    private func filesItem(named filename: String) -> XCUIElement {
         let stem = (filename as NSString).deletingPathExtension
-        let file = app.cells.matching(NSPredicate(format: "label BEGINSWITH %@ OR label == %@ OR label BEGINSWITH %@",
-            filename, stem, "\(stem),")).firstMatch
+        return app.cells.matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@ OR label == %@ OR label BEGINSWITH %@",
+            filename, "\(filename),",
+            stem, "\(stem),")).firstMatch
+    }
+
+    private func selectVisibleFile(named filename: String, captureName: String, until result: XCUIElement) -> TimeInterval {
+        let file = filesItem(named: filename)
         capture(captureName)
         XCTAssertTrue(file.waitForExistence(timeout: 20), "\(filename) is missing from Files")
         XCTAssertTrue(file.isEnabled, "\(filename) is disabled in Files")
         let open = app.navigationBars.buttons["Open"]
+        var startedAt: TimeInterval?
         func selectVisibleFile() -> Bool {
             // Prefer the thumbnail in grid mode, where the filename can sit
             // below the visible hit target.
             let thumbnail = file.images.firstMatch
-            if thumbnail.exists && thumbnail.isHittable { thumbnail.tap() }
+            let tapThumbnail = thumbnail.exists && thumbnail.isHittable
+            if startedAt == nil { startedAt = ProcessInfo.processInfo.systemUptime }
+            if tapThumbnail { thumbnail.tap() }
             else { file.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap() }
             // Some Files builds deliver the selection immediately. Others first
             // select the row and add an asynchronously enabled Open button.
-            if review.waitForExistence(timeout: 3) { return true }
-            if open.waitForExistence(timeout: 5) {
-                let enabled = expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: open)
-                if XCTWaiter.wait(for: [enabled], timeout: 5) == .completed { open.tap() }
-            }
-            return review.waitForExistence(timeout: 10)
+            let next = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                result.exists || (open.exists && open.isEnabled)
+            }, object: nil)
+            guard XCTWaiter.wait(for: [next], timeout: 25) == .completed else { return false }
+            if result.exists { return true }
+            open.tap()
+            return result.waitForExistence(timeout: 25)
         }
         var opened = selectVisibleFile()
         // Retry only while the picker and its live row are still present. Never
@@ -120,8 +150,9 @@ final class ElsepinBackupUITests: XCTestCase {
         if !opened, file.exists && file.isHittable { opened = selectVisibleFile() }
         if !opened {
             capture("\(captureName)-selection-failure")
-            XCTFail("Selecting the original export did not open import review. \(app.debugDescription)")
+            XCTFail("Selecting \(filename) did not show the expected import result. \(app.debugDescription)")
         }
+        return ProcessInfo.processInfo.systemUptime - (startedAt ?? ProcessInfo.processInfo.systemUptime)
     }
     private func saveToLocalFiles() {
         let export = app.navigationBars.buttons["Export"].firstMatch
@@ -148,7 +179,7 @@ final class ElsepinBackupUITests: XCTestCase {
             "Import selected changes", "backup.review.apply")).firstMatch
     }
 
-    func testGPXExportAndImportThroughNativeFiles() {
+    func testGPXExportAndImportThroughNativeFiles() throws {
         app = XCUIApplication()
         app.launchArguments = ["--elsepin-ui-test"]
         app.launchEnvironment["ELSEPIN_TEST_SCENARIO"] = "home-solid"
@@ -190,10 +221,169 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertTrue(saveNew.waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["Save changes"].exists)
         visible(saveNew).tap()
-        let field = app.alerts["Save trip"].textFields.firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 8))
-        capture("native-gpx-default-save-name")
-        XCTAssertEqual(field.value as? String, "Test botanical garden walking route beside the riverside observatory and community orchard")
+        let save = app.alerts["Save trip"]
+        XCTAssertTrue(save.waitForExistence(timeout: 10))
+        let exportedName = "Test botanical garden walking route beside the riverside observatory and community orchard"
+        capture("native-gpx-round-trip-default-name")
+        XCTAssertEqual(save.textFields.firstMatch.value as? String, exportedName,
+                       "Use this path discarded the exported track name before saving")
+        save.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["Trip saved with its place names and stops."].waitForExistence(timeout: 10))
+        closeGPXPlanner()
+        openGPXLibraryRoute(named: exportedName)
+        let matchingRows = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", exportedName))
+        // The new copy is inserted first. Save Changes verifies its retained name.
+        visible(app.buttons["Save changes"]).tap()
+        XCTAssertTrue(save.waitForExistence(timeout: 10))
+        XCTAssertEqual(save.textFields.firstMatch.value as? String, exportedName)
+        save.buttons["Cancel"].tap()
+        closeGPXPlanner()
+        app.buttons["navigation.library"].tap()
+        app.buttons["Routes"].tap()
+        XCTAssertEqual(matchingRows.count, 2, "Import should save a separate copy of the exported route")
+    }
+
+    private var gpxPlanner: XCUIElement { app.navigationBars["Plan a route"] }
+
+    private func launchNativeGPX(_ scenario: String) {
+        app = XCUIApplication()
+        app.launchArguments = ["--elsepin-ui-test"]
+        app.launchEnvironment["ELSEPIN_TEST_SCENARIO"] = scenario
+        app.launch()
+        let libraryTab = app.buttons["navigation.library"]
+        XCTAssertTrue(libraryTab.waitForExistence(timeout: 20))
+        prepareFilesProvider(returningTo: libraryTab)
+    }
+
+    private func openGPXLibraryRoute(named name: String) {
+        app.buttons["navigation.library"].tap()
+        let routes = app.buttons["Routes"]
+        XCTAssertTrue(routes.waitForExistence(timeout: 10))
+        routes.tap()
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "Missing Library route \(name)")
+        row.tap()
+        XCTAssertTrue(gpxPlanner.waitForExistence(timeout: 10))
+    }
+
+    private func openGPXImportPicker() {
+        let options = visible(app.buttons["Options"])
+        if options.value as? String != "Expanded" { options.tap() }
+        visible(app.buttons["Import GPX"]).tap()
+        openValidationDocuments()
+    }
+
+    private func closeGPXPlanner() {
+        gpxPlanner.buttons["Cancel"].tap()
+        XCTAssertTrue(gpxPlanner.waitForNonExistence(timeout: 10))
+    }
+
+    func testMalformedGPXThroughNativeFilesRetriesWithoutReplacingRoute() {
+        launchNativeGPX("home-solid-gpx-malformed")
+        openGPXLibraryRoute(named: "Test botanical garden walking route")
+        openGPXImportPicker()
+        let error = app.staticTexts["gpx.error"]
+        _ = selectVisibleFile(named: "QA-GPX-malformed.gpx", captureName: "native-gpx-malformed-files", until: error)
+        let message = error.label
+        XCTAssertTrue(message.contains("GPX"))
+        XCTAssertFalse(app.buttons["gpx.apply"].exists)
+        let retry = app.buttons["gpx.retry"]
+        XCTAssertTrue(retry.isHittable)
+        retry.tap()
+        XCTAssertTrue(error.waitForExistence(timeout: 15))
+        XCTAssertEqual(error.label, message)
+        XCTAssertFalse(app.buttons["gpx.apply"].exists)
+        capture("native-gpx-malformed-retry")
+        app.buttons["gpx.cancel"].tap()
+        XCTAssertTrue(error.waitForNonExistence(timeout: 10))
+        visible(app.buttons["Save changes"]).tap()
+        let save = app.alerts["Save trip"]
+        XCTAssertTrue(save.waitForExistence(timeout: 10))
+        XCTAssertEqual(save.textFields.firstMatch.value as? String,
+                       "Test botanical garden walking route beside the riverside observatory and community orchard")
+        save.buttons["Cancel"].tap()
+    }
+
+    func testNativeGPXImportSizesSaveAndReopen() throws {
+        let samples = [
+            (filename: "QA-GPX-small.gpx", name: "QA small", points: 64),
+            (filename: "QA-GPX-medium.bin", name: "QA medium", points: 4_096),
+            (filename: "QA-GPX-large.gpx", name: "QA large", points: 90_000)
+        ]
+        launchNativeGPX("home-solid-gpx-sizes")
+        var timings: [String: [String: Double]] = [:]
+        for sample in samples {
+            try XCTContext.runActivity(named: "Import and save \(sample.filename)") { _ in
+                openGPXLibraryRoute(named: "Test botanical garden walking route")
+                openGPXImportPicker()
+                let apply = app.buttons["gpx.apply"]
+                let reviewTime = selectVisibleFile(named: sample.filename,
+                    captureName: "\(sample.filename)-files", until: apply)
+                XCTAssertTrue(app.staticTexts["\(sample.points) points"].exists)
+                XCTAssertTrue(apply.isEnabled)
+                capture("\(sample.filename)-review")
+                apply.tap()
+                XCTAssertTrue(app.navigationBars["Import GPX"].waitForNonExistence(timeout: 15))
+                XCTAssertTrue(gpxPlanner.exists)
+                let saveRoute = app.buttons["Save route"]
+                for _ in 0..<5 where !saveRoute.exists { app.swipeDown() }
+                visible(saveRoute).tap()
+                let save = app.alerts["Save trip"]
+                XCTAssertTrue(save.waitForExistence(timeout: 10))
+                let field = save.textFields.firstMatch
+                let previous = try XCTUnwrap(field.value as? String)
+                field.tap()
+                field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: previous.count) + sample.name)
+                XCTAssertEqual(field.value as? String, sample.name)
+                let startedAt = ProcessInfo.processInfo.systemUptime
+                save.buttons["Save"].tap()
+                XCTAssertTrue(app.buttons["Save changes"].waitForExistence(timeout: 30))
+                timings[sample.filename] = ["filesSelectionToReviewSeconds": reviewTime,
+                    "saveConfirmationToSavedSeconds": ProcessInfo.processInfo.systemUptime - startedAt]
+                closeGPXPlanner()
+            }
+        }
+
+        app.terminate()
+        app.launchArguments.append("--preserve-gpx-test-data")
+        app.launch()
+        XCTAssertTrue(app.buttons["navigation.library"].waitForExistence(timeout: 20))
+        for sample in samples {
+            openGPXLibraryRoute(named: sample.name)
+            visible(app.buttons["Save changes"]).tap()
+            let save = app.alerts["Save trip"]
+            XCTAssertTrue(save.waitForExistence(timeout: 10))
+            XCTAssertEqual(save.textFields.firstMatch.value as? String, sample.name)
+            save.buttons["Cancel"].tap()
+            closeGPXPlanner()
+        }
+        app.buttons["validation.readGPXDiskReport"].tap()
+        let text = app.staticTexts["validation.gpxDiskReport"].label
+        let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [[String: Any]])
+        XCTAssertEqual(report.count, samples.count)
+        var measurements: [[String: Any]] = []
+        var previousBytes = 0
+        for (sample, result) in zip(samples, report) {
+            XCTAssertEqual(result["filename"] as? String, sample.filename)
+            XCTAssertEqual(result["name"] as? String, sample.name)
+            XCTAssertEqual(result["sourcePoints"] as? Int, sample.points)
+            XCTAssertGreaterThanOrEqual(result["persistedPoints"] as? Int ?? 0, sample.points)
+            XCTAssertEqual(result["matches"] as? Int, 1)
+            XCTAssertEqual(result["fromGPX"] as? Bool, true)
+            XCTAssertEqual(result["verticesRetainedInOrder"] as? Int, 5)
+            XCTAssertEqual(result["endpointsRetained"] as? Bool, true)
+            let bytes = try XCTUnwrap(result["bytes"] as? Int)
+            XCTAssertGreaterThan(bytes, previousBytes)
+            previousBytes = bytes
+            var measurement = result
+            measurement["uiTimings"] = try XCTUnwrap(timings[sample.filename])
+            measurements.append(measurement)
+        }
+        let data = try JSONSerialization.data(withJSONObject: measurements, options: [.prettyPrinted, .sortedKeys])
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        attachment.name = "native-gpx-size-measurements"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     func testSolidTabsLeaveSettingsAndPastedBackupReviewReachable() {
@@ -321,6 +511,7 @@ final class ElsepinBackupUITests: XCTestCase {
         prepareFilesProvider()
         let baseline = try snapshot()
         XCTAssertEqual(baseline["readableTripCount"] as? Int, 1)
+        XCTAssertEqual(baseline["pinCount"] as? Int, 1)
         let original = try settings(baseline)
         app.buttons["Import and export"].tap()
         visible(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Backup contents'")).firstMatch).tap()
@@ -367,9 +558,36 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertTrue(chooseFile.isEnabled)
         app.buttons["Review selected backup"].tap()
         XCTAssertTrue(review.waitForExistence(timeout: 5))
+        XCTAssertFalse(visible(app.buttons["backup.review.apply"]).isEnabled)
+
+        // Replace through the real picker with truncated JSON. The rejection
+        // must leave the previous preview available and let Files open again.
+        review.buttons["BackButton"].tap()
+        XCTAssertTrue(chooseFile.waitForExistence(timeout: 5))
+        chooseFile.tap()
+        openValidationDocuments()
+        let invalidBackup = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@",
+            "This isn't a complete Elsepin backup.")).firstMatch
+        _ = selectVisibleFile(named: "Malformed-Validation-Backup.json",
+            captureName: "34a-malformed-json-in-files", until: invalidBackup)
+        XCTAssertFalse(review.exists)
+        XCTAssertTrue(chooseFile.isEnabled)
+        capture("34b-malformed-json-rejected")
+        app.buttons["Review selected backup"].tap()
+        XCTAssertTrue(review.waitForExistence(timeout: 5))
+        XCTAssertFalse(visible(app.buttons["backup.review.apply"]).isEnabled)
+        review.buttons["BackButton"].tap()
+        XCTAssertTrue(chooseFile.waitForExistence(timeout: 5))
+        chooseFile.tap()
+        selectFile(named: filename, captureName: "34c-valid-json-retry-in-files", until: review)
+        XCTAssertFalse(visible(app.buttons["backup.review.apply"]).isEnabled)
         visible(app.buttons["Cancel import"]).tap()
         app.buttons["Close backup test"].tap()
-        XCTAssertTrue(NSDictionary(dictionary: try settings(snapshot())).isEqual(to: changed), "Cancel changed settings")
+        let afterCancel = try snapshot()
+        XCTAssertTrue(NSDictionary(dictionary: try settings(afterCancel)).isEqual(to: changed),
+            "Canceling the picker or review, or rejecting malformed JSON, changed settings")
+        XCTAssertEqual(afterCancel["tripCount"] as? Int, baseline["tripCount"] as? Int)
+        XCTAssertEqual(afterCancel["pinCount"] as? Int, baseline["pinCount"] as? Int)
 
         openImport(named: filename)
         expandSettings()
@@ -386,13 +604,26 @@ final class ElsepinBackupUITests: XCTestCase {
         expectedPartial["usualSpeeds"] = speeds
         XCTAssertTrue(NSDictionary(dictionary: partial).isEqual(to: expectedPartial), "Selective import changed an unchecked value or missed a selected value")
 
+        app.terminate()
+        app.launchArguments.append("--preserve-backup-test-data")
+        app.launch()
+        XCTAssertTrue(app.buttons["Read settings and export"].waitForExistence(timeout: 20))
+        let partialAfterRelaunch = try snapshot()
+        XCTAssertTrue(NSDictionary(dictionary: try settings(partialAfterRelaunch)).isEqual(to: expectedPartial),
+            "Selected settings or the unchecked Drive preset did not persist through relaunch")
+        XCTAssertEqual(partialAfterRelaunch["tripCount"] as? Int, baseline["tripCount"] as? Int)
+        XCTAssertEqual(partialAfterRelaunch["pinCount"] as? Int, baseline["pinCount"] as? Int)
+        capture("35a-selective-settings-after-relaunch")
+
         openImport(named: filename)
         expandSettings()
+        XCTAssertEqual(visible(drive).value as? String, "Not selected")
         visible(app.buttons["Select all settings"]).tap()
+        XCTAssertEqual(visible(drive).value as? String, "Selected for import")
+        XCTAssertTrue(visible(app.buttons["Settings · 1 selected"]).exists)
         applyImport()
         XCTAssertTrue(NSDictionary(dictionary: try settings(snapshot())).isEqual(to: original))
         app.terminate()
-        app.launchArguments.append("--preserve-backup-test-data")
         app.launch()
         XCTAssertTrue(app.buttons["Read settings and export"].waitForExistence(timeout: 20))
         let reopened = try snapshot()
@@ -401,6 +632,10 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertEqual(reopened["pinCount"] as? Int, baseline["pinCount"] as? Int)
         openImport(named: filename)
         XCTAssertFalse(visible(app.buttons["backup.review.apply"]).isEnabled, "Reimport should have no settings left to change")
+        expandSettings()
+        let selectAll = app.buttons["Select all settings"]
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5))
+        XCTAssertFalse(selectAll.isEnabled, "All settings should match the restored backup")
         capture("36-reimport-after-relaunch-no-changes")
         visible(app.buttons["Cancel import"]).tap()
         app.buttons["Close backup test"].tap()
