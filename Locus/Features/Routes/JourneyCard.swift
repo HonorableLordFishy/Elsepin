@@ -212,6 +212,8 @@ struct StopSpoofingButton<Label: View>: View {
         } message: { _ in
             Text("You’re on cellular. Starting again may require Wi-Fi or a hotspot.")
         }
+        // Let the system pick a contrasting label for the alert's preferred action.
+        .tint(nil as Color?)
         .onAppear { updateMonitor() }
         .onChange(of: observesNetwork) { _, _ in updateMonitor() }
         .onChange(of: session.commandGeneration) { _, _ in pendingStop = nil }
