@@ -42,11 +42,19 @@ enum ValidationFixture {
     static let unreadableTrips = Data("corrupt disposable trips".utf8)
     static let longName = "Test botanical garden walking route beside the riverside observatory and community orchard"
     static let updatedPinAddress = "12 Main Street, New York, NY 10019"
+    static let shortPinLayoutAddress = "12 Oak Street"
+    static let longPinLayoutAddress = "1842 North Observatory Promenade, Riverside Botanical Garden, West Conservatory Entrance, Lower Hudson River Waterfront, New York, NY 10019"
     static let points = [CLLocationCoordinate2D(latitude: 40.768, longitude: -73.981),
                          CLLocationCoordinate2D(latitude: 40.770, longitude: -73.975),
                          CLLocationCoordinate2D(latitude: 40.779, longitude: -73.970)]
+    static let searchCorridorPoints = [-73.981, -73.791, -73.601].map {
+        CLLocationCoordinate2D(latitude: 40.770, longitude: $0)
+    }
     static var route: PlannedRoute {
-        makeRoute(points, start: "Test garden entrance", end: longName)
+        if scenario == "route-search-coverage" {
+            return makeRoute(searchCorridorPoints, start: "Test search start", end: "Test search destination")
+        }
+        return makeRoute(points, start: "Test garden entrance", end: longName)
     }
     static var replacementRoute: PlannedRoute {
         makeRoute(Array(points.reversed()), start: longName, end: "Test replacement destination")
@@ -208,7 +216,7 @@ private struct ValidationHost: View {
         guard recents.first?.id == expected.id, recents.first?.address == address else { pinAddressReport = "Recent address is stale"; return }
         pinAddressReport = "Saved and recent addresses refreshed"
     }
-    private var sessionScenario: Bool { ValidationFixture.routeIdentityScenario || ["moving", "paused", "connecting", "failed", "map-pins", "route-search-replacement", "route-camera"].contains(ValidationFixture.scenario) }
+    private var sessionScenario: Bool { ValidationFixture.routeIdentityScenario || ["moving", "paused", "connecting", "failed", "map-pins", "route-search-replacement", "route-search-coverage", "route-camera"].contains(ValidationFixture.scenario) }
 
     private func replaceRoute() async {
         guard session.routeActive else { return }
@@ -287,6 +295,13 @@ private struct ValidationHost: View {
                 if ValidationFixture.scenario == "held-location" {
                     Text("\(session.commandGeneration)")
                         .accessibilityIdentifier("validation.commandGeneration")
+                }
+                if ValidationFixture.scenario == "home-solid-pin-layout" {
+                    HStack {
+                        Button("Select short address") { session.selectPin(ValidationFixture.points[0]) }
+                        Button("Select long address") { session.selectPin(ValidationFixture.points[2]) }
+                    }
+                    .buttonStyle(.bordered)
                 }
                 if ValidationFixture.scenario == "pin-address-refresh" {
                     HStack {

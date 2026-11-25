@@ -27,7 +27,12 @@ struct RouteSearchCorridor {
     }
 
     private var maxSpan: Double { Self.maxDiameter - width * 2 }
-    private var regionCount: Int { max(1, Int(ceil(min(track.length / 20_000, Double(Self.maxRegions))))) }
+    private var regionCount: Int {
+        let desired = Int(ceil(min(track.length / 20_000, Double(Self.maxRegions))))
+        // A single local window is enough for short routes. Once the path
+        // needs multiple windows, give its middle a request of its own.
+        return desired <= 1 ? 1 : max(3, desired)
+    }
     var samplesLongRoute: Bool { track.length > maxSpan * Double(Self.maxRegions) }
 
     var regions: [Region] {
@@ -68,7 +73,9 @@ struct RouteSearchCorridor {
     /// sections before sorting the selected results in itinerary order.
     func representativeIndices(for matches: [Match], limit: Int = 30) -> [Int] {
         guard limit > 0 else { return [] }
-        let sectionCount = min(regionCount, limit)
+        // Result diversity is independent of the provider request count. One
+        // dense pocket of results can otherwise fill a short route's list.
+        let sectionCount = min(max(3, regionCount), limit)
         var sections = Array(repeating: [Int](), count: sectionCount)
         let ranked = matches.indices.sorted {
             let left = matches[$0].metresAway, right = matches[$1].metresAway

@@ -32,4 +32,36 @@ final class PinLocationDetailsTests: XCTestCase {
         XCTAssertEqual(details?.name, "12 Main Street")
         XCTAssertEqual(details?.address, "12 Main Street")
     }
+
+    func testReverseGeocoderRejectsSeparateBuildingAndKeepsStreetContext() {
+        let candidates = [
+            PinLocationDetails.Candidate(name: "Sand Breeze Cottage", address: "80 Main Street",
+                                         distance: 18, context: "Main Street, Portland")
+        ]
+
+        XCTAssertNil(PinLocationDetails.reverseGeocoded(candidates))
+        XCTAssertEqual(PinLocationDetails.reverseGeocodedContext(candidates)?.name, "Main Street, Portland")
+        XCTAssertNil(PinLocationDetails.reverseGeocodedContext(candidates)?.address)
+        XCTAssertNil(PinLocationDetails.reverseGeocoded([
+            .init(name: "Sand Breeze Cottage", address: "80 Main Street", distance: 40)
+        ]))
+    }
+
+    func testNearbyLandmarkRequiresAConfidentDistanceLead() {
+        let cottage = PinLocationDetails.Candidate(name: "Sand Breeze Cottage", address: nil, distance: 12)
+        let nearby = PinLocationDetails.nearLandmark([
+            .init(name: "Park", address: nil, distance: 24),
+            cottage
+        ])
+
+        XCTAssertEqual(nearby?.name, "Near Sand Breeze Cottage")
+        XCTAssertNil(nearby?.address)
+        XCTAssertNil(PinLocationDetails.nearLandmark([
+            cottage,
+            .init(name: "Park", address: nil, distance: 15)
+        ]))
+        XCTAssertNil(PinLocationDetails.nearLandmark([
+            .init(name: "Sand Breeze Cottage", address: nil, distance: 30)
+        ]))
+    }
 }

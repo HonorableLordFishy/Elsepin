@@ -40,6 +40,18 @@ final class SessionNamingTests: XCTestCase {
                                                             exactSaved: "Exact saved pin"), exactLabel.name)
     }
 
+    func testSelectedPinUsesExactNamesWithoutInheritingAdjacentLabels() throws {
+        let adjacent = RoutePoint(latitude: 37.00001, longitude: -122)
+        let explicit = try XCTUnwrap(SessionSpotName("Adjacent explicit label", at: adjacent))
+        let route = [(point: adjacent, name: "Adjacent route stop")]
+
+        XCTAssertNil(SessionSpotName.preferredPlaceLabel(at: spot, explicit: [explicit], route: route,
+                                                         exactSaved: nil, allowsNearby: false))
+        XCTAssertEqual(SessionSpotName.preferredPlaceLabel(at: spot, explicit: [explicit], route: route,
+                                                            exactSaved: nil, exactRemembered: "Selected result",
+                                                            allowsNearby: false), "Selected result")
+    }
+
     func testWhitespaceEmptyNamesAndLengthAreHandled() throws {
         XCTAssertNil(SessionSpotName(" \n\t ", at: spot))
         XCTAssertNil(SessionSpotName("Home", at: RoutePoint(latitude: 99, longitude: 0)))

@@ -40,7 +40,7 @@ final class SpoofSession: ObservableObject {
               values.count <= 100, values.allSatisfy(\.isValid) else { return [] }
         return values
     }()
-    private var chosenNames: [SessionSpotName] = []
+    @Published private var chosenNames: [SessionSpotName] = []
     @Published private(set) var activeSavedTripID: UUID?
     @Published private(set) var previewSpotName: SessionSpotName?
     @Published private(set) var sessionSpotName: SessionSpotName?
@@ -1995,9 +1995,8 @@ final class SpoofSession: ObservableObject {
 
     func rememberPlaceName(_ text: String, at coordinate: CLLocationCoordinate2D) {
         guard !Self.isGenericFavoriteName(text), let name = SessionSpotName(text, at: RoutePoint(coordinate)) else { return }
-        chosenNames.removeAll { $0.point.distance(to: name.point) <= 5 }
-        chosenNames.insert(name, at: 0)
-        if chosenNames.count > 100 { chosenNames.removeLast() }
+        let otherNames = chosenNames.lazy.filter { $0.point != name.point }.prefix(99)
+        chosenNames = [name] + Array(otherNames)
     }
 
     func placeName(at coordinate: CLLocationCoordinate2D) -> String? {
@@ -2011,12 +2010,19 @@ final class SpoofSession: ObservableObject {
             }
         } ?? []
         let exactSaved = savedPin(at: coordinate).flatMap { Self.isGenericFavoriteName($0.name) ? nil : $0.name }
-        // Exact identity wins before proximity-based names for another coordinate.
+        let exactRemembered = chosenNames.first(where: { $0.point == point })?.name
+            ?? recents.first(where: { RoutePoint($0.coordinate) == point && !Self.isGenericFavoriteName($0.name) })?.name
+        let isSelectedPreview = pinIsPreview && pin.map { RoutePoint($0) == point } == true
+        let allowsNearby = !isSelectedPreview && (activeRoute != nil || joystickActive)
+        // Moving sessions tolerate minor coordinate changes. A selected or held pin has its own identity.
         if let label = SessionSpotName.preferredPlaceLabel(at: point,
-            explicit: [previewSpotName, sessionSpotName].compactMap { $0 }, route: routeLabels, exactSaved: exactSaved) { return label }
-        if let place = savedPins.first(where: { RoutePoint($0.coordinate).distance(to: point) <= 5 && !Self.isGenericFavoriteName($0.name) }) { return place.name }
-        if let name = chosenNames.first(where: { $0.point.distance(to: point) <= 5 }) { return name.name }
-        if let place = recents.first(where: { RoutePoint($0.coordinate).distance(to: point) <= 5 && !Self.isGenericFavoriteName($0.name) }) { return place.name }
+            explicit: [previewSpotName, sessionSpotName].compactMap { $0 }, route: routeLabels,
+            exactSaved: exactSaved, exactRemembered: exactRemembered, allowsNearby: allowsNearby) { return label }
+        if allowsNearby {
+            if let place = savedPins.first(where: { RoutePoint($0.coordinate).distance(to: point) <= 5 && !Self.isGenericFavoriteName($0.name) }) { return place.name }
+            if let name = chosenNames.first(where: { $0.point.distance(to: point) <= 5 }) { return name.name }
+            if let place = recents.first(where: { RoutePoint($0.coordinate).distance(to: point) <= 5 && !Self.isGenericFavoriteName($0.name) }) { return place.name }
+        }
         return NamedArea.name(at: point, in: namedAreas)
     }
 

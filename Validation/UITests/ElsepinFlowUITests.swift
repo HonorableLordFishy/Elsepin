@@ -34,7 +34,7 @@ final class ElsepinFlowUITests: XCTestCase {
             let button = springboard.buttons[label]
             if button.exists { button.tap() }
         }
-        if scenario.hasPrefix("route-identity-") || ["moving", "paused", "connecting", "failed", "map-pins", "route-search-replacement", "route-camera"].contains(scenario) {
+        if scenario.hasPrefix("route-identity-") || ["moving", "paused", "connecting", "failed", "map-pins", "route-search-replacement", "route-search-coverage", "route-camera"].contains(scenario) {
             let start = app.buttons["validation.start"]
             if !start.isEnabled, springboard.buttons["Allow"].waitForExistence(timeout: 5) {
                 springboard.buttons["Allow"].tap()
@@ -860,6 +860,29 @@ final class ElsepinFlowUITests: XCTestCase {
         capture("41-route-search-replacement-stays-active")
     }
 
+    func testRouteSearchCoversStartMiddleAndDestination() {
+        launch("route-search-coverage", narrow: false)
+        let search = app.buttons["map.routeSearch"]
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        search.tap()
+        let category = app.buttons["Coffee"]
+        XCTAssertTrue(category.waitForExistence(timeout: 10))
+        category.tap()
+
+        let rows = app.buttons.matching(identifier: "routeSearch.result")
+        let count = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 3"), object: rows)
+        XCTAssertEqual(XCTWaiter.wait(for: [count], timeout: 10), .completed, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Searching places…"].waitForNonExistence(timeout: 10))
+        let labels = rows.allElementsBoundByIndex.map(\.label)
+        XCTAssertEqual(labels.count, 3, "Off-route and duplicate provider results must be excluded")
+        for (label, name) in zip(labels, ["Start cafe", "Middle cafe", "Destination cafe"]) {
+            XCTAssertTrue(label.contains(name), "Expected \(name) in itinerary order, found \(label)")
+        }
+        capture("route-search-start-middle-destination")
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.buttons["session.pause"].waitForExistence(timeout: 5), "Browsing places must keep the route active")
+    }
+
     func testRouteSearchSeparatesAddStopFromSavePin() {
         launch("moving")
         let search = app.buttons["map.routeSearch"]
@@ -1201,5 +1224,46 @@ final class ElsepinFlowUITests: XCTestCase {
         let solid = app.buttons["navigation.library"]
         if solid.exists && solid.isHittable { solid.tap() }
         else { app.tabBars.buttons["Library"].tap() }
+    }
+}
+
+extension ElsepinFlowUITests {
+    func testDroppedPinAddressSpacingAtStandardTextSize() {
+        checkDroppedPinAddressSpacing(large: false)
+    }
+
+    func testDroppedPinAddressSpacingAtLargestTextSize() {
+        checkDroppedPinAddressSpacing(large: true)
+    }
+
+    private func checkDroppedPinAddressSpacing(large: Bool) {
+        launch("home-solid-pin-layout", large: large, narrow: !large)
+        let title = app.staticTexts["Dropped pin"]
+        let teleport = app.buttons["Teleport"]
+        let mapTab = app.buttons["navigation.map"]
+        let shortAddress = app.staticTexts["12 Oak Street"]
+        let longAddress = app.staticTexts["1842 North Observatory Promenade, Riverside Botanical Garden, West Conservatory Entrance, Lower Hudson River Waterfront, New York, NY 10019"]
+
+        app.buttons["Select short address"].tap()
+        XCTAssertTrue(shortAddress.waitForExistence(timeout: 10))
+        XCTAssertTrue(title.exists)
+        let shortGap = shortAddress.frame.minY - title.frame.maxY
+        let oneLineHeight = shortAddress.frame.height
+        XCTAssertLessThanOrEqual(shortGap, 4)
+        XCTAssertGreaterThan(oneLineHeight, 0)
+        XCTAssertTrue(teleport.isHittable)
+        capture("dropped-pin-short-address")
+
+        app.buttons["Select long address"].tap()
+        XCTAssertTrue(longAddress.waitForExistence(timeout: 10))
+        let addressFrame = longAddress.frame
+        XCTAssertGreaterThan(addressFrame.minY - title.frame.maxY, shortGap + 2)
+        XCTAssertGreaterThan(addressFrame.height, oneLineHeight * (large ? 4 : 2))
+        XCTAssertGreaterThanOrEqual(addressFrame.minY, app.frame.minY)
+        XCTAssertTrue(teleport.isHittable)
+        XCTAssertLessThan(addressFrame.maxY, teleport.frame.minY)
+        XCTAssertTrue(mapTab.isHittable)
+        XCTAssertLessThan(teleport.frame.maxY, mapTab.frame.minY)
+        capture("dropped-pin-wrapped-address")
     }
 }

@@ -156,6 +156,7 @@ struct RouteStopSearchSheet: View {
                 Image(systemName: browsing ? "mappin.circle.fill" : "plus.circle.fill").foregroundStyle(LocusTheme.accent)
             }.frame(maxWidth: .infinity, minHeight: 52, alignment: .leading).contentShape(Rectangle())
         }.buttonStyle(.borderless).accessibilityHint(browsing ? "Choose Add stop or Save pin" : "Add this stop to the route preview")
+            .accessibilityIdentifier("routeSearch.result")
     }
 
     private func choose(_ place: RoutePlace) {

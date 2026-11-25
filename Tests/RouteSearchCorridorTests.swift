@@ -42,6 +42,41 @@ final class RouteSearchCorridorTests: XCTestCase {
                              "Very long routes must be represented honestly as sampled, not exhaustive coverage")
     }
 
+    func testMediumRouteGetsSeparateStartMiddleAndEndSearchWindows() throws {
+        let track = try XCTUnwrap(RouteTrack([
+            RoutePoint(latitude: 0, longitude: 0),
+            RoutePoint(latitude: 0, longitude: 0.29)
+        ]))
+        let corridor = RouteSearchCorridor(track: track)
+        XCTAssertEqual(corridor.prioritizedRegions.count, 3)
+        for (window, fraction) in zip(corridor.prioritizedRegions, [1.0 / 6, 5.0 / 6, 0.5]) {
+            XCTAssertLessThan(window.center.distance(to: track.point(at: track.length * fraction)), 1)
+        }
+        for fraction in [0.0, 0.5, 1.0] {
+            let point = track.point(at: track.length * fraction)
+            XCTAssertTrue(corridor.regions.contains {
+                $0.center.distance(to: point) <= $0.diameter / 2 - corridor.width + 1
+            })
+        }
+    }
+
+    func testShortRouteKeepsStartMiddleAndEndMatchesWithOneSearchWindow() throws {
+        let track = try XCTUnwrap(RouteTrack([
+            RoutePoint(latitude: 0, longitude: 0),
+            RoutePoint(latitude: 0, longitude: 0.1)
+        ]))
+        let corridor = RouteSearchCorridor(track: track)
+        XCTAssertEqual(corridor.regions.count, 1)
+        var matches = (0..<35).map { RouteSearchCorridor.Match(metresAlong: Double($0) * 50, metresAway: 100) }
+        let middle = matches.count
+        matches.append(.init(metresAlong: track.length / 2, metresAway: 400))
+        let end = matches.count
+        matches.append(.init(metresAlong: track.length - 100, metresAway: 600))
+
+        XCTAssertEqual(corridor.representativeIndices(for: matches, limit: 3), [0, middle, end])
+        XCTAssertEqual(Array(corridor.representativeIndices(for: matches).suffix(2)), [middle, end])
+    }
+
     func testDenseStartCannotDisplaceMatchesFromLaterInTheRoute() throws {
         let track = try XCTUnwrap(RouteTrack([RoutePoint(latitude: 0, longitude: 0), RoutePoint(latitude: 0, longitude: 9)]))
         let corridor = RouteSearchCorridor(track: track)

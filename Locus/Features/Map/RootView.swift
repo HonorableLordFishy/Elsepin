@@ -466,6 +466,7 @@ struct BottomControlsView: View {
     private var joystickInputEnabled: Bool { interactionsAvailable && !handleTouchActive }
 
     var body: some View {
+        let address = previewAddress
         VStack(spacing: 10) {
             if session.journey != nil {
                 compactJourneyPanel
@@ -476,23 +477,20 @@ struct BottomControlsView: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             VStack(spacing: 0) {
-                HStack(alignment: .top, spacing: 4) {
-                // Keep the same details in the tree throughout the drag. Only their
-                // visible height changes; the map and its coordinate space never resize.
-                expandedDetails
-                    .padding(.vertical, 4)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-                        guard height.isFinite, height >= 0, height != detailHeight else { return }
-                        interruptHandle()
-                        detailHeight = height
+                if let address {
+                    // Wrap the full address and scroll its details on shorter screens.
+                    // Primary actions keep their space below the scrolling region.
+                    ViewThatFits(in: .vertical) {
+                        previewAddressRow(title: address.title, address: address.value)
+                            .fixedSize(horizontal: false, vertical: true)
+                        ScrollView {
+                            previewAddressRow(title: address.title, address: address.value)
+                        }
+                        .scrollBounceBehavior(.basedOnSize)
                     }
-                    .frame(height: detailHeight > 0 ? detailHeight * expansion : nil, alignment: .bottom)
-                    .opacity(expansion)
-                    .clipped()
-                    .allowsHitTesting((!canCollapse || !collapsed) && !handleTouchActive)
-                    .accessibilityHidden(canCollapse && collapsed)
-                if canCollapse { panelHandle }
+                    .padding(.vertical, 4)
+                } else {
+                    collapsibleDetails
                 }
                 VStack(spacing: 10) {
                     primaryActions
@@ -505,8 +503,11 @@ struct BottomControlsView: View {
                         .padding(.top, 0)
                 }
                 .padding(.bottom, 4)
+                .layoutPriority(address == nil ? 0 : 1)
             }
             .padding(.horizontal, 14).padding(.top, 12)
+            .frame(maxHeight: address == nil ? nil : availableHeight)
+            .fixedSize(horizontal: false, vertical: address != nil)
             .modifier(ControlPanelStyle(useGlass: preferences.glassPanel))
             .shadow(color: .black.opacity(0.12), radius: 20, y: 8)
             }
@@ -530,6 +531,27 @@ struct BottomControlsView: View {
         .onChange(of: reduceMotion) { _, _ in interruptHandle() }
         .onAppear { if !handleTouchActive { handleDrag.gestureDidReset() } }
         .onDisappear { interruptHandle() }
+    }
+
+    private var collapsibleDetails: some View {
+        HStack(alignment: .top, spacing: 4) {
+            // Keep the same details in the tree throughout the drag. Only their
+            // visible height changes; the map and its coordinate space never resize.
+            expandedDetails
+                .padding(.vertical, 4)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    guard height.isFinite, height >= 0, height != detailHeight else { return }
+                    interruptHandle()
+                    detailHeight = height
+                }
+                .frame(height: detailHeight > 0 ? detailHeight * expansion : nil, alignment: .bottom)
+                .opacity(expansion)
+                .clipped()
+                .allowsHitTesting((!canCollapse || !collapsed) && !handleTouchActive)
+                .accessibilityHidden(canCollapse && collapsed)
+            if canCollapse { panelHandle }
+        }
     }
 
     @ViewBuilder private var compactJourneyPanel: some View {
@@ -718,6 +740,36 @@ struct BottomControlsView: View {
         .accessibilityLabel(collapsed ? "Expand controls" : "Collapse controls")
     }
 
+    private var previewAddress: (title: String, value: String)? {
+        guard session.journey == nil, planner.preparedRoute == nil, !session.joystickActive,
+              session.pinIsPreview, let pin = session.pin, let address = session.selectedPinAddress else { return nil }
+        let name = session.suggestedFavoriteName(for: pin)
+        guard address != name else { return nil }
+        return (session.isStopping ? "Stopping session" : name, address)
+    }
+
+    private func previewAddressRow(title: String, address: String) -> some View {
+        ViewThatFits(in: .horizontal) {
+            pinAddressText(title: title, address: address, wraps: false)
+                .fixedSize(horizontal: true, vertical: false)
+            pinAddressText(title: title, address: address, wraps: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func pinAddressText(title: String, address: String, wraps: Bool) -> some View {
+        HStack(alignment: wraps ? .top : .center, spacing: 8) {
+            traySymbol("mappin")
+            VStack(alignment: .leading, spacing: wraps ? 6 : 2) {
+                Text(title).font(.subheadline.weight(.semibold))
+                Text(address).font(.caption).foregroundStyle(.secondary)
+                    .lineSpacing(wraps ? 2 : 0)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.bottom, wraps ? 4 : 0)
+    }
+
     @ViewBuilder private var expandedDetails: some View {
         VStack(alignment: .leading, spacing: 8) {
             if session.journey != nil {
@@ -742,12 +794,7 @@ struct BottomControlsView: View {
                         Text(session.isStopping ? "Stopping session" : session.pinIsPreview ? session.pin.map { session.suggestedFavoriteName(for: $0) } ?? "Dropped pin" : session.isSpoofing ? "Holding location" : session.hasSession || session.lastError != nil ? session.statusTitle : "Where to next?")
                             .font(.subheadline.weight(.semibold))
                         if let point = session.pinIsPreview ? session.pin : session.simulated {
-                            if session.pinIsPreview, let address = session.selectedPinAddress {
-                                if address != session.suggestedFavoriteName(for: point) {
-                                    Text(address).font(.caption).foregroundStyle(.secondary)
-                                        .lineLimit(4)
-                                }
-                            } else {
+                            if !session.pinIsPreview || session.selectedPinAddress == nil {
                                 Text(session.pinIsPreview ? String(format: "%.5f, %.5f", point.latitude, point.longitude) : session.suggestedFavoriteName(for: point))
                                     .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                             }

@@ -10,6 +10,11 @@ import MapKit
         if ValidationFixture.scenario == "pin-address-refresh", RoutePoint(coordinate) == RoutePoint(ValidationFixture.points[0]) {
             return PinLocationDetails(name: "Geocoder name", address: ValidationFixture.updatedPinAddress)
         }
+        if ValidationFixture.scenario == "home-solid-pin-layout" {
+            let address = RoutePoint(coordinate) == RoutePoint(ValidationFixture.points[0])
+                ? ValidationFixture.shortPinLayoutAddress : ValidationFixture.longPinLayoutAddress
+            return PinLocationDetails(name: "Dropped pin", address: address)
+        }
 #endif
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         var candidates: [PinLocationDetails.Candidate] = []
@@ -27,7 +32,8 @@ import MapKit
                     let address = PinLocationDetails.singleLine(item.addressRepresentations?.fullAddress(includingRegion: false, singleLine: true))
                         ?? PinLocationDetails.singleLine(item.address?.fullAddress)
                         ?? item.address?.shortAddress
-                    return .init(name: item.name, address: address, distance: item.location.distance(from: location))
+                    return .init(name: item.name, address: address, distance: item.location.distance(from: location),
+                                 context: item.addressRepresentations?.cityWithContext)
                 }
             }
         } else {
@@ -45,8 +51,10 @@ import MapKit
                 let fallback = [street, mark.locality, mark.administrativeArea, mark.postalCode]
                     .compactMap { PinLocationDetails.singleLine($0) }.joined(separator: ", ")
                 let postalAddress = mark.postalAddress.map { CNPostalAddressFormatter.string(from: $0, style: .mailingAddress) }
+                let context = [mark.thoroughfare, mark.locality, mark.administrativeArea]
+                    .compactMap { PinLocationDetails.singleLine($0) }.joined(separator: ", ")
                 return .init(name: mark.name, address: PinLocationDetails.singleLine(postalAddress) ?? fallback,
-                             distance: mark.location?.distance(from: location) ?? .infinity)
+                             distance: mark.location?.distance(from: location) ?? .infinity, context: context)
             }
         }
         guard !Task.isCancelled else { return nil }
@@ -54,16 +62,17 @@ import MapKit
         // A point of interest is only a fallback label. The coordinate and any
         // available postal address remain independent of nearby businesses.
         if includeNearbyName {
-            let nearby = PlaceSearchRequest(pointsOfInterest: MKLocalPointsOfInterestRequest(center: coordinate, radius: 60))
-            if let response = try? await nearby.start(seconds: 3), !Task.isCancelled,
-               let item = response.mapItems.filter({ distance($0, from: location) <= 45 })
-                .min(by: { distance($0, from: location) < distance($1, from: location) }),
-               let name = PinLocationDetails.singleLine(item.name) {
-                return PinLocationDetails(name: String("Near \(name)".prefix(120)), address: nil)
+            let request = MKLocalPointsOfInterestRequest(center: coordinate, radius: PinLocationDetails.nearbySearchRadiusMetres)
+            let nearby = PlaceSearchRequest(pointsOfInterest: request)
+            if let response = try? await nearby.start(seconds: 3), !Task.isCancelled {
+                let landmarks = response.mapItems.map {
+                    PinLocationDetails.Candidate(name: $0.name, address: nil, distance: distance($0, from: location))
+                }
+                if let details = PinLocationDetails.nearLandmark(landmarks) { return details }
             }
         }
         guard !Task.isCancelled else { return nil }
-        return PinLocationDetails(name: "Dropped pin", address: nil)
+        return PinLocationDetails.reverseGeocodedContext(candidates) ?? PinLocationDetails(name: "Dropped pin", address: nil)
     }
 
     private static func distance(_ item: MKMapItem, from location: CLLocation) -> CLLocationDistance {
