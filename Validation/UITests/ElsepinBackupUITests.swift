@@ -330,7 +330,7 @@ final class ElsepinBackupUITests: XCTestCase {
                 let apply = app.buttons["gpx.apply"]
                 let reviewTime = selectVisibleFile(named: sample.filename,
                     captureName: "\(sample.filename)-files", until: apply)
-                XCTAssertTrue(app.staticTexts["\(sample.points) points"].exists)
+                XCTAssertTrue(app.staticTexts["\(sample.points.formatted()) points"].exists)
                 XCTAssertTrue(apply.isEnabled)
                 capture("\(sample.filename)-review")
                 apply.tap()
