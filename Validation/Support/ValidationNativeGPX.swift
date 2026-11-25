@@ -10,6 +10,7 @@ enum ValidationNativeGPX {
         let name: String
         let pointCount: Int
         let vertices: [RoutePoint]
+        var trackName: String { "\(name) source" }
 
         init(filename: String, name: String, pointCount: Int, latitude: Double) {
             self.filename = filename
@@ -33,7 +34,7 @@ enum ValidationNativeGPX {
             }
             var xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
             xml += "<gpx version=\"1.1\" creator=\"Elsepin Validation\" xmlns=\"http://www.topografix.com/GPX/1/1\">\n"
-            xml += "<trk><name>\(name) source</name><trkseg>\n\(trackPoint(vertices[0]))"
+            xml += "<trk><name>\(trackName)</name><trkseg>\n\(trackPoint(vertices[0]))"
             xml.reserveCapacity(pointCount * 45)
             let legs = vertices.count - 1
             for leg in 0..<legs {
@@ -57,6 +58,21 @@ enum ValidationNativeGPX {
         Sample(filename: "QA-GPX-medium.bin", name: "QA medium", pointCount: 4_096, latitude: 40.790),
         Sample(filename: "QA-GPX-large.gpx", name: "QA large", pointCount: 90_000, latitude: 40.810)
     ]
+    private static let extensionless = Sample(filename: "QA-GPX-extensionless", name: "QA generic data",
+                                              pointCount: 64, latitude: 40.830)
+
+    enum FileSet: Equatable {
+        case sizes, malformed, genericData
+
+        var samples: [Sample] {
+            switch self {
+            case .sizes: ValidationNativeGPX.samples
+            case .malformed: Array(ValidationNativeGPX.samples.prefix(1))
+            case .genericData: [ValidationNativeGPX.extensionless]
+            }
+        }
+    }
+
     static let malformedFile = "QA-GPX-malformed.gpx"
     static let roundTripName = "Harbor switchback"
     private static let roundTripOriginalID = UUID(uuidString: "5E1E4E2B-DC57-4571-BA48-947E26A5E111")!
@@ -76,33 +92,35 @@ enum ValidationNativeGPX {
         fixtureURL(filename).appendingPathExtension("export-receipt.json")
     }
 
-    static func exportableFiles(includeSamples: Bool) -> [URL] {
-        let names = includeSamples ? samples.map(\.filename) : [malformedFile, samples[0].filename]
+    static func exportableFiles(for set: FileSet) -> [URL] {
+        let names = set.samples.map(\.filename) + (set == .malformed ? [malformedFile] : [])
         return names.map(fixtureURL)
     }
 
-    static func prepare(includeSamples: Bool) throws {
+    static func prepare(_ set: FileSet) throws {
         try FileManager.default.createDirectory(at: fixtures, withIntermediateDirectories: true)
-        for sample in samples.prefix(includeSamples ? samples.count : 1) {
+        for sample in set.samples {
             let receipt = exportReceipt(for: sample.filename)
             if FileManager.default.fileExists(atPath: receipt.path) {
                 try FileManager.default.removeItem(at: receipt)
             }
             try sample.encoded().write(to: fixtureURL(sample.filename), options: .atomic)
         }
-        if !includeSamples {
+        if set == .malformed {
             try Data("<gpx><trk>".utf8).write(to: fixtureURL(malformedFile), options: .atomic)
         }
     }
 
     static func observeExport(_ url: URL) {
-        let filename = url.lastPathComponent
-        guard samples.contains(where: { $0.filename == filename }) else { return }
+        let exportedFilename = url.lastPathComponent
+        let filename = url.deletingPathExtension().lastPathComponent == extensionless.filename
+            ? extensionless.filename : exportedFilename
+        guard filename == extensionless.filename || samples.contains(where: { $0.filename == filename }) else { return }
         let source = fixtureURL(filename)
         guard source.standardizedFileURL != url.standardizedFileURL else { return }
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        var receipt: [String: Any] = ["filename": filename]
+        var receipt: [String: Any] = ["filename": exportedFilename]
         if let attributes = try? url.resourceValues(forKeys: [.fileSizeKey, .contentTypeKey]) {
             receipt["bytes"] = attributes.fileSize
             receipt["contentType"] = attributes.contentType?.identifier
@@ -139,11 +157,12 @@ enum ValidationNativeGPX {
         return String(decoding: try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]), as: UTF8.self)
     }
 
-    @MainActor static func diskReport() throws -> String {
+    @MainActor static func diskReport(for set: FileSet) throws -> String {
         let disk = TripLibrary()
         if let error = disk.error { return "Library reload failed: \(error)" }
-        let report: [[String: Any]] = try samples.map { sample in
-            let matches = disk.trips.filter { $0.name == sample.name }
+        let report: [[String: Any]] = try set.samples.map { sample in
+            let expectedName = set == .genericData ? sample.trackName : sample.name
+            let matches = disk.trips.filter { $0.name == expectedName }
             let trip = matches.first
             let points = trip?.points ?? []
             var retained = 0

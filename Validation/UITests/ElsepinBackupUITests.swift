@@ -145,7 +145,8 @@ final class ElsepinBackupUITests: XCTestCase {
         if replace.waitForExistence(timeout: 2) { replace.tap() }
     }
 
-    private func exportValidationFixture(named filename: String) {
+    @discardableResult
+    private func exportValidationFixture(named filename: String, allowProviderExtension: Bool = false) -> String {
         let item = app.buttons["validation.exportFixture.\(filename)"]
         XCTAssertTrue(item.waitForExistence(timeout: 10), "Missing export fixture \(filename)")
         item.tap()
@@ -154,7 +155,14 @@ final class ElsepinBackupUITests: XCTestCase {
         let status = app.staticTexts["validation.fixtureExportStatus"]
         if !status.waitForExistence(timeout: 20) { capture("fixture-export-\(filename)-failure") }
         XCTAssertTrue(status.exists, "Files did not confirm \(filename)")
-        XCTAssertEqual(status.label, "Staged \(filename)")
+        let label = status.label
+        XCTAssertTrue(label.hasPrefix("Staged "), label)
+        let exportedFilename = String(label.dropFirst("Staged ".count))
+        if allowProviderExtension && (exportedFilename as NSString).deletingPathExtension == filename {
+            return exportedFilename
+        }
+        XCTAssertEqual(exportedFilename, filename)
+        return exportedFilename
     }
     private func expandSettings() {
         let group = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Settings ·'")).firstMatch
@@ -271,6 +279,31 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertTrue(gpxPlanner.waitForNonExistence(timeout: 10))
     }
 
+    private func verifyReopenedGPXName(_ name: String) {
+        openGPXLibraryRoute(named: name)
+        visible(app.buttons["Save changes"]).tap()
+        let save = app.alerts["Save trip"]
+        XCTAssertTrue(save.waitForExistence(timeout: 10))
+        XCTAssertEqual(save.textFields.firstMatch.value as? String, name)
+        save.buttons["Cancel"].tap()
+        closeGPXPlanner()
+    }
+
+    private func gpxDiskMeasurement(for filename: String) throws -> [String: Any] {
+        app.buttons["validation.readGPXDiskReport"].tap()
+        let text = app.staticTexts["validation.gpxDiskReport"].label
+        let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [[String: Any]])
+        return try XCTUnwrap(report.first { $0["filename"] as? String == filename })
+    }
+
+    private func gpxMeasurementAttachment(_ measurement: [String: Any], named name: String) throws -> XCTAttachment {
+        let data = try JSONSerialization.data(withJSONObject: measurement, options: [.prettyPrinted, .sortedKeys])
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        return attachment
+    }
+
     func testMalformedGPXThroughNativeFilesRetriesWithoutReplacingRoute() {
         launchNativeGPX("home-solid-gpx-malformed")
         exportValidationFixture(named: "QA-GPX-malformed.gpx")
@@ -322,6 +355,48 @@ final class ElsepinBackupUITests: XCTestCase {
         capture("native-gpx-valid-after-malformed-saved")
     }
 
+    func testExtensionlessGPXThroughNativeFilesSavesAndReopens() throws {
+        let sourceFilename = "QA-GPX-extensionless"
+        let routeName = "QA generic data source"
+        launchNativeGPX("home-solid-gpx-generic-data")
+        let selectedFilename = exportValidationFixture(named: sourceFilename, allowProviderExtension: true)
+        openGPXLibraryRoute(named: "Test botanical garden walking route")
+        openGPXImportPicker()
+        let apply = app.buttons["gpx.apply"]
+        _ = selectVisibleFile(named: selectedFilename, captureName: "native-gpx-extensionless-files", until: apply)
+        XCTAssertTrue(app.staticTexts["64 points"].exists)
+        XCTAssertTrue(apply.isEnabled)
+        apply.tap()
+        XCTAssertTrue(app.navigationBars["Import GPX"].waitForNonExistence(timeout: 15))
+        let saveRoute = app.buttons["Save route"]
+        for _ in 0..<5 where !saveRoute.exists { app.swipeDown() }
+        visible(saveRoute).tap()
+        let save = app.alerts["Save trip"]
+        XCTAssertTrue(save.waitForExistence(timeout: 10))
+        XCTAssertEqual(save.textFields.firstMatch.value as? String, routeName)
+        save.buttons["Save"].tap()
+        XCTAssertTrue(app.buttons["Save changes"].waitForExistence(timeout: 30))
+        closeGPXPlanner()
+        verifyReopenedGPXName(routeName)
+
+        var measurement = try gpxDiskMeasurement(for: sourceFilename)
+        let provider = measurement["providerExport"] as? [String: Any]
+        measurement["requestedExportType"] = "public.data"
+        measurement["selectedFilename"] = selectedFilename
+        if provider?["contentType"] == nil || provider?["bytes"] == nil {
+            measurement["providerObservationLimit"] = "The native export destination did not expose all resource metadata."
+        }
+        add(try gpxMeasurementAttachment(measurement, named: "native-gpx-extensionless-type-and-bytes"))
+        XCTAssertEqual(measurement["name"] as? String, routeName)
+        XCTAssertEqual(measurement["fromGPX"] as? Bool, true)
+        XCTAssertEqual(measurement["matches"] as? Int, 1)
+        XCTAssertEqual(measurement["verticesRetainedInOrder"] as? Int, 5)
+        XCTAssertEqual(measurement["endpointsRetained"] as? Bool, true)
+        if let observedFile = provider?["filename"] as? String { XCTAssertEqual(observedFile, selectedFilename) }
+        if let size = provider?["bytes"] as? Int { XCTAssertEqual(size, measurement["sourceBytes"] as? Int) }
+        if let identical = provider?["matchesSourceBytes"] as? Bool { XCTAssertTrue(identical) }
+    }
+
     func testNativeGPXImportSizesSaveAndReopen() throws {
         let samples = [
             (filename: "QA-GPX-small.gpx", name: "QA small", points: 64),
@@ -367,17 +442,8 @@ final class ElsepinBackupUITests: XCTestCase {
                     app.launch()
                     XCTAssertTrue(app.buttons["navigation.library"].waitForExistence(timeout: 20))
                 }
-                openGPXLibraryRoute(named: sample.name)
-                visible(app.buttons["Save changes"]).tap()
-                XCTAssertTrue(save.waitForExistence(timeout: 10))
-                XCTAssertEqual(save.textFields.firstMatch.value as? String, sample.name)
-                save.buttons["Cancel"].tap()
-                closeGPXPlanner()
-
-                app.buttons["validation.readGPXDiskReport"].tap()
-                let text = app.staticTexts["validation.gpxDiskReport"].label
-                let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [[String: Any]])
-                var measurement = try XCTUnwrap(report.first { $0["filename"] as? String == sample.filename })
+                verifyReopenedGPXName(sample.name)
+                var measurement = try gpxDiskMeasurement(for: sample.filename)
                 XCTAssertEqual(measurement["name"] as? String, sample.name)
                 XCTAssertEqual(measurement["sourcePoints"] as? Int, sample.points)
                 XCTAssertGreaterThanOrEqual(measurement["persistedPoints"] as? Int ?? 0, sample.points)
@@ -394,11 +460,7 @@ final class ElsepinBackupUITests: XCTestCase {
                 previousBytes = bytes
                 measurement["reopenedAfterAppRelaunch"] = relaunched
                 measurement["uiTimings"] = ["filesSelectionToReviewSeconds": reviewTime, "saveConfirmationToSavedSeconds": saveTime]
-                let data = try JSONSerialization.data(withJSONObject: measurement, options: [.prettyPrinted, .sortedKeys])
-                let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
-                attachment.name = "\(sample.filename)-measurement"
-                attachment.lifetime = .keepAlways
-                activity.add(attachment)
+                activity.add(try gpxMeasurementAttachment(measurement, named: "\(sample.filename)-measurement"))
             }
         }
     }

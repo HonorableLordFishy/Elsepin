@@ -16,7 +16,14 @@ enum ValidationFixture {
     static var fallback: Bool { ProcessInfo.processInfo.arguments.contains("--accessibility-fallback") }
     static var routeIdentityScenario: Bool { scenario.hasPrefix("route-identity-") }
     static var nativeGPXRoundTrip: Bool { scenario == "home-solid-gpx-round-trip" }
-    static var nativeGPXSizes: Bool { scenario == "home-solid-gpx-sizes" }
+    static var nativeGPXFiles: ValidationNativeGPX.FileSet? {
+        switch scenario {
+        case "home-solid-gpx-sizes": .sizes
+        case "home-solid-gpx-malformed": .malformed
+        case "home-solid-gpx-generic-data": .genericData
+        default: nil
+        }
+    }
     static var firstLaunch: Bool { scenario == "first-launch" }
     static var drawnRoute: Bool { scenario == "drawn-route" }
     static var routeReconnect: Bool { scenario == "route-reconnect" }
@@ -66,9 +73,9 @@ enum ValidationFixture {
             }, routeReplacementRequest.rawValue as CFString, nil, .deliverImmediately)
         }
         if scenario == "backup-settings", ProcessInfo.processInfo.arguments.contains("--preserve-backup-test-data") { return }
-        if nativeGPXSizes || scenario == "home-solid-gpx-malformed" {
+        if let files = nativeGPXFiles {
             if ProcessInfo.processInfo.arguments.contains("--preserve-gpx-test-data") { return }
-            do { try ValidationNativeGPX.prepare(includeSamples: nativeGPXSizes) }
+            do { try ValidationNativeGPX.prepare(files) }
             catch { preconditionFailure("Could not seed disposable Files GPX: \(error)") }
         }
         if firstLaunch || drawnRoute, ProcessInfo.processInfo.arguments.contains("--preserve-everyday-test-data") { return }
@@ -258,17 +265,18 @@ private struct ValidationHost: View {
                         NotificationCenter.default.post(name:.locusImportGPX,object:url)
                     }.accessibilityIdentifier("validation.openGPX")
                 }
-                if ValidationFixture.nativeGPXSizes || ValidationFixture.scenario == "home-solid-gpx-malformed" {
-                    ValidationFixtureExporter(files: ValidationNativeGPX.exportableFiles(includeSamples: ValidationFixture.nativeGPXSizes),
+                if let files = ValidationFixture.nativeGPXFiles {
+                    ValidationFixtureExporter(files: ValidationNativeGPX.exportableFiles(for: files),
                         onExported: ValidationNativeGPX.observeExport)
                 }
-                if ValidationFixture.nativeGPXSizes || ValidationFixture.nativeGPXRoundTrip {
+                if ValidationFixture.nativeGPXRoundTrip || ValidationFixture.nativeGPXFiles == .sizes
+                    || ValidationFixture.nativeGPXFiles == .genericData {
                     Button("Read GPX routes from disk") {
                         do {
                             if ValidationFixture.nativeGPXRoundTrip {
                                 nativeGPXDiskReport = try ValidationNativeGPX.roundTripDiskReport()
-                            } else {
-                                nativeGPXDiskReport = try ValidationNativeGPX.diskReport()
+                            } else if let files = ValidationFixture.nativeGPXFiles {
+                                nativeGPXDiskReport = try ValidationNativeGPX.diskReport(for: files)
                             }
                         }
                         catch { nativeGPXDiskReport = error.localizedDescription }
