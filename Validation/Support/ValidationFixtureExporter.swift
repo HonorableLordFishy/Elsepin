@@ -17,13 +17,13 @@ struct ValidationFixtureExporter: View {
 
     var body: some View {
         HStack {
-            Menu("Stage test file") {
-                ForEach(files, id: \.self) { file in
-                    Button(file.lastPathComponent) { stage(file) }
-                        .accessibilityIdentifier("validation.exportFixture.\(file.lastPathComponent)")
-                }
+            ForEach(files, id: \.self) { file in
+                Button(file.deletingPathExtension().lastPathComponent) { stage(file) }
+                    .font(.caption).lineLimit(1)
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Stage \(file.lastPathComponent)")
+                    .accessibilityIdentifier("validation.exportFixture.\(file.lastPathComponent)")
             }
-            .accessibilityIdentifier("validation.exportFixture")
 
             if !status.isEmpty {
                 Text(status).font(.caption).lineLimit(1)

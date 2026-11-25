@@ -146,11 +146,7 @@ final class ElsepinBackupUITests: XCTestCase {
     }
 
     private func exportValidationFixture(named filename: String) {
-        let stagingMenu = app.buttons["validation.exportFixture"]
-        XCTAssertTrue(stagingMenu.waitForExistence(timeout: 10), "Missing test file staging menu")
-        stagingMenu.tap()
-        let item = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
-            "validation.exportFixture.\(filename)", filename)).firstMatch
+        let item = app.buttons["validation.exportFixture.\(filename)"]
         XCTAssertTrue(item.waitForExistence(timeout: 10), "Missing export fixture \(filename)")
         item.tap()
         openLocalFilesStorage()
