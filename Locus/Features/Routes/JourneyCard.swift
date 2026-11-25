@@ -202,12 +202,13 @@ struct StopSpoofingButton<Label: View>: View {
             get: { pendingStop != nil },
             set: { if !$0 { pendingStop = nil } }
         ), presenting: pendingStop) { generation in
-            Button("Keep spoofing", role: .cancel) { pendingStop = nil }
-            Button("Stop spoofing", role: .destructive) {
+            Button("Stop spoofing") {
                 pendingStop = nil
                 guard session.commandGeneration == generation, session.hasSession, !session.isStopping else { return }
                 session.stop(pairing: pairing)
             }
+            Button("Keep spoofing", role: .cancel) { pendingStop = nil }
+                .keyboardShortcut(.defaultAction)
         } message: { _ in
             Text("You’re on cellular. Starting again may require Wi-Fi or a hotspot.")
         }
