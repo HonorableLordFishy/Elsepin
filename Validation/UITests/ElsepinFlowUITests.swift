@@ -1263,7 +1263,13 @@ extension ElsepinFlowUITests {
         XCTAssertGreaterThan(addressFrame.height, oneLineHeight * (large ? 4 : 2))
         XCTAssertGreaterThanOrEqual(addressFrame.minY, app.frame.minY)
         XCTAssertTrue(teleport.isHittable)
-        XCTAssertLessThan(addressFrame.maxY, teleport.frame.minY)
+        if large {
+            let viewport = app.scrollViews["map.pinAddressDetails"]
+            XCTAssertTrue(viewport.exists)
+            verifyAddressBottomReachable(longAddress, in: viewport, above: teleport)
+        } else {
+            XCTAssertLessThan(addressFrame.maxY, teleport.frame.minY)
+        }
         XCTAssertTrue(mapTab.isHittable)
         XCTAssertLessThan(teleport.frame.maxY, mapTab.frame.minY)
         capture("dropped-pin-wrapped-address")
@@ -1285,17 +1291,21 @@ extension ElsepinFlowUITests {
         XCTAssertTrue(teleport.isHittable)
         capture("dropped-pin-address-only-top")
 
-        for _ in 0..<5 {
-            if title.frame.maxY <= details.frame.maxY + 1 { break }
-            details.swipeUp(velocity: .slow)
-            XCTAssertTrue(teleport.isHittable)
-        }
-
-        let finalBottom = title.frame.maxY
-        XCTAssertLessThan(finalBottom, initialBottom - 12)
-        XCTAssertLessThanOrEqual(finalBottom, details.frame.maxY + 1, "Wren Gate should scroll into view")
-        XCTAssertGreaterThan(finalBottom, details.frame.minY + 12)
-        XCTAssertLessThanOrEqual(details.frame.maxY, teleport.frame.minY)
+        verifyAddressBottomReachable(title, in: details, above: teleport)
+        XCTAssertLessThan(title.frame.maxY, initialBottom - 12)
         capture("dropped-pin-address-only-wren-gate")
+    }
+
+    private func verifyAddressBottomReachable(_ text: XCUIElement, in viewport: XCUIElement, above action: XCUIElement) {
+        let viewportFrame = viewport.frame
+        XCTAssertLessThanOrEqual(viewportFrame.maxY, action.frame.minY)
+        let swipes = Int(ceil(text.frame.height / max(1, viewportFrame.height * 0.5))) + 2
+        for _ in 0..<min(50, swipes) {
+            if text.frame.maxY <= viewportFrame.maxY + 1 { break }
+            viewport.swipeUp(velocity: .fast)
+            XCTAssertTrue(action.isHittable)
+        }
+        XCTAssertLessThanOrEqual(text.frame.maxY, viewportFrame.maxY + 1, "The last line must scroll into view")
+        XCTAssertGreaterThan(text.frame.maxY, viewportFrame.minY)
     }
 }
