@@ -5,7 +5,7 @@ on:
       ui_focus:
         description: Run all validation, or a focused simulator recheck
         type: choice
-        options: [all, search, home, pins, routes, route-search, route-identity, review-fixes, backups, imports, import-text, phone-recheck, route-text, everyday, cellular-stop, map-feedback, single]
+        options: [all, search, home, pins, routes, route-search, route-identity, review-fixes, backups, imports, import-text, phone-recheck, route-text, everyday, cellular-stop, map-feedback, route-history-backup, single]
         default: all
       ui_test:
         description: For single, use Class/testMethod from Validation/UITests
@@ -152,6 +152,9 @@ jobs:
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests")
           elif [[ "$SIMULATOR_SUITE" == other ]]; then
             test_selection+=("-skip-testing:LocusValidationUITests/ElsepinFlowUITests")
+          elif [[ "$UI_FOCUS" == route-history-backup ]]; then
+            test_selection+=("-only-testing:LocusValidationUITests/ElsepinBackupUITests/testNativeGPXImportSizesSaveAndReopen")
+            test_selection+=("-only-testing:LocusValidationUITests/ElsepinBackupUITests/testSettingsExportFileSelectiveImportAndRelaunch")
           elif [[ "$UI_FOCUS" == map-feedback ]]; then
             for method in testDroppedPinAddressSpacingAtStandardTextSize testDroppedPinAddressSpacingAtLargestTextSize testRouteSearchCoversStartMiddleAndDestination; do
               test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$method")
@@ -217,7 +220,7 @@ jobs:
           fi
           python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "install", os.environ["VALIDATION_SIMULATOR"], ".build/simulator-validation/Build/Products/Debug-iphonesimulator/ElsepinValidation.app"], check=True, timeout=180)'
           xcrun simctl privacy "$VALIDATION_SIMULATOR" grant location-always com.n3mostudio.elsepin.validation
-          if [[ "$SIMULATOR_SUITE" == other || "$UI_FOCUS" == backups || "$UI_FOCUS" == review-fixes || "$UI_FOCUS" == phone-recheck || ( "$UI_FOCUS" == single && "$UI_TEST" == ElsepinBackupUITests/* ) ]]; then
+          if [[ "$SIMULATOR_SUITE" == other || "$UI_FOCUS" == backups || "$UI_FOCUS" == route-history-backup || "$UI_FOCUS" == review-fixes || "$UI_FOCUS" == phone-recheck || ( "$UI_FOCUS" == single && "$UI_TEST" == ElsepinBackupUITests/* ) ]]; then
             # Register Files' local provider before interacting with document UI.
             python3 - <<'PY'
           import os, pathlib, subprocess

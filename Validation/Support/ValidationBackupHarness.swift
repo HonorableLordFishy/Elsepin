@@ -49,6 +49,21 @@ struct ValidationBackupHarness: View {
                 "tripCount": reloaded.trips.count, "pinCount": session.savedPins.count
             ]
             if reloaded.error == nil { result["readableTripCount"] = reloaded.trips.count }
+            if ValidationFixture.scenario == "backup-settings" {
+                let identifier = Bundle.main.bundleIdentifier!
+                let active = UserDefaults.standard.persistentDomain(forName: identifier) ?? [:]
+                let plist = URL.libraryDirectory.appending(path: "Preferences/\(identifier).plist")
+                let bytes = try? Data(contentsOf: plist)
+                let disk = bytes.flatMap { try? PropertyListSerialization.propertyList(from: $0, format: nil) } as? [String: Any]
+                func values(_ domain: [String: Any]) -> [String: Any] {
+                    ["speedPresets": domain[UsualSpeedRules.preferenceKey] as? [String: Double] ?? [:],
+                     "smoothMovement": domain["locus.smoothMovement"] ?? NSNull(),
+                     "pinArchiveBytes": (domain["locus.favorites"] as? Data)?.count ?? 0,
+                     "legacyHistoryBytes": (domain["locus.recentRoutes"] as? Data)?.count ?? 0]
+                }
+                result["defaultsEvidence"] = ["active": values(active), "disk": values(disk ?? [:]),
+                    "diskPlistBytes": bytes?.count ?? 0, "processID": ProcessInfo.processInfo.processIdentifier] as [String: Any]
+            }
             if ["backup-unreadable-trips", "backup-late-trip-corruption"].contains(ValidationFixture.scenario) {
                 result["originalKept"] = try Data(contentsOf: AppDataWorkspace.file("Trips.json")) == ValidationFixture.unreadableTrips
             }

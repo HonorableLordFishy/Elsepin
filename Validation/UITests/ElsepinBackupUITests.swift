@@ -296,7 +296,7 @@ final class ElsepinBackupUITests: XCTestCase {
         return try XCTUnwrap(report.first { $0["filename"] as? String == filename })
     }
 
-    private func gpxMeasurementAttachment(_ measurement: [String: Any], named name: String) throws -> XCTAttachment {
+    private func evidenceAttachment(_ measurement: [String: Any], named name: String) throws -> XCTAttachment {
         let data = try JSONSerialization.data(withJSONObject: measurement, options: [.prettyPrinted, .sortedKeys])
         let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
         attachment.name = name
@@ -386,7 +386,7 @@ final class ElsepinBackupUITests: XCTestCase {
         if provider?["contentType"] == nil || provider?["bytes"] == nil {
             measurement["providerObservationLimit"] = "The native export destination did not expose all resource metadata."
         }
-        add(try gpxMeasurementAttachment(measurement, named: "native-gpx-extensionless-type-and-bytes"))
+        add(try evidenceAttachment(measurement, named: "native-gpx-extensionless-type-and-bytes"))
         XCTAssertEqual(measurement["name"] as? String, routeName)
         XCTAssertEqual(measurement["fromGPX"] as? Bool, true)
         XCTAssertEqual(measurement["matches"] as? Int, 1)
@@ -460,7 +460,7 @@ final class ElsepinBackupUITests: XCTestCase {
                 previousBytes = bytes
                 measurement["reopenedAfterAppRelaunch"] = relaunched
                 measurement["uiTimings"] = ["filesSelectionToReviewSeconds": reviewTime, "saveConfirmationToSavedSeconds": saveTime]
-                activity.add(try gpxMeasurementAttachment(measurement, named: "\(sample.filename)-measurement"))
+                activity.add(try evidenceAttachment(measurement, named: "\(sample.filename)-measurement"))
             }
         }
     }
@@ -676,7 +676,9 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertEqual(drive.value as? String, "Not selected")
         capture("35-import-leaves-drive-unchecked")
         applyImport()
-        let partial = try settings(snapshot())
+        let beforeRelaunch = try snapshot()
+        add(try evidenceAttachment(beforeRelaunch, named: "selective-backup-before-relaunch"))
+        let partial = try settings(beforeRelaunch)
         var expectedPartial = original
         var speeds = try XCTUnwrap(original["usualSpeeds"] as? [String: Any])
         speeds["drive"] = 1
@@ -688,6 +690,7 @@ final class ElsepinBackupUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["Read settings and export"].waitForExistence(timeout: 20))
         let partialAfterRelaunch = try snapshot()
+        add(try evidenceAttachment(partialAfterRelaunch, named: "selective-backup-after-relaunch"))
         XCTAssertTrue(NSDictionary(dictionary: try settings(partialAfterRelaunch)).isEqual(to: expectedPartial),
             "Selected settings or the unchecked Drive preset did not persist through relaunch")
         XCTAssertEqual(partialAfterRelaunch["tripCount"] as? Int, baseline["tripCount"] as? Int)

@@ -180,6 +180,11 @@ enum ValidationNativeGPX {
             if let data = try? Data(contentsOf: exportReceipt(for: sample.filename)) {
                 entry["providerExport"] = try JSONSerialization.jsonObject(with: data)
             }
+            if sample.pointCount == 90_000, trip != nil {
+                entry["legacyHistoryBytes"] = AppDataWorkspace.defaults.data(forKey: "locus.recentRoutes")?.count ?? 0
+                let history = AppDataWorkspace.file("RecentRouteHistory/RecentRoutes.json")
+                entry["historyFileBytes"] = (try? history.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+            }
             return entry
         }
         return String(decoding: try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]), as: UTF8.self)
