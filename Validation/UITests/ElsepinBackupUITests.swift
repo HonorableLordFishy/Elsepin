@@ -58,23 +58,6 @@ final class ElsepinBackupUITests: XCTestCase {
         navigation.descendants(matching: .any).matching(NSPredicate(format: "identifier != 'BackButton' AND (label == %@ OR label BEGINSWITH %@)",
             "On My iPhone", "On My iPhone,")).firstMatch
     }
-    private func openValidationDocuments() {
-        openLocalFilesStorage()
-        // The simulator target inherits the shipping display name and Files
-        // sharing settings. Some runtimes display the simulator product name.
-        let name = NSPredicate(format: "label == %@ OR label == %@ OR label BEGINSWITH %@ OR label BEGINSWITH %@",
-            "Elsepin", "ElsepinValidation", "Elsepin,", "ElsepinValidation,")
-        let folder = app.cells.matching(name).firstMatch
-        XCTAssertTrue(folder.waitForExistence(timeout: 20), "The validation app folder is missing in Files")
-        let thumbnail = folder.images.firstMatch
-        if thumbnail.exists && thumbnail.isHittable { thumbnail.tap() }
-        else { folder.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap() }
-        let picker = app.navigationBars["FullDocumentManagerViewControllerNavigationBar"]
-        let title = picker.descendants(matching: .any).matching(NSCompoundPredicate(andPredicateWithSubpredicates: [
-            NSPredicate(format: "identifier != 'BackButton'"), name
-        ])).firstMatch
-        XCTAssertTrue(title.waitForExistence(timeout: 20), "Files did not open the validation app folder")
-    }
     private func snapshot() throws -> [String: Any] {
         app.buttons["Read settings and export"].tap()
         let text = app.staticTexts["validation.backupSnapshot"].label
@@ -160,6 +143,22 @@ final class ElsepinBackupUITests: XCTestCase {
         else { app.navigationBars.buttons["Save"].tap() }
         let replace = app.buttons["Replace"].firstMatch
         if replace.waitForExistence(timeout: 2) { replace.tap() }
+    }
+
+    private func exportValidationFixture(named filename: String) {
+        let stagingMenu = app.buttons["validation.exportFixture"]
+        XCTAssertTrue(stagingMenu.waitForExistence(timeout: 10), "Missing test file staging menu")
+        stagingMenu.tap()
+        let item = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
+            "validation.exportFixture.\(filename)", filename)).firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 10), "Missing export fixture \(filename)")
+        item.tap()
+        openLocalFilesStorage()
+        saveToLocalFiles()
+        let status = app.staticTexts["validation.fixtureExportStatus"]
+        if !status.waitForExistence(timeout: 20) { capture("fixture-export-\(filename)-failure") }
+        XCTAssertTrue(status.exists, "Files did not confirm \(filename)")
+        XCTAssertEqual(status.label, "Staged \(filename)")
     }
     private func expandSettings() {
         let group = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Settings ·'")).firstMatch
@@ -268,7 +267,7 @@ final class ElsepinBackupUITests: XCTestCase {
         let options = visible(app.buttons["Options"])
         if options.value as? String != "Expanded" { options.tap() }
         visible(app.buttons["Import GPX"]).tap()
-        openValidationDocuments()
+        openLocalFilesStorage()
     }
 
     private func closeGPXPlanner() {
@@ -278,6 +277,8 @@ final class ElsepinBackupUITests: XCTestCase {
 
     func testMalformedGPXThroughNativeFilesRetriesWithoutReplacingRoute() {
         launchNativeGPX("home-solid-gpx-malformed")
+        exportValidationFixture(named: "QA-GPX-malformed.gpx")
+        exportValidationFixture(named: "QA-GPX-small.gpx")
         openGPXLibraryRoute(named: "Test botanical garden walking route")
         openGPXImportPicker()
         let error = app.staticTexts["gpx.error"]
@@ -327,6 +328,7 @@ final class ElsepinBackupUITests: XCTestCase {
         var previousBytes = 0
         for (index, sample) in samples.enumerated() {
             try XCTContext.runActivity(named: "Import, save and reopen \(sample.filename)") { activity in
+                exportValidationFixture(named: sample.filename)
                 openGPXLibraryRoute(named: "Test botanical garden walking route")
                 openGPXImportPicker()
                 let apply = app.buttons["gpx.apply"]
@@ -379,8 +381,12 @@ final class ElsepinBackupUITests: XCTestCase {
                 XCTAssertEqual(measurement["fromGPX"] as? Bool, true)
                 XCTAssertEqual(measurement["verticesRetainedInOrder"] as? Int, 5)
                 XCTAssertEqual(measurement["endpointsRetained"] as? Bool, true)
-                let bytes = try XCTUnwrap(measurement["bytes"] as? Int)
+                let bytes = try XCTUnwrap(measurement["sourceBytes"] as? Int)
                 XCTAssertGreaterThan(bytes, previousBytes)
+                if let providerExport = measurement["providerExport"] as? [String: Any] {
+                    if let providerBytes = providerExport["bytes"] as? Int { XCTAssertEqual(providerBytes, bytes) }
+                    if let identical = providerExport["matchesSourceBytes"] as? Bool { XCTAssertTrue(identical) }
+                }
                 previousBytes = bytes
                 measurement["reopenedAfterAppRelaunch"] = relaunched
                 measurement["uiTimings"] = ["filesSelectionToReviewSeconds": reviewTime, "saveConfirmationToSavedSeconds": saveTime]
@@ -516,6 +522,8 @@ final class ElsepinBackupUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["Read settings and export"].waitForExistence(timeout: 20))
         prepareFilesProvider()
+        let malformedFilename = "Malformed-Validation-Backup.json"
+        exportValidationFixture(named: malformedFilename)
         let baseline = try snapshot()
         XCTAssertEqual(baseline["readableTripCount"] as? Int, 1)
         XCTAssertEqual(baseline["pinCount"] as? Int, 1)
@@ -572,11 +580,9 @@ final class ElsepinBackupUITests: XCTestCase {
         review.buttons["BackButton"].tap()
         XCTAssertTrue(chooseFile.waitForExistence(timeout: 5))
         chooseFile.tap()
-        openValidationDocuments()
         let invalidBackup = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@",
             "This isn't a complete Elsepin backup.")).firstMatch
-        _ = selectVisibleFile(named: "Malformed-Validation-Backup.json",
-            captureName: "34a-malformed-json-in-files", until: invalidBackup)
+        selectFile(named: malformedFilename, captureName: "34a-malformed-json-in-files", until: invalidBackup)
         XCTAssertFalse(review.exists)
         XCTAssertTrue(chooseFile.isEnabled)
         capture("34b-malformed-json-rejected")

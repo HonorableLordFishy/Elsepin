@@ -70,7 +70,7 @@ enum ValidationFixture {
                 do { try manager.removeItem(at: observation) }
                 catch { preconditionFailure("Could not clear the old export observation: \(error)") }
             }
-            do { try ValidationBackupHarness.stageMalformedBackup() }
+            do { try ValidationBackupHarness.prepareMalformedBackup() }
             catch { preconditionFailure("Could not stage malformed backup: \(error)") }
         }
         UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
@@ -246,6 +246,10 @@ private struct ValidationHost: View {
                         try? Data(ValidationImportHarness.valid.utf8).write(to:url)
                         NotificationCenter.default.post(name:.locusImportGPX,object:url)
                     }.accessibilityIdentifier("validation.openGPX")
+                }
+                if ValidationFixture.nativeGPXSizes || ValidationFixture.scenario == "home-solid-gpx-malformed" {
+                    ValidationFixtureExporter(files: ValidationNativeGPX.exportableFiles(includeSamples: ValidationFixture.nativeGPXSizes),
+                        onExported: ValidationNativeGPX.observeExport)
                 }
                 if ValidationFixture.nativeGPXSizes || ValidationFixture.nativeGPXRoundTrip {
                     Button("Read GPX routes from disk") {

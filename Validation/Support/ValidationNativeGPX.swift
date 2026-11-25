@@ -65,15 +65,54 @@ enum ValidationNativeGPX {
         RoutePoint(latitude: 40.768, longitude: -73.975),
         RoutePoint(latitude: 40.779, longitude: -73.975)
     ]
-    private static let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    private static let fixtures = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("NativeGPXFixtures", isDirectory: true)
+
+    private static func fixtureURL(_ filename: String) -> URL {
+        fixtures.appendingPathComponent(filename)
+    }
+
+    private static func exportReceipt(for filename: String) -> URL {
+        fixtureURL(filename).appendingPathExtension("export-receipt.json")
+    }
+
+    static func exportableFiles(includeSamples: Bool) -> [URL] {
+        let names = includeSamples ? samples.map(\.filename) : [malformedFile, samples[0].filename]
+        return names.map(fixtureURL)
+    }
 
     static func prepare(includeSamples: Bool) throws {
-        try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: fixtures, withIntermediateDirectories: true)
         for sample in samples.prefix(includeSamples ? samples.count : 1) {
-            try sample.encoded().write(to: documents.appendingPathComponent(sample.filename), options: .atomic)
+            let receipt = exportReceipt(for: sample.filename)
+            if FileManager.default.fileExists(atPath: receipt.path) {
+                try FileManager.default.removeItem(at: receipt)
+            }
+            try sample.encoded().write(to: fixtureURL(sample.filename), options: .atomic)
         }
         if !includeSamples {
-            try Data("<gpx><trk>".utf8).write(to: documents.appendingPathComponent(malformedFile), options: .atomic)
+            try Data("<gpx><trk>".utf8).write(to: fixtureURL(malformedFile), options: .atomic)
+        }
+    }
+
+    static func observeExport(_ url: URL) {
+        let filename = url.lastPathComponent
+        guard samples.contains(where: { $0.filename == filename }) else { return }
+        let source = fixtureURL(filename)
+        guard source.standardizedFileURL != url.standardizedFileURL else { return }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        var receipt: [String: Any] = ["filename": filename]
+        if let attributes = try? url.resourceValues(forKeys: [.fileSizeKey, .contentTypeKey]) {
+            receipt["bytes"] = attributes.fileSize
+            receipt["contentType"] = attributes.contentType?.identifier
+        }
+        if let sourceData = try? Data(contentsOf: source), let exportedData = try? Data(contentsOf: url) {
+            receipt["matchesSourceBytes"] = exportedData == sourceData
+            receipt["bytes"] = exportedData.count
+        }
+        if let data = try? JSONSerialization.data(withJSONObject: receipt) {
+            try? data.write(to: exportReceipt(for: filename), options: .atomic)
         }
     }
 
@@ -111,14 +150,18 @@ enum ValidationNativeGPX {
             for point in points where retained < sample.vertices.count {
                 if point == sample.vertices[retained] { retained += 1 }
             }
-            let url = documents.appendingPathComponent(sample.filename)
+            let url = fixtureURL(sample.filename)
             let attributes = try url.resourceValues(forKeys: [.fileSizeKey, .contentTypeKey])
-            return ["filename": sample.filename, "name": trip?.name ?? "", "bytes": attributes.fileSize ?? 0,
-                    "localContentType": attributes.contentType?.identifier ?? "unknown",
-                    "sourcePoints": sample.pointCount, "persistedPoints": points.count,
-                    "matches": matches.count, "fromGPX": trip?.source == .gpx,
-                    "verticesRetainedInOrder": retained,
-                    "endpointsRetained": points.first == sample.vertices.first && points.last == sample.vertices.last]
+            var entry: [String: Any] = ["filename": sample.filename, "name": trip?.name ?? "", "sourceBytes": attributes.fileSize ?? 0,
+                "sourceContentType": attributes.contentType?.identifier ?? "unknown",
+                "sourcePoints": sample.pointCount, "persistedPoints": points.count,
+                "matches": matches.count, "fromGPX": trip?.source == .gpx,
+                "verticesRetainedInOrder": retained,
+                "endpointsRetained": points.first == sample.vertices.first && points.last == sample.vertices.last]
+            if let data = try? Data(contentsOf: exportReceipt(for: sample.filename)) {
+                entry["providerExport"] = try JSONSerialization.jsonObject(with: data)
+            }
+            return entry
         }
         return String(decoding: try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]), as: UTF8.self)
     }

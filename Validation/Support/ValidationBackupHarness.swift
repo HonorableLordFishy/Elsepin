@@ -20,10 +20,13 @@ struct ValidationBackupHarness: View {
             .appendingPathComponent("ValidationSettingsExport.json")
     }
 
-    static func stageMalformedBackup() throws {
-        let documents = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask,
-            appropriateFor: nil, create: true)
-        let file = documents.appendingPathComponent("Malformed-Validation-Backup.json")
+    private static var malformedBackupURL: URL {
+        observedExportURL.deletingLastPathComponent().appendingPathComponent("Malformed-Validation-Backup.json")
+    }
+
+    static func prepareMalformedBackup() throws {
+        let file = malformedBackupURL
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("{\"format\":\"Shift library\",\"version\":".utf8).write(to: file, options: .atomic)
     }
 
@@ -88,6 +91,9 @@ struct ValidationBackupHarness: View {
                         guard let export = try observedExport() else { snapshot = "ERROR: No actual export to copy"; return }
                         UIPasteboard.general.string = export.text
                     } catch { snapshot = "ERROR: \(error.localizedDescription)" }
+                }
+                if ValidationFixture.scenario == "backup-settings" {
+                    ValidationFixtureExporter(files: [Self.malformedBackupURL])
                 }
                 Text(snapshot).font(.system(size: 7)).lineLimit(1)
                     .accessibilityIdentifier("validation.backupSnapshot")
