@@ -77,7 +77,13 @@ final class RecentRouteStore {
     private static func write(_ data: Data, to context: AppDataWorkspace.Context) throws {
         let file = context.file(relativePath)
         var folder = file.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let manager = FileManager.default
+        var isDirectory: ObjCBool = false
+        if !manager.fileExists(atPath: folder.path, isDirectory: &isDirectory) || !isDirectory.boolValue {
+            // Demo activation creates its workspace. A queued stale write must
+            // never recreate that workspace after Dev Mode removes it.
+            try manager.createDirectory(at: folder, withIntermediateDirectories: context.id == nil)
+        }
         var resource = URLResourceValues()
         resource.isExcludedFromBackup = true
         try folder.setResourceValues(resource)
