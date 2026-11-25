@@ -5,8 +5,12 @@ on:
       ui_focus:
         description: Run all validation, or a focused simulator recheck
         type: choice
-        options: [all, search, home, pins, routes, route-search, route-identity, review-fixes, backups, imports, import-text, phone-recheck, route-text]
+        options: [all, search, home, pins, routes, route-search, route-identity, review-fixes, backups, imports, import-text, phone-recheck, route-text, single]
         default: all
+      ui_test:
+        description: For single, use Class/testMethod from Validation/UITests
+        type: string
+        default: ''
       validate_device:
         description: Also run full regressions and compile the device app for a focused UI run
         type: boolean
@@ -138,6 +142,7 @@ jobs:
         shell: bash
         env:
           UI_FOCUS: ${{ inputs.ui_focus }}
+          UI_TEST: ${{ inputs.ui_test }}
           SIMULATOR_SUITE: ${{ matrix.suite }}
         run: |
           set -o pipefail
@@ -146,6 +151,14 @@ jobs:
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests")
           elif [[ "$SIMULATOR_SUITE" == other ]]; then
             test_selection+=("-skip-testing:LocusValidationUITests/ElsepinFlowUITests")
+          elif [[ "$UI_FOCUS" == single ]]; then
+            if [[ ! "$UI_TEST" =~ ^(Elsepin(Flow|Backup|Import)UITests)/(test[A-Za-z0-9_]+)$ ]]; then
+              echo "Choose an Elsepin UI test as Class/testMethod"; exit 1
+            fi
+            test_file="Validation/UITests/${BASH_REMATCH[1]}.swift"
+            method="${BASH_REMATCH[3]}"
+            grep -Eq "func[[:space:]]+${method}[(]" "$test_file" || { echo "Unknown test method"; exit 1; }
+            test_selection+=("-only-testing:LocusValidationUITests/$UI_TEST")
           elif [[ "$UI_FOCUS" == route-text ]]; then
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/testInlineLegPathChoiceResetsAndBackDiscardsAtLargestText")
           elif [[ "$UI_FOCUS" == phone-recheck ]]; then
@@ -190,7 +203,7 @@ jobs:
           fi
           python3 -c 'import os, subprocess; subprocess.run(["xcrun", "simctl", "install", os.environ["VALIDATION_SIMULATOR"], ".build/simulator-validation/Build/Products/Debug-iphonesimulator/ElsepinValidation.app"], check=True, timeout=180)'
           xcrun simctl privacy "$VALIDATION_SIMULATOR" grant location-always com.n3mostudio.elsepin.validation
-          if [[ "$SIMULATOR_SUITE" == other || "$UI_FOCUS" == backups || "$UI_FOCUS" == review-fixes || "$UI_FOCUS" == phone-recheck ]]; then
+          if [[ "$SIMULATOR_SUITE" == other || "$UI_FOCUS" == backups || "$UI_FOCUS" == review-fixes || "$UI_FOCUS" == phone-recheck || ( "$UI_FOCUS" == single && "$UI_TEST" == ElsepinBackupUITests/* ) ]]; then
             # Register Files' local provider before interacting with document UI.
             python3 - <<'PY'
           import os, pathlib, subprocess

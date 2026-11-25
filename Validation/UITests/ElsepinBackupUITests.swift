@@ -189,6 +189,11 @@ final class ElsepinBackupUITests: XCTestCase {
         for _ in 0..<5 where !saveNew.exists { app.swipeDown() }
         XCTAssertTrue(saveNew.waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["Save changes"].exists)
+        visible(saveNew).tap()
+        let field = app.alerts["Save trip"].textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        capture("native-gpx-default-save-name")
+        XCTAssertEqual(field.value as? String, "Test botanical garden walking route beside the riverside observatory and community orchard")
     }
 
     func testSolidTabsLeaveSettingsAndPastedBackupReviewReachable() {
