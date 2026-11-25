@@ -180,23 +180,10 @@ final class ElsepinBackupUITests: XCTestCase {
     }
 
     func testGPXExportAndImportThroughNativeFiles() throws {
-        app = XCUIApplication()
-        app.launchArguments = ["--elsepin-ui-test"]
-        app.launchEnvironment["ELSEPIN_TEST_SCENARIO"] = "home-solid"
-        app.launch()
-        let libraryTab = app.buttons["navigation.library"]
-        XCTAssertTrue(libraryTab.waitForExistence(timeout: 20))
-        prepareFilesProvider(returningTo: libraryTab)
-        libraryTab.tap()
-        let routes = app.buttons["Routes"]
-        XCTAssertTrue(routes.waitForExistence(timeout: 10))
-        routes.tap()
-        let savedRoute = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Test botanical garden walking route'")).firstMatch
-        XCTAssertTrue(savedRoute.waitForExistence(timeout: 10))
-        savedRoute.tap()
+        let exportedName = "Harbor switchback"
+        launchNativeGPX("home-solid-gpx-round-trip")
+        openGPXLibraryRoute(named: exportedName)
 
-        let planner = app.navigationBars["Plan a route"]
-        XCTAssertTrue(planner.waitForExistence(timeout: 10))
         XCTAssertTrue(visible(app.buttons["Save changes"]).isHittable)
         visible(app.buttons["Options"]).tap()
         visible(app.buttons["Export route"]).tap()
@@ -208,12 +195,16 @@ final class ElsepinBackupUITests: XCTestCase {
         let review = app.navigationBars["Import GPX"]
         selectFile(named: "Elsepin-Route.gpx", captureName: "native-gpx-files", until: review)
         XCTAssertTrue(app.staticTexts["3 points"].waitForExistence(timeout: 10))
+        let path = app.descendants(matching: .any)["gpx.path"].firstMatch
+        XCTAssertTrue((path.exists && (path.label.contains(exportedName) || (path.value as? String)?.contains(exportedName) == true))
+            || app.staticTexts[exportedName].exists || app.buttons[exportedName].exists,
+            "The GPX review should show the exported track name")
         let apply = app.buttons["gpx.apply"]
         XCTAssertTrue(apply.isEnabled)
         capture("native-gpx-review")
         apply.tap()
         XCTAssertTrue(review.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(planner.exists)
+        XCTAssertTrue(gpxPlanner.exists)
         // Applying a GPX creates a new draft on the planner, separate from the
         // saved Library entry used to export these coordinates.
         let saveNew = app.buttons["Save route"]
@@ -223,7 +214,6 @@ final class ElsepinBackupUITests: XCTestCase {
         visible(saveNew).tap()
         let save = app.alerts["Save trip"]
         XCTAssertTrue(save.waitForExistence(timeout: 10))
-        let exportedName = "Test botanical garden walking route beside the riverside observatory and community orchard"
         capture("native-gpx-round-trip-default-name")
         XCTAssertEqual(save.textFields.firstMatch.value as? String, exportedName,
                        "Use this path discarded the exported track name before saving")
@@ -231,16 +221,22 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Trip saved with its place names and stops."].waitForExistence(timeout: 10))
         closeGPXPlanner()
         openGPXLibraryRoute(named: exportedName)
-        let matchingRows = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", exportedName))
         // The new copy is inserted first. Save Changes verifies its retained name.
         visible(app.buttons["Save changes"]).tap()
         XCTAssertTrue(save.waitForExistence(timeout: 10))
         XCTAssertEqual(save.textFields.firstMatch.value as? String, exportedName)
         save.buttons["Cancel"].tap()
         closeGPXPlanner()
-        app.buttons["navigation.library"].tap()
-        app.buttons["Routes"].tap()
-        XCTAssertEqual(matchingRows.count, 2, "Import should save a separate copy of the exported route")
+        app.buttons["validation.readGPXDiskReport"].tap()
+        let text = app.staticTexts["validation.gpxDiskReport"].label
+        let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+        XCTAssertEqual(report["originalCount"] as? Int, 1)
+        XCTAssertEqual(report["importCount"] as? Int, 1)
+        XCTAssertEqual(report["newCopyHasDistinctID"] as? Bool, true)
+        XCTAssertEqual(report["originalHasExactGeometry"] as? Bool, true)
+        XCTAssertEqual(report["importHasExactEndpoints"] as? Bool, true)
+        XCTAssertEqual(report["importHasExactTurn"] as? Bool, true)
+        capture("native-gpx-round-trip-reopened-geometry")
     }
 
     private var gpxPlanner: XCUIElement { app.navigationBars["Plan a route"] }
@@ -302,6 +298,21 @@ final class ElsepinBackupUITests: XCTestCase {
         XCTAssertEqual(save.textFields.firstMatch.value as? String,
                        "Test botanical garden walking route beside the riverside observatory and community orchard")
         save.buttons["Cancel"].tap()
+
+        openGPXImportPicker()
+        let apply = app.buttons["gpx.apply"]
+        _ = selectVisibleFile(named: "QA-GPX-small.gpx", captureName: "native-gpx-valid-after-malformed", until: apply)
+        XCTAssertTrue(app.staticTexts["64 points"].exists)
+        XCTAssertTrue(apply.isEnabled)
+        apply.tap()
+        XCTAssertTrue(app.navigationBars["Import GPX"].waitForNonExistence(timeout: 15))
+        let saveRoute = app.buttons["Save route"]
+        for _ in 0..<5 where !saveRoute.exists { app.swipeDown() }
+        visible(saveRoute).tap()
+        XCTAssertTrue(save.waitForExistence(timeout: 10))
+        save.buttons["Save"].tap()
+        XCTAssertTrue(app.buttons["Save changes"].waitForExistence(timeout: 30))
+        capture("native-gpx-valid-after-malformed-saved")
     }
 
     func testNativeGPXImportSizesSaveAndReopen() throws {
@@ -332,7 +343,7 @@ final class ElsepinBackupUITests: XCTestCase {
                 XCTAssertTrue(save.waitForExistence(timeout: 10))
                 let field = save.textFields.firstMatch
                 let previous = try XCTUnwrap(field.value as? String)
-                field.tap()
+                field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
                 field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: previous.count) + sample.name)
                 XCTAssertEqual(field.value as? String, sample.name)
                 let startedAt = ProcessInfo.processInfo.systemUptime

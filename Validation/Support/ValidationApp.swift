@@ -14,7 +14,8 @@ enum ValidationFixture {
     static var dark: Bool { ProcessInfo.processInfo.arguments.contains("--dark") }
     static var fallback: Bool { ProcessInfo.processInfo.arguments.contains("--accessibility-fallback") }
     static var routeIdentityScenario: Bool { scenario.hasPrefix("route-identity-") }
-    static var nativeGPXScenario: Bool { scenario.hasPrefix("home-solid-gpx-") }
+    static var nativeGPXRoundTrip: Bool { scenario == "home-solid-gpx-round-trip" }
+    static var nativeGPXSizes: Bool { scenario == "home-solid-gpx-sizes" }
     static var firstLaunch: Bool { scenario == "first-launch" }
     static var drawnRoute: Bool { scenario == "drawn-route" }
     static var routeReconnect: Bool { scenario == "route-reconnect" }
@@ -54,9 +55,9 @@ enum ValidationFixture {
             }, routeReplacementRequest.rawValue as CFString, nil, .deliverImmediately)
         }
         if scenario == "backup-settings", ProcessInfo.processInfo.arguments.contains("--preserve-backup-test-data") { return }
-        if nativeGPXScenario {
+        if nativeGPXSizes || scenario == "home-solid-gpx-malformed" {
             if ProcessInfo.processInfo.arguments.contains("--preserve-gpx-test-data") { return }
-            do { try ValidationNativeGPX.prepare(includeSamples: scenario == "home-solid-gpx-sizes") }
+            do { try ValidationNativeGPX.prepare(includeSamples: nativeGPXSizes) }
             catch { preconditionFailure("Could not seed disposable Files GPX: \(error)") }
         }
         if firstLaunch || drawnRoute, ProcessInfo.processInfo.arguments.contains("--preserve-everyday-test-data") { return }
@@ -83,7 +84,10 @@ enum ValidationFixture {
                     latitude: points[1].latitude, longitude: points[1].longitude)))
             }
         }
-        if routeReconnect {
+        if nativeGPXRoundTrip {
+            do { guard try ValidationNativeGPX.seedRoundTrip() else { preconditionFailure("Could not save disposable GPX export route") } }
+            catch { preconditionFailure("Could not seed disposable GPX export route: \(error)") }
+        } else if routeReconnect {
             guard TripLibrary().save(route: route, name: reconnectTripName, mode: .walk,
                                      speed: 1.4, smooth: false, favorite: true) else {
                 preconditionFailure("Could not seed the disposable reconnect route")
@@ -243,9 +247,15 @@ private struct ValidationHost: View {
                         NotificationCenter.default.post(name:.locusImportGPX,object:url)
                     }.accessibilityIdentifier("validation.openGPX")
                 }
-                if ValidationFixture.scenario == "home-solid-gpx-sizes" {
+                if ValidationFixture.nativeGPXSizes || ValidationFixture.nativeGPXRoundTrip {
                     Button("Read GPX routes from disk") {
-                        do { nativeGPXDiskReport = try ValidationNativeGPX.diskReport() }
+                        do {
+                            if ValidationFixture.nativeGPXRoundTrip {
+                                nativeGPXDiskReport = try ValidationNativeGPX.roundTripDiskReport()
+                            } else {
+                                nativeGPXDiskReport = try ValidationNativeGPX.diskReport()
+                            }
+                        }
                         catch { nativeGPXDiskReport = error.localizedDescription }
                     }.accessibilityIdentifier("validation.readGPXDiskReport")
                     Text(nativeGPXDiskReport).lineLimit(1)

@@ -58,17 +58,44 @@ enum ValidationNativeGPX {
         Sample(filename: "QA-GPX-large.gpx", name: "QA large", pointCount: 90_000, latitude: 40.810)
     ]
     static let malformedFile = "QA-GPX-malformed.gpx"
+    static let roundTripName = "Harbor switchback"
+    private static let roundTripPoints = [
+        RoutePoint(latitude: 40.768, longitude: -73.981),
+        RoutePoint(latitude: 40.768, longitude: -73.975),
+        RoutePoint(latitude: 40.779, longitude: -73.975)
+    ]
     private static let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
     static func prepare(includeSamples: Bool) throws {
         try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
-        if includeSamples {
-            for sample in samples {
-                try sample.encoded().write(to: documents.appendingPathComponent(sample.filename), options: .atomic)
-            }
-        } else {
+        for sample in samples.prefix(includeSamples ? samples.count : 1) {
+            try sample.encoded().write(to: documents.appendingPathComponent(sample.filename), options: .atomic)
+        }
+        if !includeSamples {
             try Data("<gpx><trk>".utf8).write(to: documents.appendingPathComponent(malformedFile), options: .atomic)
         }
+    }
+
+    @MainActor static func seedRoundTrip() throws -> Bool {
+        let trip = SavedTrip(name: roundTripName, mode: .walk, speedMPH: 1.4, smoothMovement: false,
+            originName: "Harbor entrance", destinationName: "Harbor overlook", points: roundTripPoints,
+            source: .drawn, instructions: [], stops: [], calculatedAt: .now, favorite: true)
+        return try TripLibrary().merge([trip])
+    }
+
+    @MainActor static func roundTripDiskReport() throws -> String {
+        let disk = TripLibrary()
+        if let error = disk.error { return "Library reload failed: \(error)" }
+        let matching = disk.trips.filter { $0.name == roundTripName }
+        let originals = matching.filter { $0.source == .drawn }
+        let imports = matching.filter { $0.source == .gpx }
+        let recoveredPoints = imports.first?.points ?? []
+        let report: [String: Any] = ["originalCount": originals.count, "importCount": imports.count,
+            "newCopyHasDistinctID": imports.first?.id != originals.first?.id,
+            "originalHasExactGeometry": originals.first?.points == roundTripPoints,
+            "importHasExactEndpoints": recoveredPoints.first == roundTripPoints.first && recoveredPoints.last == roundTripPoints.last,
+            "importHasExactTurn": recoveredPoints.dropFirst().dropLast().contains(roundTripPoints[1])]
+        return String(decoding: try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]), as: UTF8.self)
     }
 
     @MainActor static func diskReport() throws -> String {
