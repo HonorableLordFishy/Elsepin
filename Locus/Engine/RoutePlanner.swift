@@ -356,7 +356,7 @@ final class RoutePlanner: ObservableObject {
             }
         }
     }
-    func useCustom(_ coordinates: [CLLocationCoordinate2D], source: RoutePathSource) {
+    func useCustom(_ coordinates: [CLLocationCoordinate2D], source: RoutePathSource, name: String? = nil) {
         draftNextRoute = nil
         guard let route = RouteBuilder.customRoute(coordinates, source: source) else {
             error = "Choose at least two different, valid points for the path."
@@ -374,6 +374,7 @@ final class RoutePlanner: ObservableObject {
         origin = route.origin
         destination = route.destination
         alternatives = [route]
+        if let name { renameRoute(name) }
         selectedID = route.id
         error = nil
         isPresented = true

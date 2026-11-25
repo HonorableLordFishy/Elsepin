@@ -2,7 +2,7 @@ import SwiftUI
 
 struct GPXImportReviewView: View {
     @ObservedObject var model: GPXImportReviewModel
-    var onImport: ([RoutePoint]) -> Void
+    var onImport: (GPXSelection) -> Void
     var body: some View {
         NavigationStack {
             List {
@@ -39,7 +39,7 @@ struct GPXImportReviewView: View {
                         Text("\(model.selectedPoints.count) points").foregroundStyle(.secondary)
                     }
                     Section {
-                        Button("Use this path") { if let points = model.takePoints() { onImport(points) } }
+                        Button("Use this path") { if let selection = model.takeSelection() { onImport(selection) } }
                             .disabled(!model.canImport).accessibilityIdentifier("gpx.apply")
                     } footer: {
                         Text("Opens this path in the route planner. Your saved routes stay unchanged. Importing never starts movement.")

@@ -25,19 +25,19 @@ struct RootView: View {
     @State private var notice: String?
     @State private var noticeID = UUID()
     @StateObject private var gpxImport = GPXImportReviewModel()
-    @State private var pendingGPX: [RoutePoint]?
+    @State private var pendingGPX: GPXSelection?
 
     var body: some View {
         presentedTabs
         .onReceive(NotificationCenter.default.publisher(for: .locusImportGPX), perform: importGPX)
         .sheet(isPresented: $gpxImport.isPresented, onDismiss: {
             gpxImport.cancel()
-            guard let points = pendingGPX else { return }
+            guard let selection = pendingGPX else { return }
             pendingGPX = nil
             guard !reset.isResetting, tripLibrary.isCurrentWorkspace,
                   session.journey == nil, !session.isBusy, !planner.isDrawing, !planner.isPresented else { return }
             selectedTab = .map
-            planner.useCustom(points.map(\.coordinate), source: .gpx)
+            planner.useCustom(selection.points.map(\.coordinate), source: .gpx, name: selection.name)
             if let error = planner.error { session.lastError = error }
         }) {
             GPXImportReviewView(model: gpxImport) { pendingGPX = $0 }

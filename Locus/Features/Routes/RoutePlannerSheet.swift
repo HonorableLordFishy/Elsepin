@@ -27,7 +27,7 @@ struct RoutePlannerSheet: View {
     @State private var showImporter = false
     @State private var gpxPickerError: String?
     @StateObject private var gpxImport = GPXImportReviewModel()
-    @State private var pendingGPX: [RoutePoint]?
+    @State private var pendingGPX: GPXSelection?
     @State private var showExporter = false
     @State private var exportDocument = GPXRouteDocument(text: "")
     @State private var showPathStop = false
@@ -278,10 +278,10 @@ struct RoutePlannerSheet: View {
             }
             .sheet(isPresented: $gpxImport.isPresented, onDismiss: {
                 gpxImport.cancel()
-                guard let points = pendingGPX else { return }
+                guard let selection = pendingGPX else { return }
                 pendingGPX = nil
                 guard library.isCurrentWorkspace, session.journey == nil, !session.isBusy else { return }
-                planner.useCustom(points.map(\.coordinate), source: .gpx)
+                planner.useCustom(selection.points.map(\.coordinate), source: .gpx, name: selection.name)
             }) {
                 GPXImportReviewView(model: gpxImport) { pendingGPX = $0 }
             }

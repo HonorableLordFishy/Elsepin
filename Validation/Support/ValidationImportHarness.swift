@@ -60,7 +60,7 @@ struct ValidationImportHarness: View {
                     } else { original = "Planner import failed" }
                 }
             }) {
-                GPXImportReviewView(model:model) { pending = $0 }
+                GPXImportReviewView(model:model) { pending = $0.points }
                     .environment(\.dynamicTypeSize, ValidationFixture.largeText ? .accessibility5 : .large)
                     .frame(maxWidth: ProcessInfo.processInfo.arguments.contains("--narrow") ? 320 : .infinity)
             }

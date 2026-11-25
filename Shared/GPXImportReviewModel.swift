@@ -1,6 +1,11 @@
 import Foundation
 import Combine
 
+struct GPXSelection {
+    let name: String
+    let points: [RoutePoint]
+}
+
 /// Owns only an import preview. Applying it to an editor requires a separate action.
 @MainActor final class GPXImportReviewModel: ObservableObject {
     @Published var isPresented = false
@@ -59,9 +64,9 @@ import Combine
         guard loading else { return }
         invalidate(); loading = false; error = "Import paused. Try again when you're ready."
     }
-    func takePoints() -> [RoutePoint]? {
-        guard workspace == currentWorkspace(), canImport else { cancel(); return nil }
-        let result = selectedPoints
+    func takeSelection() -> GPXSelection? {
+        guard workspace == currentWorkspace(), canImport, let path = selectedPath else { cancel(); return nil }
+        let result = GPXSelection(name: path.name, points: selectedPoints)
         cancel()
         return result
     }

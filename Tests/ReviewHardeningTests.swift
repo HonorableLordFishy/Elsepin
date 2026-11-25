@@ -115,7 +115,7 @@ private actor ControlledGPXLoader {
         await loader.finish("old",result:.failure(GPXImportError.malformedXML))
         for _ in 0..<10 { await Task.yield() }
         XCTAssertNil(model.error); XCTAssertEqual(model.document, document)
-        model.cancel(); XCTAssertNil(model.takePoints())
+        model.cancel(); XCTAssertNil(model.takeSelection())
     }
     func testWorkspaceChangeAndInterruptionRejectPendingCompletion() async {
         let loader = ControlledGPXLoader()
@@ -125,7 +125,7 @@ private actor ControlledGPXLoader {
         workspace = UUID()
         await loader.finish("first",result:.success(document))
         for _ in 0..<10 { await Task.yield() }
-        XCTAssertNil(model.document); XCTAssertNil(model.takePoints())
+        XCTAssertNil(model.document); XCTAssertNil(model.takeSelection())
         model.start(URL(fileURLWithPath:"/second")); await wait(loader,"second")
         model.interrupt()
         await loader.finish("second",result:.success(document))
@@ -133,7 +133,9 @@ private actor ControlledGPXLoader {
         XCTAssertNil(model.document); XCTAssertNotNil(model.error)
         model.retry(); await wait(loader,"second")
         await loader.finish("second",result:.success(document)); await settle(model)
-        XCTAssertEqual(model.takePoints(),document.points)
+        let selection = model.takeSelection()
+        XCTAssertEqual(selection?.name, "Path")
+        XCTAssertEqual(selection?.points, document.points)
     }
     func testGapSelectionDefaultsToOneSectionButExplicitJoinRemainsAvailable() async {
         let doc = GPXImport(paths:[.init(id:0,name:"Separated",kind:.track,segments:[document.points,
@@ -142,6 +144,6 @@ private actor ControlledGPXLoader {
         model.start(URL(fileURLWithPath:"/test")); await settle(model)
         XCTAssertEqual(model.selectedPoints.count,2)
         model.segmentIndex = -1
-        XCTAssertEqual(model.takePoints()?.count,4)
+        XCTAssertEqual(model.takeSelection()?.points.count,4)
     }
 }
