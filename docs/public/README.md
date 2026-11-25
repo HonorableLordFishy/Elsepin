@@ -1,94 +1,60 @@
-<h1 align="center">What's new in 2.6.1</h1>
+# Elsepin
 
-<p align="center">
-  <strong>More control over routes. A better map. A simpler library.</strong><br>
-  <sub>Released 16 November 2026 · Version 2.6.1, build 89</sub>
-</p>
+![Elsepin banner with a route crossing a dark map](elsepin-cover.svg)
 
-<p align="center">
-  <a href="https://github.com/N3moStudio/Elsepin-Releases/releases/download/v2.6.1/Elsepin-2.6.1.ipa">Download IPA</a> &nbsp; / &nbsp;
-  <a href="SETUP.md">Setup</a> &nbsp; / &nbsp;
-  <a href="CHANGELOG.md">Full update log</a>
-</p>
+Drop a pin, take the joystick, or build a trip from start to finish. Elsepin is an iPhone location simulator with a map for exploring, a planner for rehearsing routes, and a Library for the places you want to come back to.
 
-<br>
+**2.6.1 · Build 98** · iPhone · iOS 18 or later · Requires IPA signing
 
-<table>
-<tr>
-<td width="50%" valign="top">
+[Download Elsepin](https://github.com/N3moStudio/Elsepin-Releases/releases/latest) · [Setup guide](https://github.com/N3moStudio/Elsepin-Releases/blob/main/SETUP.md) · [Release notes](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/2.6.1) · [Website](https://elsepin.onrender.com/)
 
-### ↗ Routes, your way
+## What you can do
 
-Choose **a mode and speed for each leg**: walk, run, cycle, e-bike or drive. Keep a path when changing movement, or request new directions. Add timed stops and choose what happens at the destination.
+| | |
+| --- | --- |
+| **Start with a pin** | Search a business or address, drop a pin, or enter coordinates. Review your pick, then tap **Teleport**. Use the joystick for manual movement once a session is active. |
+| **Plan a trip at your pace** | Walk, run, cycle, e-bike or drive with a speed for each leg. Add fixed waits or simulated traffic lights, adjust arrival behavior, and optionally queue a next route from the destination. |
+| **Keep the good routes** | Save and favorite pins and routes, mark named areas, revisit recent trips, and import GPX tracks, routes or waypoints for review. Back up settings and library items through Files. |
+| **Make the map yours** | Set pin size and zoom visibility, switch map layers, and choose from eight themes and thirteen icons. Use Live Activities and saved-location widgets where your device and signing setup support them. |
 
-</td>
-<td width="50%" valign="top">
+## What’s new in build 98
 
-### ⇢ Plan what comes next
+- **Movement pacing.** Route and joystick movement account for elapsed time. Green lights let you pass through selected stops, and red lights add a short, simulated wait.
+- **Files and route editing.** GPX imports carry the selected track’s name and points into the planner. When changing a leg’s mode, choose **Keep path** or **New directions**. Edits to a saved route retain its favorite and folder.
+- **Map and session controls.** Longer pin addresses have room to wrap, along-route search covers more of the trip, and **Stop spoofing** asks for confirmation on cellular.
 
-Queue **another route from your destination**, with an optional wait and one-time automatic start. Cancel the next trip without stopping the current one. Reopen planned routes from Recents.
+[Full changelog](https://github.com/N3moStudio/Elsepin-Releases/blob/main/CHANGELOG.md) · [Build history](https://github.com/N3moStudio/Elsepin-Releases/blob/main/docs/BUILD-HISTORY.md)
 
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
+## Get started
 
-### ☆ Save first. Favorite later.
+1. Download the IPA and sign it with a compatible sideloading tool. Keep the bundled extension if your signing setup supports widgets or Live Activities. Back up your Library before replacing an existing installation.
+2. Join Wi-Fi and connect [LocalDevVPN](https://apps.apple.com/us/app/localdevvpn/id6755608044). Open Elsepin and follow **Wi-Fi → LocalDevVPN → Pairing → Check connection**.
+3. Pair on a compatible iOS 27 device or import an **RPPairing** file from a computer. Once the connection check passes, select a pin or preview a route and confirm to start.
 
-**Save to Library** or **Save & Favorite**. Unfavoriting keeps the saved item. The map star and Library update the same route. Swipe to favorite, delete or restore; drag to select several deleted items.
+[Pairing and installation steps](https://github.com/N3moStudio/Elsepin-Releases/blob/main/SETUP.md)
 
-</td>
-<td width="50%" valign="top">
+## Frequently asked questions
 
-### ⌖ A map you can adjust
+### Which permissions does Elsepin use?
 
-Set **pin size and zoom visibility**. Pins update while you pinch and rotate. Show pins and area outlines separately, read the map scale, and choose symbols, emoji or a fixed pin color.
+Local Network access allows pairing, the developer tunnel, and optional Windows-helper checks. Location access centers the map on your real location and supports location checks. If enabled, background location can help iOS keep a session active. Notifications support pairing and session reminders. Face ID is used when you enable app lock.
 
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
+### Can I use cellular data?
 
-### ⤢ Room to edit
+Start a fresh developer connection on Wi-Fi with LocalDevVPN connected. Another device’s Wi-Fi hotspot can work. An already connected session may continue on cellular while iOS keeps it active and the connection stays usable.
 
-**Larger maps** for pins, areas and route planning, with optional full screen and search. Undo and Redo area corners. Search another city or along your route, not just near your current location.
+### How do I get back to my real location?
 
-</td>
-<td width="50%" valign="top">
+Use **Stop spoofing** to request a clear. **End route** stops travel and holds your last simulated point. If clearing fails, reconnect to Wi-Fi and LocalDevVPN, then try again and check your location in another app. If you close or force-quit Elsepin, the clear remains unverified.
 
-### ◌ Try it with demo data
+### Will another app show the same location?
 
-**Dev Mode keeps your real library separate.** Explore sample routes, pins and areas, then switch back. Import backups from Files or pasted text, and review changes first.
+A successful command means the developer service accepted it. Other apps can use cached or differently timed reports. Optional Find My Devices and Life360 checks have separate setup and depend on report freshness and provider access. Find My People is unsupported. [Privacy and verification limits](https://elsepin.onrender.com/privacy.html)
 
-</td>
-</tr>
-</table>
+### Does a widget start movement?
 
-## The everyday fixes
+A saved-location widget prepares a pin. You still confirm the move in Elsepin.
 
-- **Less clutter:** smaller map panels, simpler settings groups and controls that fit narrow screens. Pause and Stop stay reachable.
-- **Better route handling:** map taps keep your planned route; pin names stay readable during a trip; Destination and Add stop open the right controls.
-- **Clearer directions:** bikes and e-bikes try cycling directions first, with a labeled walking-path fallback where available.
-- **Pairing retries:** cancelled attempts no longer interfere with a later attempt or a newly imported pairing file.
-- **Crash and text fixes:** corrected the saved-pin annotation crash, lingering search bars and garbled labels.
-- **Less unnecessary work:** reduced polling and map updates, with opt-in logs to investigate problems.
+## Source and credits
 
-**Also included:** eight themes · thirteen app icons · Solid or Liquid Glass · mph/km/h · GPX import/export · Live Activities · widgets where signing allows them.
-
-<details>
-<summary><strong>Usual speeds and saved-route recalculation</strong></summary>
-
-New routes and mode changes use your Usual speeds, while saved trips keep their assigned speeds. Recalculate a saved itinerary in another mode without re-entering its start, stops or destination. Keep the original path or restore it if directions fail.
-
-</details>
-
-<details>
-<summary><strong>Connection requirements</strong></summary>
-
-A compatible iPhone, Wi-Fi, LocalDevVPN and a valid pairing connection are required. Another device's Wi-Fi hotspot can also work. If clearing fails, reconnect Wi-Fi and LocalDevVPN, then retry. Force-quitting does not confirm that the location cleared; check another map app too. [Setup and compatibility](SETUP.md).
-
-</details>
-
----
-
-[Detailed changes](docs/CHANGES-SINCE-2.6.0.md) · [Build history](docs/BUILD-HISTORY.md) · [Report a problem](https://github.com/N3moStudio/Elsepin-Releases/issues) · [Privacy](https://elsepin.onrender.com/privacy.html) · [Credits & licenses](LICENSES.txt)
+Elsepin continues Shift, which was built from Locus, and uses the idevice project for the developer connection. Previously licensed components retain their original terms. A separate rights notice covers the original additions it lists. [Source repository](https://github.com/HonorableLordFishy/Elsepin) · [License and attribution](https://github.com/HonorableLordFishy/Elsepin/blob/main/NOTICE.md) · [New additions rights notice](https://github.com/HonorableLordFishy/Elsepin/blob/main/NEW-ADDITIONS-LICENSE.md) · [Report a problem](https://github.com/N3moStudio/Elsepin-Releases/issues)

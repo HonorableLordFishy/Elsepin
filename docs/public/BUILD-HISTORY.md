@@ -1,15 +1,20 @@
 # Elsepin build history
 
-**Public release:** [2.6.1 (89)](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/v2.6.1), 16 November 2026.
+**Current release** · [2.6.1 (98)](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/2.6.1)
 
 [Feature-by-feature changes](CHANGES-SINCE-2.6.0.md) · [Complete chronological update log](../CHANGELOG.md)
 
 ## 2.6.1 build register
 
-Build 89 is the official package; builds 60–88 were development/test builds. A passing build does not prove physical pairing, signing, location clearing or battery behavior.
+Build 98 follows the original 2.6.1 release, [build 89](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/v2.6.1). Device pairing, signing, location clearing and battery behavior require physical-device checks.
 
 | Build | Date | Changes and result |
 | --- | --- | --- |
+| 98 | 25 Nov 2026 | Elapsed-time movement pacing, simulated traffic lights, GPX handoff, long-address pin cards and cellular Stop confirmation. 61 simulator scenarios passed and both bundles were verified in the IPA. |
+| 97 | 25 Nov 2026 | Intermediate package covering native Files workflows, cellular Stop, route history storage, elapsed-time pacing and simulated traffic lights. |
+| 96 | 24 Nov 2026 | Files import for JSON and GPX, inline leg-path choices, usual joystick speed and map refinements. All 45 simulator scenarios passed across two runs. Verified test IPA. |
+| 95 | 23 Nov 2026 | Pairing alert privacy, Nearby disconnect checking, backup export failure handling and exact-copy recovery. Ten selected simulator scenarios passed. Verified test IPA. |
+| 94 | 22 Nov 2026 | Adding a stop from Map search preserves the saved route, favorite and folder. Four simulator scenarios passed. Verified test IPA. |
 | 89 | 16 Nov 2026 | Official update channel; features unchanged from 88. 727 checks, clean native app/extension compilation and verified release IPA. Source stayed private. |
 | 88 | 16 Nov 2026 | Native backup file selection/cancellation and scoped background reading; paste retained. 727 checks; verified test IPA. Three route/speed UI cases passed after simulator repair; file-import provider UI remained blocked. |
 | 87 | 15 Nov 2026 | Usual speeds for new drafts/modes; recalculate saved itineraries without re-entering places. 725 checks; verified test IPA delivered. New UI check blocked by simulator startup. |
@@ -42,6 +47,14 @@ Build 89 is the official package; builds 60–88 were development/test builds. A
 | 60 | 28 Oct 2026 | Bloom default, eight themes, simpler typography/surfaces and old-backup compatibility. Native test IPA delivered. |
 
 ### Current validation
+
+Build 98 used source revision [`054d487`](https://github.com/HonorableLordFishy/Elsepin/commit/054d4874783d9c7a315963c381442bb21e83f682). [Native validation](https://github.com/HonorableLordFishy/Elsepin/actions/runs/45684189085) passed all 61 simulator scenarios. [IPA packaging](https://github.com/HonorableLordFishy/Elsepin/actions/runs/45693705459) produced a verified 19,576,035-byte IPA with both bundles at 2.6.1 (98).
+
+- IPA SHA-256 `c839c106c446032df513d4c15736700d8dee615025657e20adec198a23a9cd99`
+
+Simulator tests covered Files imports and exports, delayed writes, traffic-light behavior and the cellular Stop prompt. Physical-device results depend on the signing setup and developer connection.
+
+### Original release validation
 
 Official build 89 passed 727 checks: 581 Swift, 104 cloud-helper, 18 Windows-helper and 24 resource checks. One Windows-only case was skipped on the Mac. The production app and extension compiled without compiler warnings/errors. Package inspection verified both bundles at 2.6.1 (89), the stable update channel, device executables, icons/resources and absence of simulator fixtures.
 

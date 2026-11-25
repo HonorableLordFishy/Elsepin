@@ -1,11 +1,11 @@
 {
   "name": "Elsepin",
-  "sourceRepository": "N3moStudio/Elsepin",
+  "sourceRepository": "HonorableLordFishy/Elsepin",
   "releaseRepository": "N3moStudio/Elsepin-Releases",
   "primaryIcon": "AppIconPrismJumpgate",
   "defaultTheme": "bloom",
   "version": "2.6.1",
-  "build": 89,
+  "build": 98,
   "releaseState": "stable",
   "compatibility": {
     "bundleIdentifier": "com.n3mostudio.shift",

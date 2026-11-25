@@ -1,4 +1,12 @@
-# Current update - build 96, 24 November 2026
+# Current update - build 98, 25 November 2026
+
+Build 98 is the verified 2.6.1 release package. The [build history](BUILD-HISTORY.md) records the exact source, successful native and packaging runs, all 61 passing simulator scenarios and the IPA digest. Movement pacing, simulated traffic lights, native Files imports, long pin addresses and cellular Stop confirmation are the main user-visible changes.
+
+The release is prepared for the `2.6.1` tag in Elsepin-Releases with asset `Elsepin-2.6.1-build98.ipa`. Publication is pending repository write access. The existing `v2.6.1` release is build 89. The source README, public README, setup, changelog, build registers and release notes were updated for this release. Physical iPhone pairing, cellular handoff, signing and location clearing remain device checks.
+
+---
+
+# Prior update - build 96, 24 November 2026
 
 Build 96 is the current device-test IPA. Files import passed for JSON and GPX on an iPhone 17 simulator. The inline leg path control passed at standard and largest accessibility text sizes. The [build history](BUILD-HISTORY.md) records all 45 UI scenarios, the focused recheck, the package digest and remaining physical-device checks. The official release is 2.6.1 (89).
 

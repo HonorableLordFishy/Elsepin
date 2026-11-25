@@ -2,7 +2,7 @@
 
 ## Install
 
-1. Download the published IPA from [Elsepin Releases](https://github.com/N3moStudio/Elsepin-Releases/releases/latest). The current public release is **2.6.0**; **2.6.1 through build 86 is still in final testing**. Draft notes and build records are not public downloads.
+1. Download [Elsepin 2.6.1, Build 98](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/2.6.1) for a compatible iPhone running iOS 18 or later.
 2. Sign the IPA using your preferred compatible signing method, such as SideStore or FlareStore. Keep the bundled extension for widgets and Live Activities; capabilities depend on the signing setup.
 3. **For 2.4.x → 2.5.x, export your library first:** the new app identity creates a separate installation. Follow [the migration checklist](docs/TESTING-2.5.md). For later updates with the same identity, use the same signing setup and install over the current app.
 
@@ -16,6 +16,12 @@ and [location widgets and named areas](docs/WIDGETS-AND-AREAS.md).
 Open Elsepin’s setup checklist: **Wi-Fi → LocalDevVPN → Pairing → Check connection**.
 Install and connect [LocalDevVPN](https://apps.apple.com/us/app/localdevvpn/id6755608044).
 The default tunnel address is `10.7.0.1`.
+
+Allow **Local Network** access for pairing and the developer connection. **Location**
+access centers the map and supports location checks. If enabled, background
+location can help keep a session active. Optional notifications support pairing
+alerts and session reminders. If you enable app lock, Elsepin uses Face ID or
+your device passcode.
 
 **On-device pairing, where supported (iOS 27):**
 
@@ -37,16 +43,17 @@ available after a session is established.
 
 - **Pause route** holds the current point.
 - Set stop waits with Hours / Minutes / Seconds, from **0** (pass through) to **24 hours**. For example, choose **15 seconds** for a short stop.
+- Turn on **Simulate traffic light** at selected stops to pass through on green and wait briefly on red.
 - Choose **Settings → Usual speeds → Speed units** for mph or km/h. Changing units does not change a trip’s actual speed.
 - **End route** stops travel while retaining the held point.
 - **Stop spoofing** requests clearing the simulated location. A failed clear is not a successful reset; reconnect and retry.
 
-Wi-Fi is required to establish a fresh developer connection. Connecting to another
-device's Wi-Fi hotspot can also work. An already working
-session can continue after leaving Wi-Fi, subject to iOS execution and the
-connection staying usable. Force-closing Elsepin does not prove the simulated
-location was cleared. If clearing fails, reconnect Wi-Fi and LocalDevVPN, retry
-Stop, and check the location in another app.
+Use Wi-Fi and LocalDevVPN to establish a fresh developer connection. Another
+device’s Wi-Fi hotspot can also work. An established session may continue on
+cellular while iOS lets Elsepin run and the connection remains usable. On
+cellular, **Stop spoofing** asks for confirmation. If clearing fails, reconnect
+Wi-Fi and LocalDevVPN, retry Stop, and check the location in another app. Closing
+or force-quitting Elsepin leaves the clear unverified.
 
 ## Optional Find My checks
 
@@ -59,7 +66,6 @@ reachable on the same Wi-Fi. A cloud helper can work while that computer is off.
 Find My reports are fetched separately, around once per minute; faster Elsepin
 checks cannot make Apple produce a newer report. Devices is not Find My People.
 
-Helper guides retain their minimum compatible version, 2.3.2; they also apply
-to 2.6.0 and test build 86; Life360 cloud support requires the updated helper.
-These experiments are optional, unofficial and may stop working. A proposed fresh
-Life360 map integration is not included. See [privacy and limits](docs/PRIVACY.md).
+Helper guides retain their minimum compatible version, 2.3.2. Life360 cloud
+support requires an up-to-date helper. These experiments are optional, unofficial
+and depend on provider availability. See [privacy and limits](docs/PRIVACY.md).

@@ -1,5 +1,19 @@
 # Elsepin build history
 
+## Build 98 - 25 November 2026
+
+[Native validation](https://github.com/HonorableLordFishy/Elsepin/actions/runs/45684189085) and [IPA packaging](https://github.com/HonorableLordFishy/Elsepin/actions/runs/45693705459) passed at source `054d4874783d9c7a315963c381442bb21e83f682`. All 61 simulator scenarios passed, including native JSON and GPX Files operations, the cellular Stop prompt, and location playback with simulated traffic lights and delayed writes.
+
+The IPA is 19,576,035 bytes. SHA-256 is `c839c106c446032df513d4c15736700d8dee615025657e20adec198a23a9cd99`. Both bundles report 2.6.1 (98). Package verification checked the archive and matched its digest against the Actions artifact and local Downloads copy. The release filename is `Elsepin-2.6.1-build98.ipa`.
+
+The simulator cases used controlled connection and movement fixtures. Signed installation, physical pairing, live cellular handoff and a real location clear remain device checks.
+
+## Build 97 - 25 November 2026
+
+The intermediate [native validation](https://github.com/HonorableLordFishy/Elsepin/actions/runs/45677840575) and [IPA packaging](https://github.com/HonorableLordFishy/Elsepin/actions/runs/45681349062) passed at `d2c509eed576e752838d03d2a2863aa6e6ff5492`. Build 97 introduced simulated traffic lights and elapsed-time pacing and included the Files, address, route search, cellular Stop and Recents storage changes. Build 98 refines pacing through green waypoints and after stops.
+
+Both bundles report 2.6.1 (97). The IPA is 19,573,332 bytes. SHA-256 is `8e65f8224145b85c78220526858de16b470f5a67651f598a3b48edc22bd66e08`.
+
 ## Build 96 - 24 November 2026
 
 The [IPA build](https://github.com/HonorableLordFishy/Elsepin/actions/runs/45472841623) packaged revision `35308addd7372bfe0f08eb17feb1b5fa8f5622cd`. The app and Live Activity extension both report 2.6.1 (96). The verified IPA is 19,510,413 bytes. SHA-256 is `c8857b12bb794f78f08c64b91ffee6dd1ed793f1ac5801c4736d78c9d6b303ae`. Both helper archives matched their source files and the package has all 13 icon choices.

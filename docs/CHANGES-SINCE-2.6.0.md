@@ -1,6 +1,15 @@
 # What's new in Elsepin 2.6.1
 
-Released 16 November 2026 as **2.6.1 (89)**. Build 89 contains build 88's features and fixes with official-release metadata. [Short release notes](releases/2.6.1.md).
+The current **2.6.1 release is Build 98**. Build 89 was the first 2.6.1 release on 16 November 2026. [Short release notes](releases/2.6.1.md)
+
+## Highlights in Build 98
+
+- **Movement pacing.** Routes and the joystick account for elapsed time. Long waits for a location write are bounded to prevent a burst of catch-up movements. Green-light waypoints keep moving at the route’s pace; movement starts cleanly again after a red light or fixed wait.
+- **Simulated traffic lights.** Enable a light at a selected stop. Green allows passage and red adds a short simulated wait. The route estimate accounts for the active signal state.
+- **GPX and backup imports.** Pick files through the native Files browser and review them before applying. GPX selections preserve the name and points on the way to the planner. Backup review supports selective changes and pasted JSON.
+- **Saved route edits.** Adding a stop from Map search keeps the original Library route, favorite and folder. When changing leg mode, choose **Keep path** or **New directions**.
+- **Map and session controls.** Route search samples both ends and the middle of the trip. Long pin addresses scroll if needed while actions remain reachable. **Stop spoofing** asks for confirmation on cellular.
+- **Safer local storage.** Large recent routes are stored outside preferences, with migration for existing history. Recovery keeps damaged saved-place originals available for review or export.
 
 ## Routes that keep your choices
 
@@ -64,7 +73,11 @@ Retiring those experiments and starting a fresh Life360-only map feature is defe
 
 ## Validation and limits
 
-Official build 89 passed **727 automated checks**: 581 Swift, 104 cloud-helper, 18 Windows-helper and 24 resource checks. One Windows-only case was skipped on the Mac runner. The production app and extension compiled without compiler warnings or errors; the IPA's identities, versions, stable update channel, resources and device code were inspected. See [Build history](BUILD-HISTORY.md).
+Build 98 passed **61 simulator scenarios** on the source used to package the IPA. These included controlled location-write delays, simulated traffic lights, Files import and export, and cellular Stop messaging. The app and extension report 2.6.1 (98). Physical pairing, location clearing, signing compatibility and battery behavior require a physical device. [Build history](BUILD-HISTORY.md)
+
+### Build 89 validation
+
+The initial official build passed **727 automated checks**: 581 Swift, 104 cloud-helper, 18 Windows-helper and 24 resource checks. One Windows-only case was skipped on the Mac runner. The production app and extension compiled without compiler warnings or errors; the IPA's identities, versions, stable update channel, resources and device code were inspected.
 
 Fourteen distinct simulator UI cases passed across the focused validation runs, including narrow/large-text controls, long names, search recovery, bottom spacing, and live pinch/rotation visibility. Connection and movement fixtures were explicitly simulated. They do not prove real pairing, spoofing, Stop/clear, signing compatibility or battery behavior.
 

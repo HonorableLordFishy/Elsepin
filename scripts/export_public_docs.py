@@ -1,4 +1,4 @@
-"""Export only public introduction, setup, full changelog and build register.
+"""Export the public introduction, setup, release notes and build records.
 
 The private Change Ledger stays private. Historical/private CI links become
 record labels, since public readers cannot open them. No feature entries or
@@ -27,13 +27,18 @@ def documents():
         r"\[([^\]]+)\]\(https://github\.com/N3moStudio/(Shift|Elsepin)/[^)]+\)",
         lambda match: match[1] + (" (historical record)" if match[2] == "Shift" else " (private CI record)"),
         changelog)
+    changelog = changelog.replace(
+        "](Samples/GPX/",
+        "](https://github.com/HonorableLordFishy/Elsepin/blob/main/Samples/GPX/")
     setup = (ROOT / "SETUP.md").read_text(encoding="utf-8")
     setup = setup.replace("[the migration checklist](docs/TESTING-2.5.md)", "the backup/export steps before replacing the old installation")
     setup = setup.replace("[cloud helper](CloudFindMy/RENDER-SETUP.txt)", "[cloud helper](docs/CLOUD-GUIDE.md)")
     setup = setup.replace("[Windows helper](Companion/README.txt)", "Windows helper exported from the app")
     setup = setup.replace("[privacy and limits](docs/PRIVACY.md)", "[privacy and limits](https://elsepin.onrender.com/privacy.html)")
+    readme = (ROOT / "docs/public/README.md").read_text(encoding="utf-8")
+    readme = readme.replace("](elsepin-cover.svg)", "](docs/images/elsepin-cover.svg)")
     return {
-        "README.md": (ROOT / "docs/public/README.md").read_text(encoding="utf-8"),
+        "README.md": readme,
         "docs/images/elsepin-cover.svg": (ROOT / "docs/public/elsepin-cover.svg").read_text(encoding="utf-8"),
         "SETUP.md": setup,
         "CHANGELOG.md": changelog,
@@ -50,7 +55,7 @@ def main():
     parser.add_argument("--check", action="store_true", help="Check for drift without writing")
     args = parser.parse_args()
     if args.output.resolve() == ROOT:
-        parser.error("Choose the public checkout or a staging folder, not the private repository root")
+        parser.error("Choose the release checkout or a staging folder outside the source repository root")
     for name, text in documents().items():
         path = args.output / name
         if args.check:

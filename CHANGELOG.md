@@ -1,13 +1,26 @@
 # Elsepin changelog
 
-Updated through **24 November 2026**, including test build 96 and official build 89.
-**Public release: [2.6.1 (89)](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/v2.6.1).**
+Updated through **25 November 2026**.
+**Current release: [2.6.1 (98)](https://github.com/N3moStudio/Elsepin-Releases/releases/tag/2.6.1).**
 
 [What's new in 2.6.1](docs/CHANGES-SINCE-2.6.0.md) · [Build history](docs/BUILD-HISTORY.md) · [Setup](SETUP.md)
 
 Earlier entries describe their original development checkpoints. A later build may
 supersede a pending check or an intermediate behavior. The build history records
 successful packages separately from failed attempts and simulator/device evidence.
+
+## Build 98 - movement pacing and simulated traffic lights (25 November 2026)
+
+- Route and joystick movement use elapsed time. Slow writes no longer trigger an immediate burst of catch-up steps. Pause, restart and waypoint transitions preserve the intended pacing.
+- Selected route stops can use a simulated traffic light. Green continues through the waypoint, and red adds a short wait. Route timing accounts for the signal state and keeps fixed stop waits available.
+- Validated the packaged source in 61 simulator scenarios, including controlled write delays, traffic-light behavior, cellular Stop presentation and native Files workflows. The IPA workflow passed and both bundles report 2.6.1 (98). Physical pairing, cellular handoff and Stop/clear remain device checks.
+
+## Build 97 - Files, address cards and cellular Stop (25 November 2026)
+
+- Carry a selected GPX track’s name and points through native Files review into the planner. Exercise malformed or oversized input, retry and export/reimport.
+- Keep long addresses visible in the pin card while keeping actions reachable. Prefer the chosen place label at its exact coordinate and improve along-route search filtering.
+- Ask for confirmation before stopping a session on cellular. Move large recent routes out of preferences and keep previous history available through migration.
+- Introduce elapsed-time movement and simulated traffic lights. Build 98 refines the progress transitions and timing estimates.
 
 ## Build 96 - phone feedback (23 November 2026)
 
