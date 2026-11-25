@@ -11,6 +11,7 @@ final class PinLocationDetailsTests: XCTestCase {
 
         XCTAssertEqual(details?.name, "Library")
         XCTAssertEqual(details?.address, "12 Main Street, Portland, OR 97201")
+        XCTAssertEqual(details?.nameUsesAddress, false)
     }
 
     func testDistantOrUnlocatedAddressesDoNotBecomePinAddresses() {
@@ -31,6 +32,7 @@ final class PinLocationDetailsTests: XCTestCase {
 
         XCTAssertEqual(details?.name, "12 Main Street")
         XCTAssertEqual(details?.address, "12 Main Street")
+        XCTAssertEqual(details?.nameUsesAddress, true)
     }
 
     func testReverseGeocoderRejectsSeparateBuildingAndKeepsStreetContext() {

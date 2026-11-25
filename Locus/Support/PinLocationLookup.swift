@@ -11,6 +11,11 @@ import MapKit
             return PinLocationDetails(name: "Geocoder name", address: ValidationFixture.updatedPinAddress)
         }
         if ValidationFixture.scenario == "home-solid-pin-layout" {
+            if RoutePoint(coordinate) == RoutePoint(ValidationFixture.addressOnlyPinLayoutPoint) {
+                return PinLocationDetails.reverseGeocoded([
+                    .init(name: nil, address: ValidationFixture.addressOnlyPinLayoutAddress, distance: 0)
+                ])
+            }
             let address = RoutePoint(coordinate) == RoutePoint(ValidationFixture.points[0])
                 ? ValidationFixture.shortPinLayoutAddress : ValidationFixture.longPinLayoutAddress
             return PinLocationDetails(name: "Dropped pin", address: address)

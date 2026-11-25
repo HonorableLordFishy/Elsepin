@@ -23,6 +23,13 @@ struct PinLocationDetails {
 
     let name: String
     let address: String?
+    let nameUsesAddress: Bool
+
+    init(name: String, address: String?, nameUsesAddress: Bool = false) {
+        self.name = name
+        self.address = address
+        self.nameUsesAddress = nameUsesAddress
+    }
 
     static func reverseGeocoded(_ candidates: [Candidate]) -> Self? {
         // A reverse-geocoded result can be centered on a nearby feature.
@@ -31,9 +38,9 @@ struct PinLocationDetails {
             .sorted { $0.distance < $1.distance }
         for candidate in nearby {
             if let address = singleLine(candidate.address) {
-                let name = singleLine(candidate.name) ?? address
-                return Self(name: String(name.prefix(120)),
-                            address: String(address.prefix(300)))
+                let name = singleLine(candidate.name)
+                return Self(name: String((name ?? address).prefix(120)), address: String(address.prefix(300)),
+                            nameUsesAddress: name == nil || name == address)
             }
         }
         guard let name = nearby.lazy.compactMap({ singleLine($0.name) }).first else { return nil }

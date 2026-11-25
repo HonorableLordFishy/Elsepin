@@ -44,6 +44,8 @@ enum ValidationFixture {
     static let updatedPinAddress = "12 Main Street, New York, NY 10019"
     static let shortPinLayoutAddress = "12 Oak Street"
     static let longPinLayoutAddress = "1842 North Observatory Promenade, Riverside Botanical Garden, West Conservatory Entrance, Lower Hudson River Waterfront, New York, NY 10019"
+    static let addressOnlyPinLayoutPoint = CLLocationCoordinate2D(latitude: 40.761, longitude: -73.990)
+    static let addressOnlyPinLayoutAddress = "940 North Observatory Promenade, Riverside Botanical Garden, Lower Hudson Waterfront, Reservoir Service Trail, North Arboretum Conservatory, Garden Education Annex, North River Research Campus, Manhattan Waterfront District, New York, NY 10019, Wren Gate"
     static let points = [CLLocationCoordinate2D(latitude: 40.768, longitude: -73.981),
                          CLLocationCoordinate2D(latitude: 40.770, longitude: -73.975),
                          CLLocationCoordinate2D(latitude: 40.779, longitude: -73.970)]
@@ -300,6 +302,9 @@ private struct ValidationHost: View {
                     HStack {
                         Button("Select short address") { session.selectPin(ValidationFixture.points[0]) }
                         Button("Select long address") { session.selectPin(ValidationFixture.points[2]) }
+                        if ValidationFixture.largeText {
+                            Button("Select address only") { session.selectPin(ValidationFixture.addressOnlyPinLayoutPoint) }
+                        }
                     }
                     .buttonStyle(.bordered)
                 }

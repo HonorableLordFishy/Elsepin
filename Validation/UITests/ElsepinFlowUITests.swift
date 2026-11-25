@@ -1234,6 +1234,7 @@ extension ElsepinFlowUITests {
 
     func testDroppedPinAddressSpacingAtLargestTextSize() {
         checkDroppedPinAddressSpacing(large: true)
+        checkAddressOnlyPinScrolls()
     }
 
     private func checkDroppedPinAddressSpacing(large: Bool) {
@@ -1265,5 +1266,34 @@ extension ElsepinFlowUITests {
         XCTAssertTrue(mapTab.isHittable)
         XCTAssertLessThan(teleport.frame.maxY, mapTab.frame.minY)
         capture("dropped-pin-wrapped-address")
+    }
+
+    private func checkAddressOnlyPinScrolls() {
+        let address = "940 North Observatory Promenade, Riverside Botanical Garden, Lower Hudson Waterfront, Reservoir Service Trail, North Arboretum Conservatory, Garden Education Annex, North River Research Campus, Manhattan Waterfront District, New York, NY 10019, Wren Gate"
+        let details = app.scrollViews["map.pinAddressDetails"]
+        let title = details.staticTexts[address]
+        let teleport = app.buttons["Teleport"]
+
+        app.buttons["Select address only"].tap()
+        XCTAssertTrue(details.waitForExistence(timeout: 10))
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts.matching(identifier: address).count, 1)
+        let initialBottom = title.frame.maxY
+        XCTAssertGreaterThan(initialBottom, details.frame.maxY + 12, "Wren Gate should start below the viewport")
+        XCTAssertTrue(teleport.isHittable)
+        capture("dropped-pin-address-only-top")
+
+        for _ in 0..<5 {
+            if title.frame.maxY <= details.frame.maxY + 1 { break }
+            details.swipeUp(velocity: .slow)
+            XCTAssertTrue(teleport.isHittable)
+        }
+
+        let finalBottom = title.frame.maxY
+        XCTAssertLessThan(finalBottom, initialBottom - 12)
+        XCTAssertLessThanOrEqual(finalBottom, details.frame.maxY + 1, "Wren Gate should scroll into view")
+        XCTAssertGreaterThan(finalBottom, details.frame.minY + 12)
+        XCTAssertLessThanOrEqual(details.frame.maxY, teleport.frame.minY)
+        capture("dropped-pin-address-only-wren-gate")
     }
 }

@@ -40,7 +40,12 @@ final class SpoofSession: ObservableObject {
               values.count <= 100, values.allSatisfy(\.isValid) else { return [] }
         return values
     }()
-    @Published private var chosenNames: [SessionSpotName] = []
+    private struct RememberedPlaceName {
+        let spot: SessionSpotName
+        let usesAddress: Bool
+        let updatedSavedName: String?
+    }
+    @Published private var chosenNames: [RememberedPlaceName] = []
     @Published private(set) var activeSavedTripID: UUID?
     @Published private(set) var previewSpotName: SessionSpotName?
     @Published private(set) var sessionSpotName: SessionSpotName?
@@ -448,6 +453,17 @@ final class SpoofSession: ObservableObject {
         return resolvedAddress(at: pin) ?? savedPin(at: pin)?.address
     }
 
+    var selectedPinUsesAddressAsTitle: Bool {
+        guard let pin else { return false }
+        let point = RoutePoint(pin)
+        guard previewSpotName?.point != point, sessionSpotName?.point != point,
+              let remembered = chosenNames.first(where: { $0.spot.point == point }), remembered.usesAddress else { return false }
+        if let savedName = savedPin(at: pin)?.name, !Self.isGenericFavoriteName(savedName) {
+            return savedName == remembered.updatedSavedName
+        }
+        return true
+    }
+
     private func resolvedAddress(at coordinate: CLLocationCoordinate2D) -> String? {
         guard let resolvedPinAddress, resolvedPinAddress.point == RoutePoint(coordinate) else { return nil }
         return resolvedPinAddress.address
@@ -477,7 +493,11 @@ final class SpoofSession: ObservableObject {
                   AppDataWorkspace.shared.context.generation == workspace else { return }
             let point = RoutePoint(coordinate)
             if let address = details.address { self.resolvedPinAddress = (point, address) }
-            if self.placeName(at: coordinate) == nil { self.rememberPlaceName(details.name, at: coordinate) }
+            if self.placeName(at: coordinate) == nil {
+                let updatesSavedName = self.savedPin(at: coordinate).map { Self.isGenericFavoriteName($0.name) } ?? false
+                self.rememberPlaceName(details.name, at: coordinate, usesAddress: details.nameUsesAddress,
+                                       updatedSavedName: updatesSavedName ? details.name : nil)
+            }
             if let index = self.savedPins.firstIndex(where: { RoutePoint($0.coordinate) == point }) {
                 var saved = self.savedPins[index]
                 if Self.isGenericFavoriteName(saved.name), !Self.isGenericFavoriteName(details.name) {
@@ -1993,10 +2013,11 @@ final class SpoofSession: ObservableObject {
         recents = SavedPlace.saveRecents(recents, retention: preferences.recentHistoryRetention, saveEnabled: preferences.saveRecentLocations)
     }
 
-    func rememberPlaceName(_ text: String, at coordinate: CLLocationCoordinate2D) {
+    func rememberPlaceName(_ text: String, at coordinate: CLLocationCoordinate2D,
+                           usesAddress: Bool = false, updatedSavedName: String? = nil) {
         guard !Self.isGenericFavoriteName(text), let name = SessionSpotName(text, at: RoutePoint(coordinate)) else { return }
-        let otherNames = chosenNames.lazy.filter { $0.point != name.point }.prefix(99)
-        chosenNames = [name] + Array(otherNames)
+        let otherNames = chosenNames.lazy.filter { $0.spot.point != name.point }.prefix(99)
+        chosenNames = [RememberedPlaceName(spot: name, usesAddress: usesAddress, updatedSavedName: updatedSavedName)] + Array(otherNames)
     }
 
     func placeName(at coordinate: CLLocationCoordinate2D) -> String? {
@@ -2010,7 +2031,7 @@ final class SpoofSession: ObservableObject {
             }
         } ?? []
         let exactSaved = savedPin(at: coordinate).flatMap { Self.isGenericFavoriteName($0.name) ? nil : $0.name }
-        let exactRemembered = chosenNames.first(where: { $0.point == point })?.name
+        let exactRemembered = chosenNames.first(where: { $0.spot.point == point })?.spot.name
             ?? recents.first(where: { RoutePoint($0.coordinate) == point && !Self.isGenericFavoriteName($0.name) })?.name
         let isSelectedPreview = pinIsPreview && pin.map { RoutePoint($0) == point } == true
         let allowsNearby = !isSelectedPreview && (activeRoute != nil || joystickActive)
@@ -2020,7 +2041,7 @@ final class SpoofSession: ObservableObject {
             exactSaved: exactSaved, exactRemembered: exactRemembered, allowsNearby: allowsNearby) { return label }
         if allowsNearby {
             if let place = savedPins.first(where: { RoutePoint($0.coordinate).distance(to: point) <= 5 && !Self.isGenericFavoriteName($0.name) }) { return place.name }
-            if let name = chosenNames.first(where: { $0.point.distance(to: point) <= 5 }) { return name.name }
+            if let name = chosenNames.first(where: { $0.spot.point.distance(to: point) <= 5 }) { return name.spot.name }
             if let place = recents.first(where: { RoutePoint($0.coordinate).distance(to: point) <= 5 && !Self.isGenericFavoriteName($0.name) }) { return place.name }
         }
         return NamedArea.name(at: point, in: namedAreas)

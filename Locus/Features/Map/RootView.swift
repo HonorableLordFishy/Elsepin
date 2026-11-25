@@ -487,6 +487,7 @@ struct BottomControlsView: View {
                             previewAddressRow(title: address.title, address: address.value)
                         }
                         .scrollBounceBehavior(.basedOnSize)
+                        .accessibilityIdentifier("map.pinAddressDetails")
                     }
                     .padding(.vertical, 4)
                 } else {
@@ -740,15 +741,16 @@ struct BottomControlsView: View {
         .accessibilityLabel(collapsed ? "Expand controls" : "Collapse controls")
     }
 
-    private var previewAddress: (title: String, value: String)? {
+    private var previewAddress: (title: String, value: String?)? {
         guard session.journey == nil, planner.preparedRoute == nil, !session.joystickActive,
               session.pinIsPreview, let pin = session.pin, let address = session.selectedPinAddress else { return nil }
         let name = session.suggestedFavoriteName(for: pin)
-        guard address != name else { return nil }
-        return (session.isStopping ? "Stopping session" : name, address)
+        let addressIsTitle = address == name || session.selectedPinUsesAddressAsTitle
+        let title = session.isStopping ? "Stopping session" : addressIsTitle ? address : name
+        return (title, addressIsTitle ? nil : address)
     }
 
-    private func previewAddressRow(title: String, address: String) -> some View {
+    private func previewAddressRow(title: String, address: String?) -> some View {
         ViewThatFits(in: .horizontal) {
             pinAddressText(title: title, address: address, wraps: false)
                 .fixedSize(horizontal: true, vertical: false)
@@ -757,13 +759,16 @@ struct BottomControlsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func pinAddressText(title: String, address: String, wraps: Bool) -> some View {
+    private func pinAddressText(title: String, address: String?, wraps: Bool) -> some View {
         HStack(alignment: wraps ? .top : .center, spacing: 8) {
             traySymbol("mappin")
             VStack(alignment: .leading, spacing: wraps ? 6 : 2) {
                 Text(title).font(.subheadline.weight(.semibold))
-                Text(address).font(.caption).foregroundStyle(.secondary)
-                    .lineSpacing(wraps ? 2 : 0)
+                    .lineSpacing(wraps && address == nil ? 2 : 0)
+                if let address {
+                    Text(address).font(.caption).foregroundStyle(.secondary)
+                        .lineSpacing(wraps ? 2 : 0)
+                }
             }
             .fixedSize(horizontal: false, vertical: true)
         }
