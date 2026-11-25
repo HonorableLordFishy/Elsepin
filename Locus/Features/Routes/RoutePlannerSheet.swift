@@ -66,12 +66,14 @@ struct RoutePlannerSheet: View {
         let id: UUID
         let name: String
         let seconds: Double
+        let signal: SimulatedTrafficLight?
     }
     private struct TimelinePlace: Identifiable {
         let id: UUID
         let name: String
         let wait: Double?
         let metres: Double?
+        var signal: SimulatedTrafficLight?
     }
 
     private enum Endpoint: String, Identifiable, Hashable {
@@ -175,10 +177,10 @@ struct RoutePlannerSheet: View {
                 if let route { RoutePracticeSheet(route: route, mode: displayMode, speed: SpeedConversion.metresPerSecond(mph: displaySpeed)) }
             }
             .sheet(item: $editingStop) { item in
-                StopDurationSheet(name: item.name, seconds: item.seconds, stopCount: timelineStops.count) { seconds, all in
+                StopDurationSheet(name: item.name, seconds: item.seconds, signal: item.signal, stopCount: timelineStops.count) { seconds, signal, all in
                     guard !hasJourney, !planner.isLoading else { return }
                     if all { planner.setAllWaits(seconds: seconds) }
-                    else { planner.setWait(item.id, seconds: seconds) }
+                    else { planner.setWait(item.id, seconds: seconds, signal: signal) }
                 }
             }
             .loggedConfirmationDialog("Edit this route?", isPresented: $confirmLiveEdit, titleVisibility: .visible) {
@@ -241,9 +243,9 @@ struct RoutePlannerSheet: View {
             }
             .navigationDestination(isPresented: $showPathStop) {
                 if let route {
-                    AddPathStopSheet(route: route, liveRoute: hasJourney) { name, fraction, wait in
-                        if hasJourney { return session.addRouteStop(routeID: route.id, name: name, fraction: fraction, wait: wait) }
-                        planner.addPathStop(name: name, fraction: fraction, wait: wait)
+                    AddPathStopSheet(route: route, liveRoute: hasJourney) { name, fraction, wait, signal in
+                        if hasJourney { return session.addRouteStop(routeID: route.id, name: name, fraction: fraction, wait: wait, signal: signal) }
+                        planner.addPathStop(name: name, fraction: fraction, wait: wait, signal: signal)
                         return nil
                     }
                 }
@@ -313,7 +315,7 @@ struct RoutePlannerSheet: View {
 
     private var timelineStops: [TripWaypoint] {
         if hasJourney, let route {
-            return route.stops.map { TripWaypoint(id: $0.id, name: $0.name, point: route.track.point(at: $0.metres), waitSeconds: $0.waitSeconds) }
+            return route.stops.map { TripWaypoint(id: $0.id, name: $0.name, point: route.track.point(at: $0.metres), waitSeconds: $0.waitSeconds, signal: $0.signal) }
         }
         return planner.editableWaypoints
     }
@@ -323,7 +325,7 @@ struct RoutePlannerSheet: View {
             name: (hasJourney ? route?.origin.name : planner.origin?.name) ?? "Choose starting point", wait: nil, metres: 0)] +
         timelineStops.map { stop in
             TimelinePlace(id: stop.id, name: stop.name, wait: stop.waitSeconds,
-                metres: route?.stops.first(where: { $0.id == stop.id })?.metres)
+                metres: route?.stops.first(where: { $0.id == stop.id })?.metres, signal: stop.signal)
         } +
         [TimelinePlace(id: RouteLegChoice.destinationID,
             name: (hasJourney ? route?.destination.name : planner.destination?.name) ?? "Choose destination", wait: nil, metres: route?.track.length)]
@@ -358,16 +360,16 @@ struct RoutePlannerSheet: View {
                             }
                             if let seconds = place.wait {
                                 if hasJourney {
-                                    Label(StopDuration.label(seconds), systemImage: "clock")
+                                    Label(SimulatedTrafficLight.label(place.signal, seconds: seconds), systemImage: "clock")
                                         .font(.subheadline).foregroundStyle(.secondary).padding(.vertical, 6)
                                 } else {
-                                    Button { editingStop = StopEdit(id: place.id, name: place.name, seconds: seconds) } label: {
+                                    Button { editingStop = StopEdit(id: place.id, name: place.name, seconds: seconds, signal: place.signal) } label: {
                                         HStack(spacing: 6) {
                                             Image(systemName: "clock")
-                                            Text(seconds == 0 ? "Pass through" : "Wait \(StopDuration.label(seconds))")
+                                            Text(place.signal != nil ? "Simulated traffic light" : (seconds == 0 ? "Pass through" : "Wait \(StopDuration.label(seconds))"))
                                             Image(systemName: "chevron.right").font(.caption2)
                                         }.font(.subheadline).frame(minHeight: 44).contentShape(Rectangle())
-                                    }.accessibilityLabel("Wait at \(place.name), \(StopDuration.label(seconds))")
+                                    }.accessibilityLabel("Wait at \(place.name), \(SimulatedTrafficLight.label(place.signal, seconds: seconds))")
                                 }
                             }
                         }
@@ -428,7 +430,7 @@ struct RoutePlannerSheet: View {
         else if place.id == RoutePlacesEditor.startID { searchEndpoint = .origin }
         else if place.id == RouteLegChoice.destinationID { searchEndpoint = .destination }
         else if route != nil { stopSearchRoute = route; replacingStopID = place.id; searchEndpoint = .stop }
-        else if let seconds = place.wait { editingStop = StopEdit(id: place.id, name: place.name, seconds: seconds) }
+        else if let seconds = place.wait { editingStop = StopEdit(id: place.id, name: place.name, seconds: seconds, signal: place.signal) }
     }
 
     private func timelinePlaceMenu(_ place: TimelinePlace) -> some View {

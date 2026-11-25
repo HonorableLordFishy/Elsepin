@@ -75,7 +75,7 @@ private struct TripRevisionPreview: View {
             if !revision.trip.stops.isEmpty {
                 Section("Stops in this version") {
                     ForEach(revision.trip.stops) { stop in
-                        LabeledContent(stop.name, value: StopDuration.label(stop.waitSeconds))
+                        LabeledContent(stop.name, value: SimulatedTrafficLight.label(stop.signal, seconds: stop.waitSeconds))
                     }
                 }
             }

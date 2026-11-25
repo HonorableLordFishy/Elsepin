@@ -64,16 +64,36 @@ struct StopDurationControl: View {
     }
 }
 
+struct RouteStopWaitControl: View {
+    @Binding var seconds: Double
+    @Binding var signal: SimulatedTrafficLight?
+
+    var body: some View {
+        Toggle("Simulate traffic light", isOn: Binding(
+            get: { signal != nil },
+            set: { signal = $0 ? .enabled : nil }
+        ))
+        if signal != nil {
+            Text("At this intersection, green lets you pass and red adds a short wait. Colors are simulated.")
+                .font(.footnote).foregroundStyle(.secondary)
+        } else {
+            StopDurationControl(seconds: $seconds)
+        }
+    }
+}
+
 /// A local draft keeps Cancel and swipe-to-dismiss from changing route stops.
 struct StopDurationSheet: View {
     let name: String
     let stopCount: Int
-    let onSave: (Double, Bool) -> Void
+    let onSave: (Double, SimulatedTrafficLight?, Bool) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var seconds: Double
+    @State private var signal: SimulatedTrafficLight?
 
-    init(name: String, seconds: Double, stopCount: Int, onSave: @escaping (Double, Bool) -> Void) {
+    init(name: String, seconds: Double, signal: SimulatedTrafficLight?, stopCount: Int, onSave: @escaping (Double, SimulatedTrafficLight?, Bool) -> Void) {
         self.name = name
+        _signal = State(initialValue: signal)
         self.stopCount = stopCount
         self.onSave = onSave
         _seconds = State(initialValue: StopDuration.normalized(seconds))
@@ -82,8 +102,8 @@ struct StopDurationSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section { StopDurationControl(seconds: $seconds) } header: { Text(name) }
-                if stopCount > 1 {
+                Section { RouteStopWaitControl(seconds: $seconds, signal: $signal) } header: { Text(name) }
+                if signal == nil, stopCount > 1 {
                     Section {
                         Button("Apply to all \(stopCount) stops") { save(all: true) }
                             .frame(minHeight: 44)
@@ -101,7 +121,7 @@ struct StopDurationSheet: View {
     }
 
     private func save(all: Bool) {
-        onSave(StopDuration.normalized(seconds), all)
+        onSave(StopDuration.normalized(seconds), signal, all)
         dismiss()
     }
 }

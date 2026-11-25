@@ -15,11 +15,30 @@ enum MovementDefaults {
     }
 }
 
+enum SimulatedTrafficLight: String, Codable {
+    case enabled
+    static let redSeconds = 8...40
+
+    static func sampleWait() -> Double {
+        Bool.random() ? Double(Int.random(in: redSeconds)) : 0
+    }
+
+    static func isValid(wait: Double) -> Bool {
+        wait == 0 || (wait.rounded() == wait &&
+            wait >= Double(redSeconds.lowerBound) && wait <= Double(redSeconds.upperBound))
+    }
+
+    static func label(_ signal: Self?, seconds: Double) -> String {
+        signal == nil ? StopDuration.label(seconds) : "Simulated traffic light"
+    }
+}
+
 struct TripWaypoint: Identifiable, Codable, Equatable {
     var id = UUID()
     var name: String
     var point: RoutePoint
     var waitSeconds: Double = 60
+    var signal: SimulatedTrafficLight?
 }
 
 struct RouteStop: Identifiable, Codable, Equatable {
@@ -27,6 +46,17 @@ struct RouteStop: Identifiable, Codable, Equatable {
     var name: String
     var metres: Double
     var waitSeconds: Double
+    var signal: SimulatedTrafficLight?
+
+    var estimatedWait: Double {
+        guard signal != nil else { return waitSeconds }
+        // Half the visits are red, with a uniform wait within the red range.
+        return Double(SimulatedTrafficLight.redSeconds.lowerBound + SimulatedTrafficLight.redSeconds.upperBound) / 4
+    }
+
+    func visitWait(sample: () -> Double = SimulatedTrafficLight.sampleWait) -> Double {
+        signal == nil ? waitSeconds : sample()
+    }
 
     func isValid(length: Double) -> Bool {
         metres.isFinite && metres >= 0 && metres <= length && StopDuration.isValid(waitSeconds)
@@ -37,6 +67,7 @@ struct RouteStop: Identifiable, Codable, Equatable {
 /// A resume after suspension must never silently consume the whole stop.
 struct RouteStopProgress: Equatable, Codable {
     private(set) var completed: Set<UUID> = []
+    private var signalWaits: [UUID: Double]?
     private(set) var currentID: UUID?
     private(set) var remainingSeconds: Double = 0
 
@@ -44,18 +75,50 @@ struct RouteStopProgress: Equatable, Codable {
         let ids = Set(stops.map(\.id))
         guard completed.isSubset(of: ids), remainingSeconds.isFinite, remainingSeconds >= 0,
               stops.filter({ completed.contains($0.id) }).allSatisfy({ $0.metres <= metres + 0.05 }) else { return false }
+        if let signalWaits {
+            let lightIDs = Set(stops.filter { $0.signal != nil }.map(\.id))
+            guard signalWaits.allSatisfy({ id, seconds in
+                lightIDs.contains(id) && SimulatedTrafficLight.isValid(wait: seconds)
+            }) else { return false }
+        }
         if let currentID {
             guard !completed.contains(currentID), let stop = stops.first(where: { $0.id == currentID }) else { return false }
-            return abs(stop.metres - metres) <= 0.05 && remainingSeconds <= stop.waitSeconds
+            let wait = stop.signal == nil ? stop.waitSeconds : signalWaits?[currentID]
+            guard let wait else { return false }
+            return abs(stop.metres - metres) <= 0.05 && remainingSeconds <= wait
         }
         return remainingSeconds == 0
     }
 
     func next(in stops: [RouteStop]) -> RouteStop? { stops.first { !completed.contains($0.id) } }
-    mutating func arrive(_ stop: RouteStop) {
+    /// Resolve upcoming lights through the next stopping point. Green lights
+    /// create no motion boundary. The decision stays with the checkpoint.
+    mutating func nextMovementBoundary(in stops: [RouteStop], sample: () -> Double = SimulatedTrafficLight.sampleWait) -> RouteStop? {
+        for stop in stops where !completed.contains(stop.id) {
+            guard stop.signal != nil else { return stop }
+            if signalWaits?[stop.id] == nil {
+                if signalWaits == nil { signalWaits = [:] }
+                signalWaits?[stop.id] = sample()
+            }
+            if signalWaits?[stop.id] != 0 { return stop }
+        }
+        return nil
+    }
+
+    mutating func passGreenLights(in stops: [RouteStop], through metres: Double) {
+        guard let signalWaits else { return }
+        for stop in stops where stop.metres <= metres && !completed.contains(stop.id) && signalWaits[stop.id] == 0 {
+            completed.insert(stop.id)
+        }
+    }
+
+    mutating func arrive(_ stop: RouteStop, sample: () -> Double = SimulatedTrafficLight.sampleWait) {
         guard currentID != stop.id, !completed.contains(stop.id) else { return }
         currentID = stop.id
-        remainingSeconds = stop.waitSeconds
+        if stop.signal != nil && signalWaits?[stop.id] == nil {
+            _ = nextMovementBoundary(in: [stop], sample: sample)
+        }
+        remainingSeconds = signalWaits?[stop.id] ?? stop.waitSeconds
         if remainingSeconds <= 0 { finish() }
     }
     mutating func tick(_ seconds: Double, maximumElapsed: Double = 0.5) {
@@ -71,14 +134,27 @@ struct RouteStopProgress: Equatable, Codable {
         currentID = nil
         remainingSeconds = 0
     }
+    func continuingSignals(in replacement: [RouteStop]) -> Self {
+        var result = Self()
+        let lights = replacement.filter { $0.signal != nil }
+        let ids = Set(lights.map(\.id))
+        result.signalWaits = signalWaits?.filter { ids.contains($0.key) }
+        if let currentID, lights.contains(where: { $0.id == currentID && $0.metres <= 0.01 }) {
+            result.currentID = currentID
+            result.remainingSeconds = remainingSeconds
+        }
+        return result
+    }
+
     mutating func seek(to metres: Double, stops: [RouteStop]) {
+        signalWaits = nil
         completed = Set(stops.filter { $0.metres < metres - 0.01 }.map(\.id))
         currentID = nil
         remainingSeconds = 0
     }
     func remainingWait(in stops: [RouteStop]) -> Double {
         stops.filter { !completed.contains($0.id) }.reduce(0) {
-            $0 + ($1.id == currentID ? remainingSeconds : $1.waitSeconds)
+            $0 + ($1.id == currentID ? remainingSeconds : (signalWaits?[$1.id] ?? $1.estimatedWait))
         }
     }
 }
@@ -142,12 +218,12 @@ struct RouteMotion {
 
     static func braking(for mode: TravelMode) -> Double { mode == .drive ? 3 : mode == .walk ? 1 : 1.8 }
     static func step(speed: Double, target: Double, remaining: Double, mode: TravelMode,
-                     smooth: Bool, seconds: Double = 0.5) -> (speed: Double, metres: Double) {
+                     smooth: Bool, seconds: Double = MovementPlaybackClock.routeInterval) -> (speed: Double, metres: Double) {
         guard speed.isFinite, target.isFinite, remaining.isFinite, seconds.isFinite,
               speed >= 0, target >= 0, remaining > 0, seconds > 0 else { return (0, 0) }
         // Ordinary command latency counts toward travel time. A long sleep or
         // stalled connection gets only one normal step, never a catch-up leap.
-        let dt = RoutePlaybackClock.travelTime(for: seconds)
+        let dt = MovementPlaybackClock.travelTime(for: seconds, interval: MovementPlaybackClock.routeInterval)
         let acceleration = mode == .drive ? 2.2 : mode == .walk ? 0.8 : 1.3
         let next = smooth ? (target >= speed ? min(target, speed + acceleration * dt) : max(target, speed - braking(for: mode) * dt)) : target
         let movement = smooth ? (speed + next) * 0.5 * dt : next * dt
@@ -156,39 +232,34 @@ struct RouteMotion {
     }
 }
 
-struct RoutePlaybackClock {
-    static let interval = 0.5
-    static let maximumGap = 1.5
-    private(set) var lastDispatch: Double
-    private var lastConfirmation: Double?
-    private var latencies: [Double] = []
-    // Use a conservative recent estimate, not a slow/outlier response. The
-    // native API accepts coordinates only; delivery timing determines motion.
-    private var expectedLatency: Double { min(0.25, latencies.min() ?? 0) }
+struct MovementPlaybackClock {
+    static let routeInterval = 0.5
+    static let joystickInterval = 0.25
+    private static let maximumGap = 1.5
+    private static let maximumWriteTime = 1.0
+    private let interval: Double
+    private var lastDispatch: Double
 
-    init(now: Double) { lastDispatch = now }
-    mutating func reset(now: Double) {
-        lastDispatch = now; lastConfirmation = nil; latencies.removeAll(keepingCapacity: true)
+    init(now: Double, interval: Double = MovementPlaybackClock.routeInterval) {
+        self.interval = interval
+        lastDispatch = now
     }
+    mutating func reset(now: Double) { lastDispatch = now }
     func delay(now: Double) -> Double {
-        let nextDispatch = lastDispatch + Self.interval
-        let paced = lastConfirmation.map { $0 + Self.interval - expectedLatency } ?? nextDispatch
-        return max(0, max(nextDispatch, paced) - now)
+        max(0, lastDispatch + interval - now)
     }
     mutating func advance(now: Double) -> Double {
-        let gap = now - lastDispatch
-        let elapsed = lastConfirmation.map { now - $0 + expectedLatency } ?? gap
+        guard now.isFinite, now >= lastDispatch else { return 0 }
+        let elapsed = Self.travelTime(for: now - lastDispatch, interval: interval)
         lastDispatch = now
-        if gap > Self.maximumGap { return Self.interval }
-        return Self.travelTime(for: elapsed)
+        return elapsed
     }
     mutating func confirm(now: Double) {
-        guard now.isFinite, now >= lastDispatch else { return }
-        lastConfirmation = now
-        latencies.append(now - lastDispatch)
-        if latencies.count > 5 { latencies.removeFirst() }
+        // Ordinary writes consume part of the interval between dispatches.
+        // After a stall, wait a full tick and drop accumulated travel time.
+        if now.isFinite, now - lastDispatch > Self.maximumWriteTime { reset(now: now) }
     }
-    static func travelTime(for elapsed: Double) -> Double {
+    static func travelTime(for elapsed: Double, interval: Double) -> Double {
         guard elapsed.isFinite, elapsed > 0 else { return 0 }
         return elapsed > maximumGap ? interval : elapsed
     }

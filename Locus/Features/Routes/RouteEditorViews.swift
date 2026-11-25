@@ -81,7 +81,7 @@ struct RoutePracticeSheet: View {
             if !route.stops.isEmpty {
                 Menu {
                     ForEach(route.stops) { stop in
-                        Button("\(stop.name) · \(StopDuration.label(stop.waitSeconds))") {
+                        Button("\(stop.name) · \(SimulatedTrafficLight.label(stop.signal, seconds: stop.waitSeconds))") {
                             preview.seek(to: stop.metres, length: route.track.length, stops: route.stops)
                         }
                     }

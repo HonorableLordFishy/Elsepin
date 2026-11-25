@@ -27,6 +27,7 @@ enum ValidationFixture {
     static var firstLaunch: Bool { scenario == "first-launch" }
     static var drawnRoute: Bool { scenario == "drawn-route" }
     static var routeReconnect: Bool { scenario == "route-reconnect" }
+    static var routePace: Bool { scenario == "route-pace" }
     static var stopNetworkPath: StopNetworkPath? {
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("--stop-cellular") {
@@ -38,6 +39,7 @@ enum ValidationFixture {
         return nil
     }
     static let reconnectTripName = "Test park loop"
+    static let paceTripName = "Test straight drive"
     static let routeReplacementRequest = Notification.Name("com.n3mostudio.elsepin.validation.replace-route")
     static let unreadableTrips = Data("corrupt disposable trips".utf8)
     static let longName = "Test botanical garden walking route beside the riverside observatory and community orchard"
@@ -120,6 +122,15 @@ enum ValidationFixture {
                                      speed: 1.4, smooth: false, favorite: true) else {
                 preconditionFailure("Could not seed the disposable reconnect route")
             }
+        } else if routePace {
+            let straightPoints = [40.770, 40.785, 40.800].map {
+                CLLocationCoordinate2D(latitude: $0, longitude: -73.981)
+            }
+            let straight = makeRoute(straightPoints, start: "Test drive start", end: "Test drive destination")
+            guard TripLibrary().save(route: straight, name: paceTripName, mode: .drive,
+                                     speed: 60, smooth: false, favorite: true) else {
+                preconditionFailure("Could not seed the disposable pace route")
+            }
         } else if scenario != "empty" && !firstLaunch && !drawnRoute {
             SavedPlace.save([SavedPlace(name: longName, latitude: points[1].latitude,
                 longitude: points[1].longitude, favorite: true)], key: "locus.favorites")
@@ -199,6 +210,7 @@ private struct ValidationHost: View {
     @State private var runSession = false
     @State private var permissionsReady = false
     @State private var routeLibrarySnapshot = ""
+    @State private var routePlaybackTrace = "[]"
     @State private var nativeGPXDiskReport = ""
     @State private var pinAddressReport = ""
     @State private var stalePinDraft: PinDraft?
@@ -267,6 +279,16 @@ private struct ValidationHost: View {
                     }.accessibilityIdentifier("validation.readRouteLibrary")
                     Text(routeLibrarySnapshot).lineLimit(1)
                         .accessibilityIdentifier("validation.routeLibrarySnapshot")
+                }
+                if ValidationFixture.routePace {
+                    Button {
+                        routePlaybackTrace = LocationEngine.playbackTrace()
+                    } label: {
+                        Text("Read playback trace").frame(minHeight: 44).contentShape(Rectangle())
+                    }.accessibilityIdentifier("validation.readPlaybackTrace")
+                    Text("Adapter confirmations")
+                        .accessibilityLabel(routePlaybackTrace)
+                        .accessibilityIdentifier("validation.playbackTrace")
                 }
                 if ValidationFixture.scenario == "import-root" {
                     Button("Open validation GPX") {
@@ -369,7 +391,7 @@ private struct ValidationHost: View {
                 preferences.glassPanel = !ValidationFixture.scenario.hasPrefix("home-solid")
                 // Settle the real system permission before timing the synthetic
                 // connecting state. This never changes production permission flow.
-                if sessionScenario || ValidationFixture.routeReconnect {
+                if sessionScenario || ValidationFixture.routeReconnect || ValidationFixture.routePace {
                     _ = await SessionNotifications.shared.requestPermission()
                     permissionsReady = true
                 }
@@ -383,7 +405,7 @@ private struct ValidationHost: View {
                     precondition(namedNeighbor)
                     session.selectPin(destination)
                 } else if !sessionScenario && !ValidationFixture.firstLaunch && !ValidationFixture.routeReconnect
-                            && !ValidationFixture.scenario.hasPrefix("home-") {
+                            && !ValidationFixture.routePace && !ValidationFixture.scenario.hasPrefix("home-") {
                     session.selectPin(ValidationFixture.points[0], name: "Test garden entrance")
                 }
                 if ValidationFixture.scenario == "pin-adjustment" {

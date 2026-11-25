@@ -66,7 +66,7 @@ enum LiveRouteStopInsertion {
         }
     }
     static func make(name: String, metres: Double, waitSeconds: Double, length: Double,
-                     travelled: Double, pendingMetres: Double?, existingCount: Int) -> Result<RouteStop, Failure> {
+                     travelled: Double, pendingMetres: Double?, existingCount: Int, signal: SimulatedTrafficLight? = nil) -> Result<RouteStop, Failure> {
         guard length.isFinite, length > 0, travelled.isFinite, travelled >= 0,
               metres.isFinite, metres <= length, StopDuration.isValid(waitSeconds),
               pendingMetres.map({ $0.isFinite && $0 >= 0 }) ?? true else { return .failure(.invalid) }
@@ -76,6 +76,6 @@ enum LiveRouteStopInsertion {
         guard metres > max(travelled, pendingMetres ?? travelled) + 0.5 else { return .failure(.alreadyPassed) }
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
         return .success(RouteStop(name: trimmed.isEmpty ? "Stop \(existingCount + 1)" : trimmed,
-                                  metres: metres, waitSeconds: waitSeconds))
+                                  metres: metres, waitSeconds: waitSeconds, signal: signal))
     }
 }

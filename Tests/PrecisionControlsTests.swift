@@ -4,7 +4,7 @@ import XCTest
 final class PrecisionControlsTests: XCTestCase {
     func testConfirmedCadenceMaintainsTenMPHWithConsistentWriteLatency() {
         for latency in [0.01, 0.05, 0.2] {
-            var clock = RoutePlaybackClock(now: 0), now = 0.0, metres = 0.0
+            var clock = MovementPlaybackClock(now: 0), now = 0.0, metres = 0.0
             let speed = SpeedConversion.metresPerSecond(mph: 10)
             for _ in 0..<120 {
                 now += clock.delay(now: now)
@@ -18,21 +18,24 @@ final class PrecisionControlsTests: XCTestCase {
     }
 
     func testSlowThenFastWriteCannotSendImmediateCatchUpBurst() {
-        var clock = RoutePlaybackClock(now: 0)
-        _ = clock.advance(now: 0.5); clock.confirm(now: 0.55)
-        _ = clock.advance(now: 1); clock.confirm(now: 2.2)
-        let wait = clock.delay(now: 2.2)
-        XCTAssertEqual(wait, 0.45, accuracy: 0.00001)
-        let movementSeconds = clock.advance(now: 2.2 + wait)
-        XCTAssertEqual(movementSeconds, 0.5, accuracy: 0.00001)
-        // A fast response after that slow one now spans 0.46 seconds, rather
-        // than delivering 1.2 seconds of movement in 0.01 seconds.
-        let observedMPH = 10 * movementSeconds / (wait + 0.01)
-        XCTAssertLessThan(observedMPH, 11)
+        for interval in [MovementPlaybackClock.routeInterval, MovementPlaybackClock.joystickInterval] {
+            var clock = MovementPlaybackClock(now: 0, interval: interval)
+            _ = clock.advance(now: interval)
+            clock.confirm(now: interval + 0.05)
+            _ = clock.advance(now: 2 * interval)
+            let recoveredAt = 2 * interval + 1.2
+            clock.confirm(now: recoveredAt)
+            let wait = clock.delay(now: recoveredAt)
+            XCTAssertEqual(wait, interval, accuracy: 0.00001)
+            let movementSeconds = clock.advance(now: recoveredAt + wait)
+            XCTAssertEqual(movementSeconds, interval, accuracy: 0.00001)
+            let observedMPH = 10 * movementSeconds / (wait + 0.01)
+            XCTAssertLessThan(observedMPH, 11)
+        }
     }
 
     func testResumeAndJumpResetPriorConfirmationTiming() {
-        var clock = RoutePlaybackClock(now: 0)
+        var clock = MovementPlaybackClock(now: 0)
         _ = clock.advance(now: 0.5); clock.confirm(now: 0.7)
         clock.reset(now: 100)
         XCTAssertEqual(clock.delay(now: 100), 0.5)
@@ -42,16 +45,17 @@ final class PrecisionControlsTests: XCTestCase {
     }
 
     func testWriteLatencyUsesRemainingTickTimeInsteadOfAnotherFullDelay() {
-        var clock = RoutePlaybackClock(now: 0)
+        var clock = MovementPlaybackClock(now: 0)
         XCTAssertEqual(clock.delay(now: 0), 0.5)
         XCTAssertEqual(clock.advance(now: 0.5), 0.5)
         // A write took 0.2 seconds. The next wait must be only 0.3 seconds.
+        clock.confirm(now: 0.7)
         XCTAssertEqual(clock.delay(now: 0.7), 0.3, accuracy: 0.000001)
         XCTAssertEqual(clock.advance(now: 1), 0.5)
     }
 
     func testConstantCruiseCoversTheRequestedDistanceDespiteShortCommandDelays() {
-        var clock = RoutePlaybackClock(now: 0)
+        var clock = MovementPlaybackClock(now: 0)
         var now = 0.0, metres = 0.0
         for _ in 0..<120 {
             now += clock.delay(now: now)
@@ -59,19 +63,70 @@ final class PrecisionControlsTests: XCTestCase {
             metres += RouteMotion.step(speed: 10, target: 10, remaining: 10_000,
                                        mode: .eBike, smooth: false, seconds: elapsed).metres
             now += 0.2
+            clock.confirm(now: now)
         }
         XCTAssertEqual(metres, 600, accuracy: 0.00001)
         XCTAssertEqual(now, 60.2, accuracy: 0.00001)
     }
 
     func testSlowOrdinaryWriteCountsButSuspensionDoesNotCatchUp() {
-        var clock = RoutePlaybackClock(now: 0)
+        var clock = MovementPlaybackClock(now: 0)
         XCTAssertEqual(clock.advance(now: 0.8), 0.8)
         XCTAssertEqual(RouteMotion.step(speed: 10, target: 10, remaining: 100,
                                        mode: .eBike, smooth: false, seconds: 0.8).metres, 8)
         XCTAssertEqual(clock.advance(now: 300), 0.5)
         clock.reset(now: 600)
         XCTAssertEqual(clock.advance(now: 600.5), 0.5)
+    }
+
+    func testRouteAndJoystickKeepConfiguredSpeedUnderOrdinaryWriteLatency() {
+        let examples: [(TravelMode, Double)] = [(.walk, 3), (.run, 6), (.cycle, 12), (.eBike, 15), (.drive, 60)]
+        for latencies in [[0.05, 0.2], [0.35]] {
+            for (mode, mph) in examples {
+                let speed = SpeedConversion.metresPerSecond(mph: mph)
+                let route = cruiseTrace(mode: mode, mph: mph, interval: MovementPlaybackClock.routeInterval, latencies: latencies)
+                XCTAssertEqual(route.seconds, 60, accuracy: 0.00001)
+                XCTAssertEqual(route.metres, speed * 60, accuracy: 0.00001)
+                let joystick = cruiseTrace(mode: mode, mph: mph, interval: MovementPlaybackClock.joystickInterval, latencies: latencies)
+                XCTAssertEqual(joystick.metres, speed * joystick.seconds, accuracy: 0.00001)
+                if mode == .drive {
+                    XCTAssertEqual(route.metres, 1609.344, accuracy: 0.00001)
+                    XCTAssertEqual(joystick.metres * 60 / joystick.seconds, 1609.344, accuracy: 0.00001)
+                }
+            }
+        }
+    }
+
+    func testCycleEBikeAndDriveCoverTheSameDistanceAtFiveMPH() {
+        for mode in [TravelMode.cycle, .eBike, .drive] {
+            for interval in [MovementPlaybackClock.routeInterval, MovementPlaybackClock.joystickInterval] {
+                let trace = cruiseTrace(mode: mode, mph: 5, interval: interval, latencies: [0.05, 0.2])
+                XCTAssertEqual(trace.seconds, 60, accuracy: 0.00001)
+                XCTAssertEqual(trace.metres, 134.112, accuracy: 0.00001)
+            }
+        }
+    }
+
+    private func cruiseTrace(mode: TravelMode, mph: Double, interval: Double,
+                             latencies: [Double]) -> (seconds: Double, metres: Double) {
+        let speed = SpeedConversion.metresPerSecond(mph: mode.clampedSpeedMPH(mph))
+        var clock = MovementPlaybackClock(now: 0, interval: interval)
+        var readyAt = 0.0, dispatchedAt = 0.0, metres = 0.0, writes = 0
+        while true {
+            let next = readyAt + clock.delay(now: readyAt)
+            if next > 60.000001 { return (dispatchedAt, metres) }
+            dispatchedAt = next
+            let elapsed = clock.advance(now: next)
+            if interval == MovementPlaybackClock.routeInterval {
+                metres += RouteMotion.step(speed: speed, target: speed, remaining: 10_000,
+                    mode: mode, smooth: false, seconds: elapsed).metres
+            } else {
+                metres += speed * elapsed
+            }
+            readyAt = next + latencies[writes % latencies.count]
+            clock.confirm(now: readyAt)
+            writes += 1
+        }
     }
 
     func testLiveSpeedChangeUsesNewTargetAndRespectsSmoothOption() {
@@ -83,6 +138,16 @@ final class PrecisionControlsTests: XCTestCase {
         XCTAssertGreaterThan(smooth.speed, 2)
         let slower = RouteMotion.step(speed: 12, target: 2, remaining: 1000, mode: .eBike, smooth: false)
         XCTAssertEqual(slower.metres, 1)
+    }
+
+    func testRouteMotionClampsExactlyAtTheNextBoundary() {
+        let speed = SpeedConversion.metresPerSecond(mph: 60)
+        for smoothing in [false, true] {
+            let step = RouteMotion.step(speed: speed, target: speed, remaining: 2.345,
+                                        mode: .drive, smooth: smoothing, seconds: 0.85)
+            XCTAssertEqual(step.metres, 2.345)
+            XCTAssertEqual(step.speed, 0)
+        }
     }
 
     func testDisplayedSpeedMeasuresConfirmedDistanceOverRealElapsedTime() {

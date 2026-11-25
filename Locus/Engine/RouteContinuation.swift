@@ -39,7 +39,7 @@ enum RouteContinuation {
             sections[sections.count - 1].endMetres = track.length
             guard RouteTravelSection.valid(sections, length: track.length) else { throw ContinuationError.tooManySections }
         }
-        let stops = original.stops.map { RouteStop(id: $0.id, name: $0.name, metres: min(track.length, $0.metres + offset), waitSeconds: $0.waitSeconds) }
+        let stops = original.stops.map { RouteStop(id: $0.id, name: $0.name, metres: min(track.length, $0.metres + offset), waitSeconds: $0.waitSeconds, signal: $0.signal) }
         let initialGap = connector?.track.points.first.map { current.distance(to: $0) } ?? 0
         var instructions = (connector?.instructions ?? []).enumerated().map { index, step in
             RouteInstruction(id: index, text: step.text, endDistance: min(offset, step.endDistance + initialGap))

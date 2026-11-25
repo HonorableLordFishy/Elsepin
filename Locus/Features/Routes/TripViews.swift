@@ -190,13 +190,14 @@ struct SavedTripsSection: View {
 struct AddPathStopSheet: View {
     let route: PlannedRoute
     var liveRoute = false
-    let onAdd: (String, Double, Double) -> String?
+    let onAdd: (String, Double, Double, SimulatedTrafficLight?) -> String?
     @EnvironmentObject private var session: SpoofSession
     @Environment(\.dismiss) private var dismiss
     @Environment(\.shiftEditorEmbedded) private var embedded
     @State private var fraction = 0.5
     @State private var name = ""
     @State private var waitSeconds = 60.0
+    @State private var signal: SimulatedTrafficLight?
     @State private var error: String?
     @State private var fullMap = false
     @State private var initialized = false
@@ -225,7 +226,7 @@ struct AddPathStopSheet: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     TextField("Stop name", text: $name)
-                    StopDurationControl(seconds: $waitSeconds)
+                    RouteStopWaitControl(seconds: $waitSeconds, signal: $signal)
                     if let error { Text(error).font(.caption).foregroundStyle(LocusTheme.statusWarn) }
                 } footer: { Text(liveRoute
                     ? "The route keeps moving. Choose a point ahead; if you pass it before tapping Add, choose a later point. Your current pause and progress stay intact."
@@ -251,7 +252,7 @@ struct AddPathStopSheet: View {
                 if !embedded { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        error = onAdd(name, fraction, waitSeconds)
+                        error = onAdd(name, fraction, waitSeconds, signal)
                         if error == nil { dismiss() }
                     }
                 }
@@ -266,7 +267,7 @@ struct RouteExtrasControls: View {
         if let stop = session.currentStop {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(stop.name).lineLimit(1)
+                    Text(stop.signal == nil ? stop.name : "Red light · \(stop.name)").lineLimit(1)
                     Text("\(session.routePaused ? "Paused · " : "")\(StopDuration.formatted(ceil(session.stopProgress.remainingSeconds))) left")
                         .font(.footnote).foregroundStyle(.secondary)
                 }

@@ -38,7 +38,7 @@ struct PlannedRoute: Identifiable {
                             smooth: smooth, stops: stops, sections: travelSections).remaining(from: metres)
     }
     func estimate(mode: TravelMode, speed: Double, smooth: Bool) -> Double {
-        movingEstimate(mode: mode, speed: speed, smooth: smooth) + stops.reduce(0) { $0 + $1.waitSeconds }
+        movingEstimate(mode: mode, speed: speed, smooth: smooth) + stops.reduce(0) { $0 + $1.estimatedWait }
     }
 }
 
@@ -72,7 +72,7 @@ enum RouteBuilder {
         for (index, candidate) in legs.enumerated() {
             guard let leg = candidate else {
                 if index < stops.count {
-                    pauses.append(RouteStop(id: stops[index].id, name: stops[index].name, metres: distance, waitSeconds: stops[index].waitSeconds))
+                    pauses.append(RouteStop(id: stops[index].id, name: stops[index].name, metres: distance, waitSeconds: stops[index].waitSeconds, signal: stops[index].signal))
                 }
                 continue
             }
@@ -96,7 +96,7 @@ enum RouteBuilder {
             }
             points += leg.coordinates
             if index < stops.count {
-                pauses.append(RouteStop(id: stops[index].id, name: stops[index].name, metres: distance, waitSeconds: stops[index].waitSeconds))
+                pauses.append(RouteStop(id: stops[index].id, name: stops[index].name, metres: distance, waitSeconds: stops[index].waitSeconds, signal: stops[index].signal))
             }
         }
         guard let track = RouteTrack(points.map(RoutePoint.init)) else { throw MissingRoute() }
@@ -105,7 +105,7 @@ enum RouteBuilder {
         let source: RoutePathSource = actualLegs.allSatisfy({ $0.source == firstLeg.source }) ? firstLeg.source
             : (sections.contains(where: { $0.mode == .drive }) ? .mixedModes : .mixedCyclingWalking)
         if !sections.isEmpty { sections[sections.count - 1].endMetres = track.length }
-        let boundedStops = pauses.map { RouteStop(id: $0.id, name: $0.name, metres: min(track.length, $0.metres), waitSeconds: $0.waitSeconds) }
+        let boundedStops = pauses.map { RouteStop(id: $0.id, name: $0.name, metres: min(track.length, $0.metres), waitSeconds: $0.waitSeconds, signal: $0.signal) }
         var notices = Array(Set(actualLegs.flatMap(\.notices))).sorted()
         if !sections.isEmpty { notices.append("Optional section settings are on. Each section uses its own travel mode, speed, and matching directions.") }
         if hasConnector { notices.append("Short links of at most 25 metres join directions at stops.") }

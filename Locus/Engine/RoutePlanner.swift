@@ -399,7 +399,7 @@ final class RoutePlanner: ObservableObject {
         destination = route.destination
         alternatives = [route]
         selectedID = route.id
-        waypoints = route.stops.map { TripWaypoint(id: $0.id, name: $0.name, point: route.track.point(at: $0.metres), waitSeconds: $0.waitSeconds) }
+        waypoints = route.stops.map { TripWaypoint(id: $0.id, name: $0.name, point: route.track.point(at: $0.metres), waitSeconds: $0.waitSeconds, signal: $0.signal) }
         usesStoredPath = true
         var choices = Dictionary(uniqueKeysWithValues: route.travelSections.map { ($0.id, RouteLegChoice(mode: $0.mode, speedMPH: $0.speedMPH)) })
         // Editing a leg can split a movement section and give the remainder a
@@ -463,29 +463,35 @@ final class RoutePlanner: ObservableObject {
         waypoints.swapAt(index, index + offset)
         rebuild(mode: mode, preserving: previous)
     }
-    func setWait(_ id: UUID, seconds: Double) {
+    func setWait(_ id: UUID, seconds: Double, signal: SimulatedTrafficLight?) {
         guard seconds.isFinite else { return }
         let value = StopDuration.normalized(seconds)
-        if let index = waypoints.firstIndex(where: { $0.id == id }) { waypoints[index].waitSeconds = value }
+        if let index = waypoints.firstIndex(where: { $0.id == id }) {
+            waypoints[index].waitSeconds = value
+            waypoints[index].signal = signal
+        }
         for index in alternatives.indices {
-            if let stop = alternatives[index].stops.firstIndex(where: { $0.id == id }) { alternatives[index].stops[stop].waitSeconds = value }
+            if let stop = alternatives[index].stops.firstIndex(where: { $0.id == id }) {
+                alternatives[index].stops[stop].waitSeconds = value
+                alternatives[index].stops[stop].signal = signal
+            }
         }
     }
     func setAllWaits(seconds: Double) {
         guard !isLoading, seconds.isFinite else { return }
         let value = StopDuration.normalized(seconds)
-        waypoints = waypoints.map { var stop = $0; stop.waitSeconds = value; return stop }
+        waypoints = waypoints.map { var stop = $0; stop.waitSeconds = value; stop.signal = nil; return stop }
         alternatives = alternatives.map { route in
             var updated = route
-            updated.stops = route.stops.map { var stop = $0; stop.waitSeconds = value; return stop }
+            updated.stops = route.stops.map { var stop = $0; stop.waitSeconds = value; stop.signal = nil; return stop }
             return updated
         }
     }
-    func addPathStop(name: String, fraction: Double, wait: Double) {
+    func addPathStop(name: String, fraction: Double, wait: Double, signal: SimulatedTrafficLight? = nil) {
         guard let route = selectedRoute, route.stops.count < 20, fraction.isFinite, wait.isFinite else { return }
         let title = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
         let stop = RouteStop(name: title.isEmpty ? "Stop \(route.stops.count + 1)" : title,
-            metres: min(1, max(0, fraction)) * route.track.length, waitSeconds: StopDuration.normalized(wait))
+            metres: min(1, max(0, fraction)) * route.track.length, waitSeconds: StopDuration.normalized(wait), signal: signal)
         guard let index = alternatives.firstIndex(where: { $0.id == route.id }) else { return }
         var updated = alternatives[index]
         updated.stops.append(stop)
@@ -604,7 +610,7 @@ final class RoutePlanner: ObservableObject {
 
     var editableWaypoints: [TripWaypoint] {
         if usesStoredPath, let route = selectedRoute {
-            return route.stops.map { TripWaypoint(id: $0.id, name: $0.name, point: route.track.point(at: $0.metres), waitSeconds: $0.waitSeconds) }
+            return route.stops.map { TripWaypoint(id: $0.id, name: $0.name, point: route.track.point(at: $0.metres), waitSeconds: $0.waitSeconds, signal: $0.signal) }
         }
         return waypoints
     }
@@ -629,6 +635,7 @@ final class RoutePlanner: ObservableObject {
                     if let value = stops.first(where: { $0.id == alternatives[index].stops[j].id }) {
                         alternatives[index].stops[j].name = value.name
                         alternatives[index].stops[j].waitSeconds = value.waitSeconds
+                        alternatives[index].stops[j].signal = value.signal
                     }
                 }
             }
@@ -644,7 +651,7 @@ final class RoutePlanner: ObservableObject {
 
     private func syncPathStops() {
         guard usesStoredPath, let route = selectedRoute else { return }
-        waypoints = route.stops.map { TripWaypoint(id: $0.id, name: $0.name, point: route.track.point(at: $0.metres), waitSeconds: $0.waitSeconds) }
+        waypoints = route.stops.map { TripWaypoint(id: $0.id, name: $0.name, point: route.track.point(at: $0.metres), waitSeconds: $0.waitSeconds, signal: $0.signal) }
     }
 }
 

@@ -158,8 +158,8 @@ final class SpoofSession: ObservableObject {
     private var warnedUnverified = false
     private var warnedFailure = false
     private var monitorTask: Task<Void, Never>?
-    private var joystickTimer: Timer?
-    private var joystickTick: (() -> Void)?
+    private var joystickTask: Task<Void, Never>?
+    private var joystickContext: (pairing: PairingStore, ticket: Int)?
     private var routeTask: Task<Void, Never>?
     private let routeControls = RouteWakeSignal()
     private let routeConnection = RouteWakeSignal()
@@ -168,7 +168,7 @@ final class SpoofSession: ObservableObject {
     private var backgroundTask = UIBackgroundTaskIdentifier.invalid
     @Published private var joystickSpeedOverride: Double?
     private var joystickVector: CGVector = .zero
-    // Camera changes don't publish session/UI updates or start a movement timer.
+    // Camera changes don't publish session/UI updates or start movement.
     private var joystickMapHeading: Double = 0
     private let locationKeeper = BackgroundKeepAlive()
     private var appActive = UIApplication.shared.applicationState == .active
@@ -182,7 +182,7 @@ final class SpoofSession: ObservableObject {
     /// Read only when sampling/exporting diagnostics; never drives SwiftUI updates.
     var energySnapshot: [String: String] {
         ["location_writes_total": String(diagnosticWriteCount), "route_worker": String(routeTask != nil),
-         "joystick_timer": String(joystickTimer != nil), "connection_monitor": String(monitorTask != nil),
+         "joystick_timer": String(joystickTask != nil), "connection_monitor": String(monitorTask != nil),
          "recovery_monitor": String(automaticRecoveryPending), "map_visible": String(mapLocationNeeded),
          "background_location": String(sessionLocationKeepAlive), "location_manager": locationKeeper.diagnosticState,
          "phase": effectivePhase.rawValue, "stop_pending": String(stopInFlight),
@@ -738,15 +738,12 @@ final class SpoofSession: ObservableObject {
         guard pairing.hasPairingFile else { return "Pair this iPhone in Settings before using the joystick." }
         // Reuse the confirmed session. No teleport, initial write, or route
         // cancellation is allowed just because the joystick was opened.
-        let ticket = epoch
         joystickVector = .zero
         joystickSpeedOverride = nil
         joystickActive = true
-        joystickTimer?.invalidate()
-        joystickTimer = nil
-        joystickTick = { [weak self] in
-            Task { @MainActor in await self?.tickJoystick(pairing: pairing, ticket: ticket) }
-        }
+        joystickTask?.cancel()
+        joystickTask = nil
+        joystickContext = (pairing, epoch)
         return nil
     }
 
@@ -760,22 +757,23 @@ final class SpoofSession: ObservableObject {
         guard vector.dx.isFinite, vector.dy.isFinite else { updateJoystick(vector: .zero); return }
         joystickVector = vector
         if hypot(vector.dx, vector.dy) > 0.08 {
-            guard joystickTimer == nil else { return }
-            joystickTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
-                Task { @MainActor in self?.joystickTick?() }
+            guard joystickTask == nil, let context = joystickContext else { return }
+            let startedAt = ProcessInfo.processInfo.systemUptime
+            joystickTask = Task { [weak self] in
+                await self?.runJoystick(pairing: context.pairing, ticket: context.ticket, startedAt: startedAt)
             }
         } else {
-            joystickTimer?.invalidate()
-            joystickTimer = nil
+            joystickTask?.cancel()
+            joystickTask = nil
         }
     }
     func stopJoystick() {
         joystickActive = false
         joystickSpeedOverride = nil
         joystickVector = .zero
-        joystickTimer?.invalidate()
-        joystickTimer = nil
-        joystickTick = nil
+        joystickTask?.cancel()
+        joystickTask = nil
+        joystickContext = nil
     }
 
     @discardableResult
@@ -851,7 +849,7 @@ final class SpoofSession: ObservableObject {
             defer {
                 if needsInitialWrite { initialTrace?.record("worker_ended_before_confirmation") }
             }
-            var clock = RoutePlaybackClock(now: ProcessInfo.processInfo.systemUptime)
+            var clock = MovementPlaybackClock(now: ProcessInfo.processInfo.systemUptime)
             var lastMovementConfirmation = ProcessInfo.processInfo.systemUptime
             var samples = RouteSpeedSamples()
             var sampledRevision = speedRevision
@@ -860,6 +858,7 @@ final class SpoofSession: ObservableObject {
                 clock.reset(now: now)
                 lastMovementConfirmation = now
                 samples.reset()
+                sampledRevision = self.speedRevision
                 if self.measuredRouteSpeed != 0 { self.measuredRouteSpeed = 0 }
             }
             defer {
@@ -898,6 +897,8 @@ final class SpoofSession: ObservableObject {
                 let controlRevision = routeControls.revision
                 if sendInFlight {
                     await routeConnection.wait(after: connectionRevision)
+                    guard !Task.isCancelled, ticket == epoch, workerID == routeWorkerID else { return }
+                    resetMovementClock()
                     continue
                 }
                 if needsInitialWrite {
@@ -964,9 +965,14 @@ final class SpoofSession: ObservableObject {
                     continue
                 }
                 if let next = stopProgress.next(in: activeRoute?.stops ?? plan.stops), next.metres <= progress.travelledMetres + 0.01 {
-                    resetMovementClock()
-                    if motionSpeed != 0 { motionSpeed = 0 }
-                    if stopProgress.currentID != next.id { stopProgress.arrive(next) }
+                    if stopProgress.currentID != next.id {
+                        stopProgress.arrive(next)
+                        if next.signal != nil { saveTripCheckpoint(force: true) }
+                    }
+                    if next.signal == nil || stopProgress.currentID != nil {
+                        resetMovementClock()
+                        if motionSpeed != 0 { motionSpeed = 0 }
+                    }
                     if stopProgress.currentID != nil {
                         if journey?.state != .waiting { journey?.state = .waiting }
                         publishActivity(force: false)
@@ -979,6 +985,7 @@ final class SpoofSession: ObservableObject {
                         guard !Task.isCancelled, ticket == epoch, workerID == routeWorkerID else { return }
                         if !routePaused, pendingSeek == nil, effectivePhase == .active, revision == waitRevision, elapsed <= interval + 0.25 {
                             stopProgress.tick(elapsed, maximumElapsed: interval + 0.25)
+                            if next.signal != nil, stopProgress.currentID == nil { saveTripCheckpoint(force: true) }
                         }
                     }
                     continue
@@ -991,6 +998,9 @@ final class SpoofSession: ObservableObject {
                     return
                 }
                 if journey?.state != .moving { journey?.state = .moving }
+                applyPlannedSection(at: progress.travelledMetres)
+                if sampledRevision != speedRevision { resetMovementClock() }
+                let movementWaitRevision = waitRevision
                 let delay = clock.delay(now: ProcessInfo.processInfo.systemUptime)
                 if delay > 0 {
                     do { try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) } catch { return }
@@ -998,30 +1008,40 @@ final class SpoofSession: ObservableObject {
                 guard !Task.isCancelled, ticket == epoch, workerID == routeWorkerID, !status.isDropped else { return }
                 // A pause, seek, speed/mode change, or heartbeat may have arrived
                 // during the delay. Re-read state before choosing the next point.
-                if routePaused || pendingSeek != nil || sendInFlight || effectivePhase != .active { continue }
+                if movementWaitRevision != waitRevision || connectionRevision != routeConnection.revision {
+                    resetMovementClock()
+                    continue
+                }
+                if routePaused || pendingSeek != nil || sendInFlight || effectivePhase != .active
+                    || sampledRevision != speedRevision { continue }
                 guard let current = journey else { return }
-                applyPlannedSection(at: current.travelledMetres)
-                let stopAt = min(stopProgress.next(in: activeRoute?.stops ?? plan.stops)?.metres ?? plan.track.length,
+                let routeStops = activeRoute?.stops ?? plan.stops
+                var upcomingStops = stopProgress
+                let nextBoundary = upcomingStops.nextMovementBoundary(in: routeStops)
+                if upcomingStops != stopProgress {
+                    stopProgress = upcomingStops
+                    saveTripCheckpoint(force: true)
+                }
+                let stopAt = min(nextBoundary?.metres ?? plan.track.length,
                                  currentPlannedSection?.endMetres ?? plan.track.length)
                 let elapsed = clock.advance(now: ProcessInfo.processInfo.systemUptime)
-                if sampledRevision != speedRevision {
-                    samples.reset()
-                    sampledRevision = speedRevision
-                }
                 let cruise = cruiseSpeed(for: travelMode)
                 let desired = currentSmoothMovement ? motion.target(cruise: cruise, position: current.travelledMetres, stopAt: stopAt, mode: travelMode) : cruise
                 let movement = RouteMotion.step(speed: motionSpeed, target: desired,
                     remaining: max(0, stopAt - current.travelledMetres), mode: travelMode, smooth: currentSmoothMovement, seconds: elapsed)
                 let target = min(stopAt, current.travelledMetres + movement.metres)
                 let result = await sendRoutePoint(at: target, plan: plan, pairing: pairing, ticket: ticket)
-                if result == .busy { continue }
+                if result == .busy { resetMovementClock(); continue }
                 guard result == .sent, !Task.isCancelled, ticket == epoch, workerID == routeWorkerID else { return }
                 let confirmedAt = ProcessInfo.processInfo.systemUptime
                 clock.confirm(now: confirmedAt)
                 samples.append(metres: target - current.travelledMetres, seconds: confirmedAt - lastMovementConfirmation)
                 lastMovementConfirmation = confirmedAt
-                measuredRouteSpeed = routePaused ? 0 : samples.metresPerSecond
+                measuredRouteSpeed = routePaused || sampledRevision != speedRevision ? 0 : samples.metresPerSecond
                 journey?.confirmPosition(target)
+                var confirmedStops = stopProgress
+                confirmedStops.passGreenLights(in: routeStops, through: target)
+                if confirmedStops != stopProgress { stopProgress = confirmedStops }
                 let confirmedSpeed = routePaused ? 0 : movement.speed
                 if motionSpeed != confirmedSpeed { motionSpeed = confirmedSpeed }
                 applyPlannedSection(at: target)
@@ -1041,14 +1061,14 @@ final class SpoofSession: ObservableObject {
         routeActive && canEditRouteMovement && isSpoofing && activeRoute != nil && journey != nil
     }
     /// Returns an error without closing the editor when its chosen spot passed.
-    func addRouteStop(routeID: UUID, name: String, fraction: Double, wait: Double) -> String? {
+    func addRouteStop(routeID: UUID, name: String, fraction: Double, wait: Double, signal: SimulatedTrafficLight? = nil) -> String? {
         guard let route = activeRoute, route.id == routeID, let progress = journey, canAddRouteStop else {
             return "This route is no longer ready for a new stop. Check the route and connection, then try again."
         }
         guard fraction.isFinite, (0...1).contains(fraction) else { return LiveRouteStopInsertion.Failure.invalid.message }
         let result = LiveRouteStopInsertion.make(name: name, metres: fraction * route.track.length, waitSeconds: wait,
             length: route.track.length, travelled: progress.travelledMetres, pendingMetres: pendingRouteTarget,
-            existingCount: route.stops.count)
+            existingCount: route.stops.count, signal: signal)
         switch result {
         case .failure(let error): return error.message
         case .success(let stop):
@@ -1203,7 +1223,8 @@ final class SpoofSession: ObservableObject {
                 let start = RoutePlace(name: "Current simulated location", coordinate: coordinate)
                 let remainingStops = plan.stops.filter { !self.stopProgress.completed.contains($0.id) }.map {
                     TripWaypoint(id: $0.id, name: $0.name, point: plan.track.point(at: $0.metres),
-                        waitSeconds: $0.id == self.stopProgress.currentID ? self.stopProgress.remainingSeconds : $0.waitSeconds)
+                        waitSeconds: $0.signal == nil && $0.id == self.stopProgress.currentID ? self.stopProgress.remainingSeconds : $0.waitSeconds,
+                        signal: $0.signal)
                 }
                 let routes = try await RouteBuilder.itinerary(from: start, to: plan.destination, via: remainingStops,
                     mode: mode, preferWalkingPaths: AppDataWorkspace.defaults.bool(forKey: "locus.preferWalkingPaths"))
@@ -1219,10 +1240,12 @@ final class SpoofSession: ObservableObject {
                 }
                 rerouteTask = nil
                 let smoothing = currentSmoothMovement
+                let continuingSignals = stopProgress.continuingSignals(in: replacement.stops)
                 cancelRoute()
                 travelMode = mode
                 setSpeedMPH(requestedSpeed, for: mode)
                 if followRoute(replacement, pairing: pairing, smoothing: smoothing) {
+                    stopProgress = continuingSignals
                     routePaused = wasPaused
                     journey?.state = wasPaused ? .paused : .moving
                 } else {
@@ -1511,18 +1534,51 @@ final class SpoofSession: ObservableObject {
         }
     }
 
-    private func tickJoystick(pairing: PairingStore, ticket: Int) async {
-        guard joystickActive, isSpoofing, !sendInFlight, ticket == epoch, let current = simulated else { return }
-        let magnitude = hypot(joystickVector.dx, joystickVector.dy)
-        guard magnitude > 0.08 else { return }
-        let speed = cruiseSpeed(for: travelMode) * min(1.0, magnitude)
-        // Resolve at each tick: rotating the map while holding the stick still
-        // must keep movement aligned with the screen, not the old compass angle.
-        let direction = MapJoystickProjection.vector(right: Double(joystickVector.dx),
-            down: Double(joystickVector.dy), heading: joystickMapHeading)
-        let coordinate = offset(coordinate: current, eastMeters: direction.east / magnitude * speed * 0.25,
-                                northMeters: direction.north / magnitude * speed * 0.25)
-        _ = await apply(coordinate, pairing: pairing, markRecent: false, ticket: ticket)
+    private func runJoystick(pairing: PairingStore, ticket: Int, startedAt: Double) async {
+        var clock = MovementPlaybackClock(now: startedAt, interval: MovementPlaybackClock.joystickInterval)
+        var mode = travelMode
+        var cruise = cruiseSpeed(for: mode)
+        defer { if !Task.isCancelled { joystickTask = nil } }
+        while !Task.isCancelled, joystickActive, ticket == epoch {
+            if !isSpoofing || sendInFlight {
+                await routeConnection.wait(after: routeConnection.revision)
+                clock.reset(now: ProcessInfo.processInfo.systemUptime)
+                continue
+            }
+            let connectionRevision = routeConnection.revision
+            let delay = clock.delay(now: ProcessInfo.processInfo.systemUptime)
+            if delay > 0 {
+                do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            }
+            guard !Task.isCancelled, joystickActive, ticket == epoch else { return }
+            guard isSpoofing, !sendInFlight, connectionRevision == routeConnection.revision else {
+                clock.reset(now: ProcessInfo.processInfo.systemUptime)
+                continue
+            }
+            let updatedCruise = cruiseSpeed(for: travelMode)
+            if mode != travelMode || cruise != updatedCruise {
+                mode = travelMode
+                cruise = updatedCruise
+                clock.reset(now: ProcessInfo.processInfo.systemUptime)
+                continue
+            }
+            let magnitude = hypot(joystickVector.dx, joystickVector.dy)
+            guard magnitude > 0.08, let current = simulated else { return }
+            let elapsed = clock.advance(now: ProcessInfo.processInfo.systemUptime)
+            let metres = cruise * min(1.0, magnitude) * elapsed
+            // Re-read the heading so a held stick follows the camera as it turns.
+            let direction = MapJoystickProjection.vector(right: Double(joystickVector.dx),
+                down: Double(joystickVector.dy), heading: joystickMapHeading)
+            let coordinate = offset(coordinate: current, eastMeters: direction.east / magnitude * metres,
+                                    northMeters: direction.north / magnitude * metres)
+            let result = await apply(coordinate, pairing: pairing, markRecent: false, ticket: ticket)
+            if result == .busy {
+                clock.reset(now: ProcessInfo.processInfo.systemUptime)
+                continue
+            }
+            guard result == .sent else { return }
+            clock.confirm(now: ProcessInfo.processInfo.systemUptime)
+        }
     }
 
     private weak var activePairingStore: PairingStore?

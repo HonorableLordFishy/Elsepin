@@ -1,4 +1,5 @@
 import CoreFoundation
+import CoreLocation
 import XCTest
 
 final class ElsepinFlowUITests: XCTestCase {
@@ -220,6 +221,61 @@ final class ElsepinFlowUITests: XCTestCase {
         routeControl(app.buttons["Movement to Test pond"]).tap()
         XCTAssertEqual(try XCTUnwrap(Double((app.sliders.firstMatch.value as? String ?? "").components(separatedBy: " ")[0])), bike, accuracy: 0.11)
         capture("29-reopened-custom-ebike-speed")
+    }
+
+    func testTrafficSignalStopCancelsAndPersistsAfterReopening() throws {
+        launchRoutes()
+        let beforeSnapshot = try savedSnapshot()
+        let before = try XCTUnwrap(beforeSnapshot["saved"] as? [String: Any])
+        let beforeStops = try XCTUnwrap(before["stops"] as? [[String: Any]])
+        XCTAssertEqual(beforeStops.count, 2)
+        XCTAssertNil(beforeStops[0]["signal"])
+        let fixed = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND NOT (label CONTAINS %@)",
+            "Wait at Test cafe,", "Simulated traffic light")).firstMatch
+        let signal = app.buttons["Wait at Test cafe, Simulated traffic light"]
+        let waitEditor = app.navigationBars["Wait at stop"]
+        let toggle = app.switches["Simulate traffic light"]
+
+        app.buttons["Open saved route"].tap()
+        routeControl(fixed).tap()
+        XCTAssertTrue(waitEditor.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.value as? String, "0")
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "1")
+        capture("traffic-light-enabled-in-stop-draft")
+        waitEditor.buttons["Cancel"].tap()
+        XCTAssertTrue(fixed.waitForExistence(timeout: 5))
+        XCTAssertFalse(signal.exists)
+        routeControl(fixed).tap()
+        XCTAssertTrue(waitEditor.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.value as? String, "0")
+        toggle.tap()
+        waitEditor.buttons["Done"].tap()
+        XCTAssertTrue(signal.waitForExistence(timeout: 5))
+        capture("traffic-light-on-route-stop")
+        saveRouteChanges()
+        closeRoute()
+
+        let afterSnapshot = try savedSnapshot()
+        let after = try XCTUnwrap(afterSnapshot["saved"] as? [String: Any])
+        let afterStops = try XCTUnwrap(after["stops"] as? [[String: Any]])
+        XCTAssertEqual(afterStops.count, 2)
+        XCTAssertEqual(afterSnapshot["count"] as? Int, beforeSnapshot["count"] as? Int)
+        XCTAssertEqual(afterSnapshot["directionsRequests"] as? Int, beforeSnapshot["directionsRequests"] as? Int)
+        XCTAssertEqual(after["id"] as? String, before["id"] as? String)
+        XCTAssertEqual(after["points"] as? NSArray, before["points"] as? NSArray)
+        XCTAssertEqual(afterStops[0]["id"] as? String, beforeStops[0]["id"] as? String)
+        XCTAssertEqual(afterStops[0]["name"] as? String, "Test cafe")
+        XCTAssertEqual(afterStops[0]["metres"] as? Double, beforeStops[0]["metres"] as? Double)
+        XCTAssertEqual(afterStops[0]["waitSeconds"] as? Double, beforeStops[0]["waitSeconds"] as? Double)
+        XCTAssertEqual(afterStops[0]["signal"] as? String, "enabled")
+        XCTAssertEqual(afterStops[1] as NSDictionary, beforeStops[1] as NSDictionary)
+
+        app.buttons["Reopen last saved route"].tap()
+        routeControl(signal).tap()
+        XCTAssertTrue(waitEditor.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.value as? String, "1")
+        capture("reopened-saved-traffic-light-stop")
     }
 
     func testInlineLegPathChoiceResetsAndBackDiscardsAtLargestText() throws {
@@ -569,6 +625,103 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Where do you want to go?"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.alerts["Stop spoofing?"].exists)
         capture("03-cleared-test-session")
+    }
+
+    private struct ConfirmedPlaybackWrite: Decodable {
+        let latitude: Double
+        let longitude: Double
+        let startedAt: TimeInterval
+        let confirmedAt: TimeInterval
+        let requestedLatencyMillis: Int
+
+        func distance(to other: Self) -> Double {
+            CLLocation(latitude: latitude, longitude: longitude)
+                .distance(from: CLLocation(latitude: other.latitude, longitude: other.longitude))
+        }
+    }
+
+    private func readPlaybackTrace(attachmentName: String? = nil) throws -> [ConfirmedPlaybackWrite] {
+        app.buttons["validation.readPlaybackTrace"].tap()
+        let trace = app.staticTexts["validation.playbackTrace"].label
+        if let attachmentName {
+            let attachment = XCTAttachment(string: trace)
+            attachment.name = attachmentName
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        return try JSONDecoder().decode([ConfirmedPlaybackWrite].self, from: Data(trace.utf8))
+    }
+
+    private func observePlayback(for seconds: TimeInterval) {
+        let elapsed = expectation(description: "Observe adapter confirmations for \(seconds) seconds")
+        DispatchQueue.global().asyncAfter(deadline: .now() + seconds) { elapsed.fulfill() }
+        XCTAssertEqual(XCTWaiter.wait(for: [elapsed], timeout: seconds + 5), .completed)
+    }
+
+    func testConfirmedRoutePlaybackTracksSelectedPaceAndResume() throws {
+        launch("route-pace", narrow: false, cellular: false)
+        openLibrary()
+        let trip = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Test straight drive")).firstMatch
+        XCTAssertTrue(trip.waitForExistence(timeout: 10))
+        trip.tap()
+        XCTAssertTrue(app.navigationBars["Plan a route"].waitForExistence(timeout: 10))
+        app.buttons["Show route"].tap()
+        let start = app.buttons["Start route"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        capture("60mph-saved-route-before-start")
+        start.tap()
+
+        let following = app.staticTexts["Following route"]
+        XCTAssertTrue(following.waitForExistence(timeout: 10))
+        observePlayback(for: 23)
+        let moving = try readPlaybackTrace(attachmentName: "60mph-steady-adapter-confirmations")
+        app.buttons["session.pause"].tap()
+        let resume = app.buttons.matching(NSPredicate(format: "identifier == 'session.pause' AND label == 'Resume'")).firstMatch
+        XCTAssertTrue(resume.waitForExistence(timeout: 10))
+        let paused = try readPlaybackTrace()
+        let pauseObservedAt = ProcessInfo.processInfo.systemUptime
+        observePlayback(for: 4)
+        let held = try readPlaybackTrace(attachmentName: "60mph-paused-adapter-confirmations")
+        let observedPause = ProcessInfo.processInfo.systemUptime - pauseObservedAt
+        capture("60mph-route-paused")
+        resume.tap()
+        XCTAssertTrue(following.waitForExistence(timeout: 10))
+        observePlayback(for: 3)
+        let resumed = try readPlaybackTrace(attachmentName: "60mph-resumed-adapter-confirmations")
+        app.buttons["session.stop"].tap()
+        XCTAssertTrue(app.buttons["session.stop"].waitForNonExistence(timeout: 10))
+
+        let initial = try XCTUnwrap(moving.first)
+        let steady = moving.filter { $0.confirmedAt >= initial.confirmedAt + 2 }
+        let first = try XCTUnwrap(steady.first)
+        let last = try XCTUnwrap(steady.last)
+        let elapsed = last.confirmedAt - first.confirmedAt
+        let metres = first.distance(to: last)
+        let measuredMPH = metres / elapsed / 0.44704
+        let latencyLow = steady.filter { $0.requestedLatencyMillis == 20 }.map { $0.confirmedAt - $0.startedAt }
+        let latencyHigh = steady.filter { $0.requestedLatencyMillis == 145 }.map { $0.confirmedAt - $0.startedAt }
+        let pausedPoint = try XCTUnwrap(paused.last)
+        let heldPoint = try XCTUnwrap(held.last)
+        let pauseMovement = held.dropFirst(paused.count).map { pausedPoint.distance(to: $0) }.max() ?? 0
+        let firstResumed = try XCTUnwrap(resumed.dropFirst(held.count).first { heldPoint.distance(to: $0) > 0.01 })
+        let resumeStep = heldPoint.distance(to: firstResumed)
+        let report = XCTAttachment(string: """
+            Pace from adapter-confirmed coordinates and monotonic timestamps: \(measuredMPH) mph
+            Distance: \(metres) m. Steady observation time: \(elapsed) s. Confirmed writes: \(steady.count).
+            Mean latency at 20 ms request: \(latencyLow.reduce(0, +) / Double(latencyLow.count)) s.
+            Mean latency at 145 ms request: \(latencyHigh.reduce(0, +) / Double(latencyHigh.count)) s.
+            Largest movement over \(observedPause) seconds of settled pause: \(pauseMovement) m.
+            First movement after resume: \(resumeStep) m.
+            """)
+        report.name = "60mph-independent-playback-measurement"
+        report.lifetime = .keepAlways
+        add(report)
+        XCTAssertGreaterThanOrEqual(elapsed, 18)
+        XCTAssertGreaterThan(latencyLow.count, 10)
+        XCTAssertGreaterThan(latencyHigh.count, 10)
+        XCTAssertEqual(measuredMPH, 60, accuracy: 1.8)
+        XCTAssertEqual(pauseMovement, 0, accuracy: 0.01)
+        XCTAssertLessThanOrEqual(resumeStep, 60 * 0.44704 * 0.85)
     }
 
     func testCellularStopFromMovingRouteKeepsThenClearsSession() {

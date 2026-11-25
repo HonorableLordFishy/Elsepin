@@ -70,7 +70,7 @@ struct RouteRehearsal {
         completedStops = Set(stops.filter { $0.metres < metres - 0.001 }.map(\.id))
         let stop = stops.first { abs($0.metres - metres) <= 0.001 }
         waitingID = stop?.id
-        waitingSeconds = stop?.waitSeconds ?? 0
+        waitingSeconds = stop?.visitWait() ?? 0
     }
     mutating func skipWait() {
         if let waitingID { completedStops.insert(waitingID) }
@@ -95,7 +95,7 @@ struct RouteRehearsal {
             }
             if let stop = stops.first(where: { !completedStops.contains($0.id) }), stop.metres <= metres + 0.001 {
                 waitingID = stop.id
-                waitingSeconds = stop.waitSeconds
+                waitingSeconds = stop.visitWait()
                 continue
             }
             if metres >= length - 0.001 { metres = length; isPlaying = false; return }

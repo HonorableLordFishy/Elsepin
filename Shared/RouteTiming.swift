@@ -52,7 +52,7 @@ struct RouteTimingProfile {
                 let step = RouteMotion.step(speed: velocity, target: target, remaining: end - position,
                                             mode: currentMode, smooth: true)
                 guard step.metres > 0 else { break }
-                elapsed += RoutePlaybackClock.interval
+                elapsed += MovementPlaybackClock.routeInterval
                 position = min(end, position + step.metres)
                 velocity = step.speed
             }

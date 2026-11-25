@@ -11,6 +11,33 @@ enum LocationEngine {
     private static let lock = NSLock()
     private static var acceptedWrites = 0
     private static var reconnectFailureSent = false
+    private struct PlaybackWrite: Encodable {
+        let latitude: Double
+        let longitude: Double
+        let startedAt: TimeInterval
+        let confirmedAt: TimeInterval
+        let requestedLatencyMillis: Int
+    }
+    private static var playbackWrites: [PlaybackWrite] = []
+
+    static func playbackTrace() -> String {
+        lock.lock()
+        let snapshot = playbackWrites
+        lock.unlock()
+        guard let data = try? JSONEncoder().encode(snapshot) else { return "Trace encoding failed" }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    private static func playbackLatencyMillis() -> Int {
+        lock.lock(); defer { lock.unlock() }
+        return playbackWrites.count.isMultiple(of: 2) ? 20 : 145
+    }
+
+    private static func recordPlaybackWrite(_ write: PlaybackWrite) {
+        lock.lock(); defer { lock.unlock() }
+        playbackWrites.append(write)
+    }
+
     private static func shouldFailWrite(explicit: Bool) -> Bool {
         lock.lock(); defer { lock.unlock() }
         if ValidationFixture.routeReconnect, acceptedWrites > 0, !explicit, !reconnectFailureSent {
@@ -38,10 +65,17 @@ enum LocationEngine {
             // checked the new route's camera before its first accepted write.
             try? await Task.sleep(for: .seconds(25))
         }
-        try? await Task.sleep(for: .milliseconds(60))
+        let observePlayback = ValidationFixture.routePace
+        let latency = observePlayback ? playbackLatencyMillis() : 60
+        let startedAt = ProcessInfo.processInfo.systemUptime
+        try? await Task.sleep(for: .milliseconds(latency))
         // Fail after one accepted test command so recovery includes a location
         // that may remain, rather than the separate never-started case.
         if shouldFailWrite(explicit: explicit) { return .failure(.tunnelUnreachable) }
+        if observePlayback {
+            recordPlaybackWrite(PlaybackWrite(latitude: latitude, longitude: longitude,
+                startedAt: startedAt, confirmedAt: ProcessInfo.processInfo.systemUptime, requestedLatencyMillis: latency))
+        }
         return Result.success(()) // TEST ONLY: UI command acceptance, not device spoofing.
     }
     static func clear(pairingPath: String, deviceIP: String) async -> Result<Void, LocationEngineError> {

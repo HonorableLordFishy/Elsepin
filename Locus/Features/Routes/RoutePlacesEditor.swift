@@ -94,7 +94,7 @@ private struct RoutePlaceDetailEditor: View {
             }
             if isStop {
                 Section("Wait here") {
-                    StopDurationControl(seconds: $place.waitSeconds)
+                    RouteStopWaitControl(seconds: $place.waitSeconds, signal: $place.signal)
                 }
             }
         }

@@ -63,6 +63,56 @@ final class TripFeaturesTests: XCTestCase {
         progress.tick(.nan)
         XCTAssertEqual(progress.remainingSeconds, 59)
     }
+    func testGreenLightsPassWithoutABoundaryAndRedWaitSurvivesRecovery() throws {
+        let green = RouteStop(name: "First intersection", metres: 10, waitSeconds: 0, signal: .enabled)
+        let red = RouteStop(name: "Second intersection", metres: 20, waitSeconds: 0, signal: .enabled)
+        let fixed = RouteStop(name: "Coffee", metres: 30, waitSeconds: 5)
+        let stops = [green, red, fixed]
+        var progress = RouteStopProgress()
+        var draws = [0.0, 32.0].makeIterator()
+        func sample() -> Double {
+            guard let next = draws.next() else { XCTFail("Repeated a signal decision"); return 0 }
+            return next
+        }
+
+        XCTAssertEqual(progress.remainingWait(in: stops), 29)
+        XCTAssertEqual(progress.nextMovementBoundary(in: stops, sample: sample), red)
+        XCTAssertEqual(progress.remainingWait(in: stops), 37)
+        progress = try JSONDecoder().decode(RouteStopProgress.self, from: JSONEncoder().encode(progress))
+        XCTAssertEqual(progress.nextMovementBoundary(in: stops, sample: sample), red)
+        progress.passGreenLights(in: stops, through: 19)
+        XCTAssertEqual(progress.completed, [green.id])
+        progress.arrive(red, sample: sample)
+        progress.tick(4, maximumElapsed: 4)
+        progress = try JSONDecoder().decode(RouteStopProgress.self, from: JSONEncoder().encode(progress))
+        XCTAssertTrue(progress.isValid(for: stops, at: 20))
+        progress.arrive(red, sample: sample)
+        XCTAssertEqual(progress.remainingSeconds, 28)
+        var reroutedRed = red
+        reroutedRed.metres = 0
+        var replacement = progress.continuingSignals(in: [reroutedRed])
+        XCTAssertTrue(replacement.isValid(for: [reroutedRed], at: 0))
+        replacement.arrive(reroutedRed, sample: sample)
+        XCTAssertEqual(replacement.remainingSeconds, 28)
+        progress.finish()
+        XCTAssertEqual(progress.nextMovementBoundary(in: stops, sample: sample), fixed)
+        progress.arrive(fixed, sample: sample)
+        XCTAssertEqual(progress.remainingSeconds, 5)
+        progress.seek(to: 5, stops: stops)
+        XCTAssertEqual(progress.nextMovementBoundary(in: stops) { 8 }, green)
+    }
+
+    func testFixedStopAndProgressDecodeWithoutSignalFields() throws {
+        let id = UUID()
+        let oldStop = #"{"id":"\#(id.uuidString)","name":"Cafe","metres":10,"waitSeconds":15}"#
+        let stop = try JSONDecoder().decode(RouteStop.self, from: Data(oldStop.utf8))
+        XCTAssertNil(stop.signal)
+        let oldProgress = #"{"completed":[],"currentID":"\#(id.uuidString)","remainingSeconds":3}"#
+        let progress = try JSONDecoder().decode(RouteStopProgress.self, from: Data(oldProgress.utf8))
+        XCTAssertTrue(progress.isValid(for: [stop], at: 10))
+        XCTAssertEqual(progress.remainingWait(in: [stop]), 3)
+    }
+
     func testContinueNowCompletesExactlyOneStop() {
         let first = RouteStop(name: "A", metres: 100, waitSeconds: 60)
         let second = RouteStop(name: "B", metres: 200, waitSeconds: 120)

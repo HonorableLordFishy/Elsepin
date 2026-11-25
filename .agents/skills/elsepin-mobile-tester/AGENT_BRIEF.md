@@ -15,3 +15,5 @@ Use invented route names, coordinates and settings in a disposable library. Read
 Report pass, fail, skipped and untested separately. Disclose retry-only passes and fixture limitations. A selectable file must be tapped in the system picker for a Files claim. Parser tests establish parser behavior. A success banner alone cannot establish persistence. Development validation ends with native checks and evidence.
 
 For a persistence failure after a large GPX, use `ui_focus=route-history-backup` to run the size sequence and selective JSON restore on the same simulator. Inspect the large route’s history storage and compare the before/after relaunch snapshots for the saved pin and speed presets, including the first attempt.
+
+For changes to movement timing or simulated traffic lights, use `ui_focus=pace-and-signals` with `validate_device=true`. Inspect the independent 60 mph measurement from accepted synthetic coordinates, the paused and resumed traces, and the saved stop after reopening. Check Google Maps navigation and Find My separately on a physical device.
