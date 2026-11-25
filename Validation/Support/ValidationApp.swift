@@ -27,7 +27,8 @@ enum ValidationFixture {
     static var firstLaunch: Bool { scenario == "first-launch" }
     static var drawnRoute: Bool { scenario == "drawn-route" }
     static var routeReconnect: Bool { scenario == "route-reconnect" }
-    static var routePace: Bool { scenario == "route-pace" }
+    static var routePace: Bool { scenario == "route-pace" || routePaceDwell }
+    static var routePaceDwell: Bool { scenario == "route-pace-dwell" }
     static var stopNetworkPath: StopNetworkPath? {
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("--stop-cellular") {
@@ -126,7 +127,10 @@ enum ValidationFixture {
             let straightPoints = [40.770, 40.785, 40.800].map {
                 CLLocationCoordinate2D(latitude: $0, longitude: -73.981)
             }
-            let straight = makeRoute(straightPoints, start: "Test drive start", end: "Test drive destination")
+            var straight = makeRoute(straightPoints, start: "Test drive start", end: "Test drive destination")
+            if routePaceDwell {
+                straight.stops = [RouteStop(name: "Test four-second stop", metres: 60, waitSeconds: 4)]
+            }
             guard TripLibrary().save(route: straight, name: paceTripName, mode: .drive,
                                      speed: 60, smooth: false, favorite: true) else {
                 preconditionFailure("Could not seed the disposable pace route")

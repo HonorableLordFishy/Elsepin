@@ -13,8 +13,11 @@ struct RouteTimingProfile {
          stops: [RouteStop], sections: [RouteTravelSection]) {
         let speed = speed.isFinite && speed > 0 ? speed : mode.baseSpeed
         let sections = RouteTravelSection.valid(sections, length: track.length) ? sections : []
+        let movementBoundaries: [Double] = zip(sections, sections.dropFirst()).compactMap { section, next in
+            section.hasSameMovement(as: next) ? nil : section.endMetres
+        }
         let boundaries = Array(Set(stops.filter { $0.isValid(length: track.length) }.map(\.metres)
-            + sections.map(\.endMetres) + [track.length])).filter { $0 > 0 }.sorted()
+            + movementBoundaries + [track.length])).filter { $0 > 0 && $0 <= track.length }.sorted()
         var output = [Sample(metres: 0, seconds: 0)]
         if !smooth {
             // Exact piecewise distance/speed; changing display units never

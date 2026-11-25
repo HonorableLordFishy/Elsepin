@@ -31,8 +31,24 @@ struct RouteTravelSection: Identifiable, Codable, Equatable {
         return abs(cursor - length) <= 0.05
     }
     static func current(in sections: [Self], at metres: Double) -> Self? {
+        guard let index = currentIndex(in: sections, at: metres) else { return nil }
+        return sections[index]
+    }
+    private static func currentIndex(in sections: [Self], at metres: Double) -> Int? {
         guard metres.isFinite else { return nil }
-        return sections.first { metres < $0.endMetres - 0.001 } ?? sections.last
+        return sections.firstIndex { metres < $0.endMetres - 0.001 } ?? sections.indices.last
+    }
+    func hasSameMovement(as other: Self) -> Bool {
+        mode == other.mode && speedMPH == other.speedMPH
+    }
+    static func movementEnd(in sections: [Self], at metres: Double, length: Double) -> Double {
+        guard let current = currentIndex(in: sections, at: metres) else { return length }
+        for index in current..<(sections.count - 1) {
+            let section = sections[index]
+            if !section.hasSameMovement(as: sections[index + 1]) { return min(length, section.endMetres) }
+        }
+        // Saved sections allow a small rounding difference at the destination.
+        return length
     }
     /// Editors describe the incoming fragment of a leg, not the fragment that
     /// playback will enter after crossing its endpoint.
@@ -63,14 +79,26 @@ struct RouteRehearsal {
     mutating func reset() { self = RouteRehearsal() }
     /// Seeking is a rehearsal-only action and always pauses playback. Stops
     /// before the cursor are complete; landing on a stop restores its full wait.
-    mutating func seek(to requestedMetres: Double, length: Double, stops: [RouteStop]) {
+    mutating func seek(to requestedMetres: Double, length: Double, stops: [RouteStop],
+                       sampleSignalWait: () -> Double = SimulatedTrafficLight.sampleWait) {
         guard requestedMetres.isFinite, length.isFinite, length > 0 else { return }
         metres = min(length, max(0, requestedMetres))
         isPlaying = false
         completedStops = Set(stops.filter { $0.metres < metres - 0.001 }.map(\.id))
-        let stop = stops.first { abs($0.metres - metres) <= 0.001 }
-        waitingID = stop?.id
-        waitingSeconds = stop?.visitWait() ?? 0
+        waitingID = nil
+        waitingSeconds = 0
+        for stop in stops where abs(stop.metres - metres) <= 0.001 {
+            arrive(stop, sampleSignalWait: sampleSignalWait)
+            if waitingID != nil { break }
+        }
+    }
+    private mutating func arrive(_ stop: RouteStop, sampleSignalWait: () -> Double = SimulatedTrafficLight.sampleWait) {
+        waitingSeconds = stop.visitWait(sample: sampleSignalWait)
+        if waitingSeconds > 0 {
+            waitingID = stop.id
+        } else {
+            completedStops.insert(stop.id)
+        }
     }
     mutating func skipWait() {
         if let waitingID { completedStops.insert(waitingID) }
@@ -94,15 +122,14 @@ struct RouteRehearsal {
                 } else { return }
             }
             if let stop = stops.first(where: { !completedStops.contains($0.id) }), stop.metres <= metres + 0.001 {
-                waitingID = stop.id
-                waitingSeconds = stop.visitWait()
+                arrive(stop)
                 continue
             }
             if metres >= length - 0.001 { metres = length; isPlaying = false; return }
             guard remainingTime > 0 else { return }
             let section = RouteTravelSection.current(in: sections, at: metres)
             let boundary = min(length, stops.first(where: { !completedStops.contains($0.id) })?.metres ?? length,
-                               section?.endMetres ?? length)
+                                RouteTravelSection.movementEnd(in: sections, at: metres, length: length))
             let velocity = section?.metresPerSecond ?? speed
             let movement = min(boundary - metres, remainingTime * velocity)
             guard movement > 0 else { return }

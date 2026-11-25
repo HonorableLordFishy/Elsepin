@@ -48,14 +48,29 @@ final class RouteTimingTests: XCTestCase {
     func testResolvedGreenRemovesBrakingAndWaitFromLiveEstimate() throws {
         let route = try track([.init(latitude: 0, longitude: 0), .init(latitude: 0, longitude: 0.01)])
         let light = RouteStop(name: "Light", metres: route.length / 2, waitSeconds: 0, signal: .enabled)
+        let sections = [RouteTravelSection(id: UUID(), startMetres: 0, endMetres: light.metres, mode: .eBike, speedMPH: 10),
+                        RouteTravelSection(id: UUID(), startMetres: light.metres, endMetres: route.length, mode: .eBike, speedMPH: 10)]
         for wait in [0.0, 20.0] {
             var progress = RouteStopProgress()
             _ = progress.nextMovementBoundary(in: [light], sample: { wait })
-            let moving = profile(route, smooth: true, stops: progress.timingStops(in: [light])).seconds
+            let stops = progress.timingStops(in: [light])
+            let moving = profile(route, smooth: true, stops: stops).seconds
+            XCTAssertEqual(profile(route, smooth: true, stops: stops, sections: sections).seconds, moving)
             let uninterrupted = profile(route, smooth: true).seconds
             if wait == 0 { XCTAssertEqual(moving, uninterrupted) }
             else { XCTAssertGreaterThan(moving, uninterrupted) }
             XCTAssertEqual(progress.remainingWait(in: [light]), wait)
+        }
+    }
+
+    func testEstimateUsesTrackEndForSectionRounding() throws {
+        let route = try track([.init(latitude: 0, longitude: 0), .init(latitude: 0, longitude: 0.01)])
+        for adjustment in [-0.04, 0.04] {
+            let sections = [RouteTravelSection(id: UUID(), startMetres: 0, endMetres: route.length + adjustment,
+                                              mode: .eBike, speedMPH: 10)]
+            let estimate = profile(route, sections: sections)
+            XCTAssertEqual(estimate.samples.last?.metres, route.length)
+            XCTAssertEqual(estimate.seconds, profile(route).seconds)
         }
     }
 

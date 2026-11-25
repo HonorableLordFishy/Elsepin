@@ -153,7 +153,7 @@ jobs:
           elif [[ "$SIMULATOR_SUITE" == other ]]; then
             test_selection+=("-skip-testing:LocusValidationUITests/ElsepinFlowUITests")
           elif [[ "$UI_FOCUS" == pace-and-signals ]]; then
-            for method in testConfirmedRoutePlaybackTracksSelectedPaceAndResume testTrafficSignalStopCancelsAndPersistsAfterReopening testJoystickUsesUsualSpeedsBetweenEditsAndRestarts testMovingPauseResumeAndStop testSavedRouteStartsFromPreviewAndReconnectsPaused testSavedLegModeAndCustomSpeedsSurviveReopening; do
+            for method in testConfirmedRoutePlaybackTracksSelectedPaceAndResume testRouteRestartsMovementClockAfterTimedStop testTrafficSignalStopCancelsAndPersistsAfterReopening testJoystickUsesUsualSpeedsBetweenEditsAndRestarts testMovingPauseResumeAndStop testSavedRouteStartsFromPreviewAndReconnectsPaused testSavedLegModeAndCustomSpeedsSurviveReopening; do
               test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$method")
             done
           elif [[ "$UI_FOCUS" == route-history-backup ]]; then

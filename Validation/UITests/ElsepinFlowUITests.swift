@@ -725,6 +725,31 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertLessThanOrEqual(resumeStep, 60 * 0.44704 * 0.85)
     }
 
+    func testRouteRestartsMovementClockAfterTimedStop() throws {
+        launch("route-pace-dwell", narrow: false, cellular: false)
+        openLibrary()
+        let trip = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Test straight drive")).firstMatch
+        XCTAssertTrue(trip.waitForExistence(timeout: 10))
+        trip.tap()
+        XCTAssertTrue(app.navigationBars["Plan a route"].waitForExistence(timeout: 10))
+        app.buttons["Show route"].tap()
+        let start = app.buttons["Start route"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
+
+        XCTAssertTrue(app.staticTexts["Waiting at stop"].waitForExistence(timeout: 10))
+        observePlayback(for: 6)
+        let writes = try readPlaybackTrace(attachmentName: "60mph-timed-stop-adapter-confirmations")
+        let origin = try XCTUnwrap(writes.first)
+        let arrivalIndex = try XCTUnwrap(writes.firstIndex { abs(origin.distance(to: $0) - 60) < 1 })
+        let arrival = writes[arrivalIndex]
+        let departure = try XCTUnwrap(writes.dropFirst(arrivalIndex + 1).first { arrival.distance(to: $0) > 0.01 })
+        XCTAssertGreaterThanOrEqual(departure.startedAt - arrival.confirmedAt, 4.45)
+        XCTAssertEqual(arrival.distance(to: departure), 60 * 0.44704 * 0.5, accuracy: 4)
+        app.buttons["session.stop"].tap()
+        XCTAssertTrue(app.buttons["session.stop"].waitForNonExistence(timeout: 10))
+    }
+
     func testCellularStopFromMovingRouteKeepsThenClearsSession() {
         launch("moving", narrow: false, cellular: true)
         keepThenStopCellularSession(activeStatus: "Following route")

@@ -985,7 +985,10 @@ final class SpoofSession: ObservableObject {
                         guard !Task.isCancelled, ticket == epoch, workerID == routeWorkerID else { return }
                         if !routePaused, pendingSeek == nil, effectivePhase == .active, revision == waitRevision, elapsed <= interval + 0.25 {
                             stopProgress.tick(elapsed, maximumElapsed: interval + 0.25)
-                            if next.signal != nil, stopProgress.currentID == nil { saveTripCheckpoint(force: true) }
+                            if stopProgress.currentID == nil {
+                                if next.signal != nil { saveTripCheckpoint(force: true) }
+                                resetMovementClock()
+                            }
                         }
                     }
                     continue
@@ -1022,8 +1025,9 @@ final class SpoofSession: ObservableObject {
                     stopProgress = upcomingStops
                     saveTripCheckpoint(force: true)
                 }
-                let stopAt = min(nextBoundary?.metres ?? plan.track.length,
-                                 currentPlannedSection?.endMetres ?? plan.track.length)
+                let sections = routeSectionSettingsEnabled ? (activeRoute?.travelSections ?? plan.travelSections) : []
+                let sectionEnd = RouteTravelSection.movementEnd(in: sections, at: current.travelledMetres, length: plan.track.length)
+                let stopAt = min(nextBoundary?.metres ?? plan.track.length, sectionEnd)
                 let elapsed = clock.advance(now: ProcessInfo.processInfo.systemUptime)
                 let cruise = cruiseSpeed(for: travelMode)
                 let desired = currentSmoothMovement ? motion.target(cruise: cruise, position: current.travelledMetres, stopAt: stopAt, mode: travelMode) : cruise
@@ -1088,7 +1092,9 @@ final class SpoofSession: ObservableObject {
     private func applyPlannedSection(at metres: Double) {
         guard routeSectionSettingsEnabled, let route = activeRoute,
               let section = RouteTravelSection.current(in: route.travelSections, at: metres), section.id != appliedSectionID else { return }
+        let previous = route.travelSections.first { $0.id == appliedSectionID }
         appliedSectionID = section.id
+        if let previous, section.hasSameMovement(as: previous) { return }
         travelMode = section.mode
         motionSpeed = 0
         speedRevision += 1

@@ -31,6 +31,27 @@ final class RouteEditingTests: XCTestCase {
         XCTAssertEqual(RouteTravelSection.current(in: values, at: 25)?.mode, .walk)
         XCTAssertNil(RouteTravelSection.current(in: values, at: .nan))
     }
+    func testMovementEndPreservesChangesAndReachesTheDestination() {
+        var values = [
+            RouteTravelSection(id: UUID(), startMetres: 0, endMetres: 100, mode: .eBike, speedMPH: 10),
+            RouteTravelSection(id: UUID(), startMetres: 100, endMetres: 200, mode: .eBike, speedMPH: 10),
+            RouteTravelSection(id: UUID(), startMetres: 200, endMetres: 299.96, mode: .eBike, speedMPH: 15)
+        ]
+        XCTAssertTrue(RouteTravelSection.valid(values, length: 300))
+        XCTAssertEqual(RouteTravelSection.current(in: values, at: 100)?.id, values[1].id)
+        XCTAssertEqual(RouteTravelSection.movementEnd(in: values, at: 90, length: 300), 200)
+        XCTAssertEqual(RouteTravelSection.movementEnd(in: values, at: 299.96, length: 300), 300)
+
+        var preview = RouteRehearsal()
+        preview.seek(to: 299.96, length: 300, stops: [])
+        preview.isPlaying = true
+        preview.advance(seconds: 0.25, length: 300, speed: 1, sections: values, stops: [])
+        XCTAssertEqual(preview.metres, 300)
+        XCTAssertFalse(preview.isPlaying)
+
+        values[1].mode = .cycle
+        XCTAssertEqual(RouteTravelSection.movementEnd(in: values, at: 90, length: 300), 100)
+    }
     func testETAUsesEachSectionAndCurrentSectionOverride() {
         let values = sections()
         let expected = 50 / (3 * 0.44704) + 200 / (20 * 0.44704)
@@ -123,6 +144,20 @@ final class RouteEditingTests: XCTestCase {
         preview.seek(to: 10, length: 40, stops: [stop])
         XCTAssertEqual(preview.waitingSeconds, 15)
     }
+    func testPreviewSeekSkipsGreenAndShowsRedCountdown() {
+        let light = RouteStop(name: "Light", metres: 10, waitSeconds: 60, signal: .enabled)
+        var preview = RouteRehearsal()
+        preview.seek(to: 10, length: 40, stops: [light], sampleSignalWait: { 0 })
+        XCTAssertNil(preview.waitingID)
+        XCTAssertEqual(preview.waitingSeconds, 0)
+        XCTAssertEqual(preview.completedStops, [light.id])
+        XCTAssertFalse(preview.isPlaying)
+
+        preview.seek(to: 10, length: 40, stops: [light], sampleSignalWait: { 20 })
+        XCTAssertEqual(preview.waitingID, light.id)
+        XCTAssertEqual(preview.waitingSeconds, 20)
+        XCTAssertTrue(preview.completedStops.isEmpty)
+    }
     func testPreviewRestoresFullDayWaitAndPausesIt() {
         let stop = RouteStop(name: "Long stop", metres: 10, waitSeconds: 86_400)
         var preview = RouteRehearsal()
@@ -151,7 +186,8 @@ final class RouteEditingTests: XCTestCase {
         let stops = [RouteStop(name: "A", metres: 10, waitSeconds: 0), RouteStop(name: "B", metres: 10, waitSeconds: 1)]
         var preview = RouteRehearsal()
         preview.seek(to: 10, length: 10, stops: stops)
-        XCTAssertEqual(preview.waitingID, stops[0].id)
+        XCTAssertEqual(preview.completedStops, [stops[0].id])
+        XCTAssertEqual(preview.waitingID, stops[1].id)
         preview.rate = 10
         preview.isPlaying = true
         preview.advance(seconds: 0.1, length: 10, speed: 10, sections: [], stops: stops)
