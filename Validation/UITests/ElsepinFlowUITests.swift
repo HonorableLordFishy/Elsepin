@@ -965,6 +965,7 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertTrue(deferSetup.isHittable)
         XCTAssertFalse(search.exists)
         capture("first-launch-setup")
+        if !large { inspectInitialPairingOptions() }
         deferSetup.tap()
 
         XCTAssertTrue(search.waitForExistence(timeout: 10))
@@ -1014,6 +1015,38 @@ final class ElsepinFlowUITests: XCTestCase {
         openLibrary()
         XCTAssertTrue(savedFavorite.waitForExistence(timeout: 10))
         capture("first-launch-saved-pin-after-relaunch")
+    }
+
+    private func inspectInitialPairingOptions() {
+        let wifi = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Wi-Fi")).firstMatch
+        let vpn = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "LocalDevVPN")).firstMatch
+        let notPaired = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Not paired")).firstMatch
+        XCTAssertTrue(wifi.waitForExistence(timeout: 10))
+        XCTAssertTrue(vpn.exists)
+        XCTAssertTrue(notPaired.exists)
+
+        let checklist = app.scrollViews.firstMatch
+        let options = checklist.buttons["Pairing options"]
+        if !options.isHittable { checklist.swipeUp() }
+        XCTAssertTrue(options.isHittable)
+        options.tap()
+
+        let importPairing = checklist.buttons["Import pairing file"].firstMatch
+        XCTAssertTrue(checklist.buttons["Paste pairing file"].waitForExistence(timeout: 10))
+        if !importPairing.isHittable { checklist.swipeUp() }
+        XCTAssertTrue(importPairing.isHittable)
+        capture("first-launch-pairing-options")
+        importPairing.tap()
+
+        let cancelFiles = app.navigationBars["FullDocumentManagerViewControllerNavigationBar"].buttons["Cancel"]
+        XCTAssertTrue(cancelFiles.waitForExistence(timeout: 25))
+        capture("first-launch-pairing-file-picker")
+        cancelFiles.tap()
+
+        XCTAssertTrue(cancelFiles.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(options.waitForExistence(timeout: 10))
+        XCTAssertTrue(notPaired.exists)
+        XCTAssertFalse(app.buttons["Open map"].exists)
     }
 
     private func relaunchWithEverydayData() {

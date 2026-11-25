@@ -59,6 +59,7 @@ enum ValidationNativeGPX {
     ]
     static let malformedFile = "QA-GPX-malformed.gpx"
     static let roundTripName = "Harbor switchback"
+    private static let roundTripOriginalID = UUID(uuidString: "5E1E4E2B-DC57-4571-BA48-947E26A5E111")!
     private static let roundTripPoints = [
         RoutePoint(latitude: 40.768, longitude: -73.981),
         RoutePoint(latitude: 40.768, longitude: -73.975),
@@ -77,7 +78,7 @@ enum ValidationNativeGPX {
     }
 
     @MainActor static func seedRoundTrip() throws -> Bool {
-        let trip = SavedTrip(name: roundTripName, mode: .walk, speedMPH: 1.4, smoothMovement: false,
+        let trip = SavedTrip(id: roundTripOriginalID, name: roundTripName, mode: .walk, speedMPH: 1.4, smoothMovement: false,
             originName: "Harbor entrance", destinationName: "Harbor overlook", points: roundTripPoints,
             source: .drawn, instructions: [], stops: [], calculatedAt: .now, favorite: true)
         return try TripLibrary().merge([trip])
@@ -91,6 +92,7 @@ enum ValidationNativeGPX {
         let imports = matching.filter { $0.source == .gpx }
         let recoveredPoints = imports.first?.points ?? []
         let report: [String: Any] = ["originalCount": originals.count, "importCount": imports.count,
+            "originalID": originals.first?.id.uuidString ?? "",
             "newCopyHasDistinctID": imports.first?.id != originals.first?.id,
             "originalHasExactGeometry": originals.first?.points == roundTripPoints,
             "importHasExactEndpoints": recoveredPoints.first == roundTripPoints.first && recoveredPoints.last == roundTripPoints.last,
