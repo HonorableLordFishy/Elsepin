@@ -461,6 +461,10 @@ final class ElsepinBackupUITests: XCTestCase {
                 measurement["reopenedAfterAppRelaunch"] = relaunched
                 measurement["uiTimings"] = ["filesSelectionToReviewSeconds": reviewTime, "saveConfirmationToSavedSeconds": saveTime]
                 activity.add(try evidenceAttachment(measurement, named: "\(sample.filename)-measurement"))
+                if relaunched {
+                    XCTAssertEqual(measurement["legacyHistoryBytes"] as? Int, 0)
+                    XCTAssertEqual(measurement["historyHasLargeRoute"] as? Bool, true)
+                }
             }
         }
     }

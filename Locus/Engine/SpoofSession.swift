@@ -199,8 +199,7 @@ final class SpoofSession: ObservableObject {
         mapStyleIndex = min(2, max(0, AppDataWorkspace.defaults.integer(forKey: "locus.mapStyle")))
         savedPins = SavedPlace.load(key: favoritesKey)
         recents = SavedPlace.loadRecents(retention: preferences.recentHistoryRetention, saveEnabled: preferences.saveRecentLocations)
-        recentRoutes = RecentRoute.kept(recentRouteStore.load(), retention: preferences.recentHistoryRetention, enabled: preferences.saveRecentLocations)
-        recentRouteStore.save(recentRoutes)
+        reloadRecentRouteHistory()
         // Never adopt the old app process's green status after a crash/relaunch.
         if SessionLifetime.shared.previousLocationMayRemain {
             requiresClear = true
@@ -1895,17 +1894,23 @@ final class SpoofSession: ObservableObject {
         if loaded != recents { recents = loaded }
         refreshSavedPlaceRecoveryCounts()
     }
-    func clearRecentHistory() {
-        recentRoutes = []; recentRouteStore.save([])
+    private func reloadRecentRouteHistory() {
+        let loaded = recentRouteStore.load()
+        recentRoutes = RecentRoute.kept(loaded, retention: preferences.recentHistoryRetention, enabled: preferences.saveRecentLocations)
+        if recentRoutes != loaded { recentRouteStore.save(recentRoutes) }
+    }
+    func clearRecentHistory() throws {
+        try recentRouteStore.clear()
+        recentRoutes = []
         recents = []
         AppDataWorkspace.defaults.removeObject(forKey: recentsKey)
         SavedPlace.discardRecovery(key: recentsKey)
         recentPinRecoveryCount = 0
     }
     /// Called only by the confirmed reset coordinator after it verifies no session remains.
-    func resetPlacesAndAreas() {
+    func resetPlacesAndAreas() throws {
         precondition(!hasSession && !isBusy)
-        clearRecentHistory()
+        try clearRecentHistory()
         savedPins = []; recents = []; namedAreas = []; chosenNames = []
         for key in [favoritesKey, recentsKey, "locus.favorites.recovery", "locus.recents.recovery", "locus.favorites.recovery.history", "locus.recents.recovery.history", "locus.namedAreas"] {
             AppDataWorkspace.defaults.removeObject(forKey: key)
@@ -1944,7 +1949,7 @@ final class SpoofSession: ObservableObject {
         savedPins = SavedPlace.load(key: favoritesKey)
         recents = SavedPlace.loadRecents(retention: preferences.recentHistoryRetention, saveEnabled: preferences.saveRecentLocations)
         refreshSavedPlaceRecoveryCounts()
-        recentRoutes = RecentRoute.kept(recentRouteStore.load(), retention: preferences.recentHistoryRetention, enabled: preferences.saveRecentLocations)
+        reloadRecentRouteHistory()
         let defaults = AppDataWorkspace.defaults
         namedAreas = defaults.data(forKey: "locus.namedAreas")
             .flatMap { try? JSONDecoder().decode([NamedArea].self, from: $0) }

@@ -46,7 +46,7 @@ final class AppResetController: ObservableObject {
             switch stage {
             case .trips: try library.resetAll()
             case .deletedItems: try RecentlyDeletedStore.shared.resetAll()
-            case .places: session.resetPlacesAndAreas()
+            case .places: try session.resetPlacesAndAreas()
             case .recovery: try await session.recovery.resetAll()
             case .diagnostics:
                 try await DeveloperLogStore.shared.resetForAppWipe()

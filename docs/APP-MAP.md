@@ -194,7 +194,7 @@ downtime as movement. See [lifecycle details](SESSION-CLOSURE.md).
 - `SavedPinMapIcon.swift`: centered, size-adjustable marker and accessible hit target. Build 71 selects a preview on tap; its name bubble never shifts the coordinate. `MapFavoriteButton.swift` toggles stars without naming or movement.
 - `SavedPlace.swift`, `LibraryBackup.swift`: optional favorite flag; nil means an old favorite. `SpoofSession.savedPins` owns all pins; `favorites` is filtered display only. Import/export/widgets must use all pins.
 - `SettingsView.swift` / `PlacesView`: Library categories and Favorites headings. `TripViews.swift`: saved route favorite action.
-- `RecentRoute.swift`, `RecentRouteStore.swift`: bounded, local-only route history. Keep privacy clear/reset/retention in `SpoofSession` in sync.
+- `Shared/RecentRoute.swift` and `Shared/RecentRouteStore.swift` own bounded, local-only route history. Each workspace stores it in `RecentRouteHistory/RecentRoutes.json`, excluded from device backups. Older installs migrate their preferences payload on read. Keep clear, reset and retention in `SpoofSession` in sync.
 - `PlaceSearchRequest.swift`, `PlaceSearchIntent.swift`: native cancellation, deadlines, category interpretation. Never choose or move to a result automatically.
 - `RouteDirectionsRequest.swift`: cancels the native directions operation when its owning draft is canceled; no changes to the returned route geometry.
 - `RoutePlaceSearchSheet.swift`: Home search and recent pin/route actions. `RouteStopSearchSheet.swift`: draft stop insertion or active-route browsing.

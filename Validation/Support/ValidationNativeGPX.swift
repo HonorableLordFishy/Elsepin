@@ -182,8 +182,14 @@ enum ValidationNativeGPX {
             }
             if sample.pointCount == 90_000, trip != nil {
                 entry["legacyHistoryBytes"] = AppDataWorkspace.defaults.data(forKey: "locus.recentRoutes")?.count ?? 0
-                let history = AppDataWorkspace.file("RecentRouteHistory/RecentRoutes.json")
-                entry["historyFileBytes"] = (try? history.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+                let history = AppDataWorkspace.file(RecentRouteStore.relativePath)
+                let data = try? Data(contentsOf: history)
+                entry["historyFileBytes"] = data?.count ?? 0
+                let routes = data.flatMap { try? JSONDecoder().decode([RecentRoute].self, from: $0) } ?? []
+                entry["historyHasLargeRoute"] = routes.contains {
+                    $0.trip.points.count == sample.pointCount && $0.trip.points.first == sample.vertices.first
+                        && $0.trip.points.last == sample.vertices.last
+                }
             }
             return entry
         }

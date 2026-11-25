@@ -13,3 +13,5 @@ Use invented route names, coordinates and settings in a disposable library. Read
 | Physical iPhone | Pair a real device and establish LocalDevVPN. Start a held pin and a route on Wi-Fi, then switch to cellular. At Stop, choose Keep spoofing and verify the session continues. Confirm Stop and check clearing from another app. Reconnect on Wi-Fi or hotspot and start again. Check any cloud Files provider separately. |
 
 Report pass, fail, skipped and untested separately. Disclose retry-only passes and fixture limitations. A selectable file must be tapped in the system picker for a Files claim. Parser tests establish parser behavior. A success banner alone cannot establish persistence. Development validation ends with native checks and evidence.
+
+For a persistence failure after a large GPX, use `ui_focus=route-history-backup` to run the size sequence and selective JSON restore on the same simulator. Inspect the large route’s history storage and compare the before/after relaunch snapshots for the saved pin and speed presets, including the first attempt.

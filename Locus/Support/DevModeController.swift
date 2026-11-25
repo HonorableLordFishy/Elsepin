@@ -45,8 +45,7 @@ final class DevModeController: ObservableObject {
                         var recent = pin; recent.visitedAt = Date(); return recent
                     }), forKey: "locus.recents")
                     context.defaults.set(try encoder.encode(sample.backup.areas ?? []), forKey: "locus.namedAreas")
-                    context.defaults.set(try encoder.encode(sample.recentRoutes), forKey: RecentRouteStore.key)
-                    context.defaults.set(true, forKey: "locus.recentRoutesAvailable")
+                    try RecentRouteStore.seed(sample.recentRoutes, in: context)
                 }
             } else { AppDataWorkspace.shared.deactivateDemo() }
             SessionPreferences.shared.reloadAfterReset()

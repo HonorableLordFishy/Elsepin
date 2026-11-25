@@ -6,6 +6,7 @@ struct PrivacySettingsSection: View {
     @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var library: TripLibrary
     @State private var deletion: Deletion?
+    @State private var historyError: String?
 
     private enum Deletion: String, Identifiable {
         case recents, stopSaving, favorites, trips
@@ -63,7 +64,10 @@ struct PrivacySettingsSection: View {
                 ForEach(RecentHistoryRetention.allCases) { option in Text(option.title).tag(option) }
             }.disabled(!preferences.saveRecentLocations)
             Button("Clear recent pins & routes", role: .destructive) { deletion = .recents }
-                .disabled(session.recents.isEmpty && session.recentRoutes.isEmpty)
+                .disabled(historyError == nil && session.recents.isEmpty && session.recentRoutes.isEmpty)
+            if let historyError {
+                Text(historyError).font(.footnote).foregroundStyle(LocusTheme.statusWarn)
+            }
             Button("Delete saved pins…", role: .destructive) { deletion = .favorites }
                 .disabled(session.savedPins.isEmpty)
             Button("Delete saved trips…", role: .destructive) { deletion = .trips }
@@ -94,10 +98,14 @@ struct PrivacySettingsSection: View {
 
     private func perform(_ action: Deletion) {
         switch action {
-        case .recents: session.clearRecentHistory()
-        case .stopSaving:
-            preferences.saveRecentLocations = false
-            session.clearRecentHistory()
+        case .recents, .stopSaving:
+            if action == .stopSaving { preferences.saveRecentLocations = false }
+            do {
+                try session.clearRecentHistory()
+                historyError = nil
+            } catch {
+                historyError = "Couldn't clear recent routes. Try clearing history again."
+            }
         case .favorites: session.clearFavorites()
         case .trips:
             if !library.clearAll() { session.lastError = library.error }
