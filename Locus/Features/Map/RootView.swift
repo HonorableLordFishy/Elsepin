@@ -773,7 +773,8 @@ struct BottomControlsView: View {
             }
             .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.bottom, wraps ? 4 : 0)
+        // Keep the extra space with the address so it can scroll on short screens.
+        .padding(.bottom, wraps ? (typeSize.isAccessibilitySize ? 12 : 10) : 0)
     }
 
     @ViewBuilder private var expandedDetails: some View {

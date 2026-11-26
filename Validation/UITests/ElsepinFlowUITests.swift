@@ -57,8 +57,12 @@ final class ElsepinFlowUITests: XCTestCase {
         launch("reset-review", dark: true, narrow: false)
         app.buttons["Wipe everything…"].tap()
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Wipe data, keep setup")).firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["Pins, routes, areas, history and Recently Deleted."].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Pairing, tunnel address and setup progress."].exists)
+        XCTAssertTrue(app.navigationBars["Confirm reset"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Saved pins, routes, named areas, recent history and Recently Deleted."].exists)
+        XCTAssertTrue(app.staticTexts["Saved cloud and Windows helper connections. You’ll need to reconnect them."].exists)
+        let keptSetup = app.staticTexts["Device pairing, tunnel address and setup progress."]
+        if !keptSetup.exists { app.swipeUp() }
+        XCTAssertTrue(keptSetup.exists)
         capture("reset-review-keep-setup")
         app.buttons["Cancel"].tap()
         XCTAssertTrue(app.navigationBars["Wipe everything"].waitForExistence(timeout: 5))
@@ -1433,6 +1437,7 @@ extension ElsepinFlowUITests {
         XCTAssertLessThanOrEqual(shortGap, 4)
         XCTAssertGreaterThan(oneLineHeight, 0)
         XCTAssertTrue(teleport.isHittable)
+        let shortActionGap = teleport.frame.minY - shortAddress.frame.maxY
         capture("dropped-pin-short-address")
 
         app.buttons["Select long address"].tap()
@@ -1447,7 +1452,7 @@ extension ElsepinFlowUITests {
             XCTAssertTrue(viewport.exists)
             verifyAddressBottomReachable(longAddress, in: viewport, above: teleport)
         } else {
-            XCTAssertLessThan(addressFrame.maxY, teleport.frame.minY)
+            XCTAssertGreaterThanOrEqual(teleport.frame.minY - addressFrame.maxY, shortActionGap + 8)
         }
         XCTAssertTrue(mapTab.isHittable)
         XCTAssertLessThan(teleport.frame.maxY, mapTab.frame.minY)

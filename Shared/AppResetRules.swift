@@ -11,13 +11,6 @@ enum AppResetScope: String, CaseIterable, Identifiable {
         case .full: return "Wipe everything & restart setup"
         }
     }
-    var keptSummary: String {
-        switch self {
-        case .settings: return "Library, history, recovery, helper connections and pairing."
-        case .keepSetup: return "Pairing, tunnel address and setup progress."
-        case .full: return "Exported files and accounts on your helper server."
-        }
-    }
     var stages: [AppResetStage] {
         let data: [AppResetStage] = wipesData ? [.trips, .deletedItems, .places, .recovery, .diagnostics, .cloudLink, .computerLink, .widgetData] : []
         return data + [.settings, .icon] + (self == .full ? [.pairingAndSetup] : [])

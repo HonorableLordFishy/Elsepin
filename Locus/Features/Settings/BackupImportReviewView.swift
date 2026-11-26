@@ -21,29 +21,42 @@ struct BackupImportReviewView: View {
         let review = BackupImportReview(backup: backup, current: current)
         let result = Result { try review.plan(selection) }
         let plan = try? result.get()
+        let settings = review.changes
+        let changedSettings = Set(settings.filter(\.changesValue).map(\.key))
+        let available = review.defaultSelection
+        let appliedSettings = Dictionary(uniqueKeysWithValues: (plan.map { review.settingChanges(in: $0) } ?? [])
+            .map { ($0.key, $0.after) })
         List {
             Section {
-                if let plan { overview(plan, review: review) }
-                else if case .failure(let error) = result { Text(error.localizedDescription).font(.footnote) }
-            } header: { Text("Overview") } footer: {
-                Text("Selected changes, compared with your current data.")
+                if let plan {
+                    Text(plan.summary)
+                        .accessibilityIdentifier("backup.review.summary")
+                } else if case .failure(let error) = result {
+                    Text(error.localizedDescription).font(.footnote)
+                }
+            } header: {
+                Text("Selected for import")
             }.shiftSettingsRows()
 
-            if !review.changes.isEmpty {
+            if !settings.isEmpty {
+                let count = selection.settings.intersection(changedSettings).count
+                let status = count == 0 ? "Keep current" : "\(count) selected"
                 Section {
-                    DisclosureGroup("Settings · \(selection.settings.intersection(review.changedSettings).count) selected") {
-                        selectionButtons(all: review.changedSettings, values: $selection.settings, name: "settings")
+                    DisclosureGroup("Settings · \(status)") {
+                        selectionButtons(all: changedSettings, values: $selection.settings, name: "settings")
                         ForEach(BackupSettingGroup.allCases) { group in
-                            let changes = review.changes.filter { $0.changesValue && $0.key.group == group }
+                            let changes = settings.filter { $0.changesValue && $0.key.group == group }
                             if !changes.isEmpty {
                                 Text(group.rawValue).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                                    .accessibilityAddTraits(.isHeader)
                                 ForEach(changes) { change in
-                                    BackupImportCheckRow(title: change.key.title, detail: "\(change.before) → \(change.after)",
+                                    let after = appliedSettings[change.key] ?? change.after
+                                    BackupImportCheckRow(title: change.key.title, detail: "\(change.before) → \(after)",
                                         isSelected: selected(change.key, in: $selection.settings))
                                 }
                             }
                         }
-                        let unchanged = review.changes.filter { !$0.changesValue }
+                        let unchanged = settings.filter { !$0.changesValue }
                         if !unchanged.isEmpty {
                             DisclosureGroup("Already the same · \(unchanged.count)") {
                                 ForEach(unchanged) { change in
@@ -53,56 +66,50 @@ struct BackupImportReviewView: View {
                             }
                         }
                     }
-                } header: { Text("Settings changes") } footer: {
-                    Text("Only checked settings change.")
                 }.shiftSettingsRows()
             }
-            if !backup.trips.isEmpty {
+            if !backup.trips.isEmpty || !backup.places.isEmpty || !(backup.areas ?? []).isEmpty {
                 Section {
-                    DisclosureGroup("Routes · \(selection.trips.intersection(review.defaultSelection.trips).count) selected") {
-                        selectionButtons(all: review.defaultSelection.trips, values: $selection.trips, name: "routes")
-                        ForEach(backup.trips) { trip in
-                            let exists = review.existingTrips.contains(trip.id)
-                            BackupImportCheckRow(title: trip.name,
-                                detail: exists ? "Already saved — keep current version" : "Add route · \(trip.points.count) points · \(trip.stops.count) stops\n\(trip.originName) → \(trip.destinationName)",
-                                isSelected: selected(trip.id, in: $selection.trips), enabled: !exists)
+                    if !backup.trips.isEmpty {
+                        DisclosureGroup("Routes") {
+                            selectionButtons(all: available.trips, values: $selection.trips, name: "routes")
+                            ForEach(backup.trips) { trip in
+                                let exists = review.existingTrips.contains(trip.id)
+                                BackupImportCheckRow(title: trip.name,
+                                    detail: exists ? "Already saved — keep current version" : "Add route · \(trip.points.count) points · \(trip.stops.count) stops\n\(trip.originName) → \(trip.destinationName)",
+                                    isSelected: selected(trip.id, in: $selection.trips), enabled: !exists)
+                            }
                         }
                     }
-                } header: { Text("Routes to add") }.shiftSettingsRows()
-            }
-            if !backup.places.isEmpty {
-                Section {
-                    DisclosureGroup("Pins · \(selection.places.intersection(review.defaultSelection.places).count) selected") {
-                        selectionButtons(all: review.defaultSelection.places, values: $selection.places, name: "places")
-                        ForEach(backup.places, id: \.id) { place in
-                            let exists = review.existingPlaces.contains(place.id)
-                            BackupImportCheckRow(title: place.name,
-                                detail: exists ? "Already saved — keep current version" : "\(place.latitude.formatted(.number.precision(.fractionLength(5)))), \(place.longitude.formatted(.number.precision(.fractionLength(5))))",
-                                isSelected: selected(place.id, in: $selection.places), enabled: !exists)
+                    if !backup.places.isEmpty {
+                        DisclosureGroup("Pins") {
+                            selectionButtons(all: available.places, values: $selection.places, name: "pins")
+                            ForEach(backup.places, id: \.id) { place in
+                                let exists = review.existingPlaces.contains(place.id)
+                                BackupImportCheckRow(title: place.name,
+                                    detail: exists ? "Already saved — keep current version" : "\(place.latitude.formatted(.number.precision(.fractionLength(5)))), \(place.longitude.formatted(.number.precision(.fractionLength(5))))",
+                                    isSelected: selected(place.id, in: $selection.places), enabled: !exists)
+                            }
                         }
                     }
-                } header: { Text("Pins to add") }.shiftSettingsRows()
-            }
-            if let areas = backup.areas, !areas.isEmpty {
-                Section {
-                    DisclosureGroup("Named areas · \(selection.areas.intersection(review.defaultSelection.areas).count) selected") {
-                        selectionButtons(all: review.defaultSelection.areas, values: $selection.areas, name: "areas")
-                        ForEach(areas) { area in
-                            let exists = review.existingAreas.contains(area.id)
-                            BackupImportCheckRow(title: area.name,
-                                detail: exists ? "Already saved — keep current boundary" : "Add named area · \(area.points.count) boundary points",
-                                isSelected: selected(area.id, in: $selection.areas), enabled: !exists)
+                    if let areas = backup.areas, !areas.isEmpty {
+                        DisclosureGroup("Named areas") {
+                            selectionButtons(all: available.areas, values: $selection.areas, name: "areas")
+                            ForEach(areas) { area in
+                                let exists = review.existingAreas.contains(area.id)
+                                BackupImportCheckRow(title: area.name,
+                                    detail: exists ? "Already saved — keep current boundary" : "Add named area · \(area.points.count) boundary points",
+                                    isSelected: selected(area.id, in: $selection.areas), enabled: !exists)
+                            }
                         }
                     }
-                } header: { Text("Areas to add") }.shiftSettingsRows()
+                }.shiftSettingsRows()
             }
             Section {
-                if let plan {
-                    if plan.settingKeys.contains(.recentHistoryRetention),
-                       let retention = plan.preferences?.display?.recentHistoryRetention, retention != .forever {
-                        Text("The selected history limit removes older recent locations: \(retention.title).")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
+                if let plan, plan.settingKeys.contains(.recentHistoryRetention),
+                   let retention = plan.preferences?.display?.recentHistoryRetention, retention != .forever {
+                    Text("Recent locations older than the selected limit (\(retention.title)) will be removed.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 Button("Import selected changes") {
                     confirmedContext = current
@@ -116,9 +123,10 @@ struct BackupImportReviewView: View {
                         .accessibilityIdentifier("backup.review.confirmApply")
                     Button("Keep reviewing", role: .cancel) { }
                 } message: {
-                    Text((plan?.summary ?? "No changes selected") + ". Unchecked items stay unchanged.")
+                    Text(plan?.summary ?? "No changes selected")
                 }
                 Button("Cancel import", role: .cancel) { finished("Import canceled. Nothing was changed.") }
+                    .frame(minHeight: 44)
             } footer: {
                 if plan?.needsStoppedSession(hasSession: session.hasSession, isBusy: session.isBusy) == true {
                     Text("Stop spoofing to change movement settings, or import library items only.")
@@ -127,54 +135,6 @@ struct BackupImportReviewView: View {
             if let message { Section { Text(message).font(.footnote) }.shiftSettingsRows() }
         }
         .shiftSettingsScreen().loggedNavigationTitle("Review import").navigationBarTitleDisplayMode(.inline)
-    }
-
-    @ViewBuilder private func overview(_ plan: BackupImportPlan, review: BackupImportReview) -> some View {
-        if plan.count == 0 {
-            Text("No changes selected").foregroundStyle(.secondary)
-        } else {
-            if !plan.places.isEmpty || !plan.trips.isEmpty || !plan.areas.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Added").font(.subheadline.weight(.semibold))
-                    VStack(spacing: 6) {
-                        if !plan.places.isEmpty { addition("Pins", count: plan.places.count) }
-                        if !plan.trips.isEmpty { addition("Routes", count: plan.trips.count) }
-                        if !plan.areas.isEmpty { addition("Areas", count: plan.areas.count) }
-                    }.padding(.leading, 16)
-                }
-            }
-            let changes = review.settingChanges(in: plan)
-            if !changes.isEmpty {
-                DisclosureGroup("Changed settings · \(changes.count)") {
-                    ForEach(BackupSettingGroup.allCases) { group in
-                        let grouped = changes.filter { $0.key.group == group }
-                        if !grouped.isEmpty {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text(group.rawValue).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-                                ForEach(grouped) { change in
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(change.key.title)
-                                        Text("\(change.before) → \(change.after)").font(.footnote).foregroundStyle(.secondary)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                    }.padding(.leading, 16).accessibilityElement(children: .combine)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func addition(_ title: String, count: Int) -> some View {
-        LabeledContent {
-            Text(count.formatted())
-        } label: {
-            HStack(spacing: 8) {
-                Circle().fill(.secondary).frame(width: 5, height: 5).accessibilityHidden(true)
-                Text(title)
-            }
-        }
     }
 
     private func selected<ID: Hashable>(_ id: ID, in values: Binding<Set<ID>>) -> Binding<Bool> {

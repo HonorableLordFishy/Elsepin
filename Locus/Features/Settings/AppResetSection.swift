@@ -53,27 +53,35 @@ private struct AppResetReview: View {
     var body: some View {
         NavigationStack {
             List {
-                Section(scope.wipesData ? "Permanently erased" : "Restored to defaults") {
-                    if scope.wipesData {
-                        Text("Pins, routes, areas, history and Recently Deleted.")
-                        Text("Recovery copies, diagnostics and saved helper sign-ins.")
-                        if scope == .full { Text("Device pairing and setup. You’ll need to pair again.") }
-                    } else {
-                        Text("Appearance, icon, speeds, controls, privacy, notifications and widgets.")
+                if scope.wipesData {
+                    Section {
+                        Text("Saved pins, routes, named areas, recent history and Recently Deleted.")
+                        Text("Recovery copies, diagnostics, widget data and notifications.")
+                        Text("Saved cloud and Windows helper connections. You’ll need to reconnect them.")
+                        if scope == .full {
+                            Text("Device pairing, tunnel address and setup progress. You’ll need to set up Elsepin again.")
+                        }
+                    } header: {
+                        Text("Permanently erased")
+                    } footer: {
+                        Text("Export a backup before wiping if you want a copy of your library.")
+                    }.shiftSettingsRows()
+                }
+                Section("Restored to defaults") {
+                    Text("App settings and the Home Screen icon.")
+                    if scope == .settings {
+                        Text("Cloud and Windows helper checks turn off. Saved connections are kept.")
                     }
                 }.shiftSettingsRows()
                 Section("What you keep") {
-                    Text(scope.keptSummary)
-                }.shiftSettingsRows()
-                Section {
-                    if scope.wipesData { Text("Export a backup first. This wipe is permanent.") }
-                    Text("Open drafts close. If App Lock is on, you’ll authenticate before it turns off.")
-                    DisclosureGroup("More details") {
-                        if scope.wipesData { Text("App preferences and experimental settings return to their defaults.") }
-                        else { Text("Experimental settings also return to their defaults.") }
-                        Text("Files, server accounts, installed widgets, iOS permissions, Developer Mode, host trust and LocalDevVPN stay in place.")
+                    if scope == .settings {
+                        Text("Library, recent history, Recently Deleted, recovery copies and diagnostics.")
                     }
-                }.font(.subheadline).shiftSettingsRows()
+                    if scope != .full {
+                        Text("Device pairing, tunnel address and setup progress.")
+                    }
+                    Text("Exported files, helper server accounts, installed widgets and iOS settings.")
+                }.shiftSettingsRows()
                 Section {
                     Button(scope.title, role: .destructive) {
                         dismiss()
@@ -82,6 +90,9 @@ private struct AppResetReview: View {
                                 preferences: preferences, library: library, privacy: privacy, updates: updates)
                         }
                     }.frame(minHeight: 44).disabled(reset.isResetting || session.hasSession || session.isBusy || AppDataWorkspace.shared.isDemo)
+                        .accessibilityIdentifier("reset.confirm")
+                } footer: {
+                    Text("Open drafts close.\(preferences.appLockEnabled ? " Confirm with device authentication to turn off App Lock." : "")")
                 }.shiftSettingsRows()
             }.shiftSettingsScreen().loggedNavigationTitle("Confirm reset").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }

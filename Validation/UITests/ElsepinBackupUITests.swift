@@ -506,7 +506,7 @@ final class ElsepinBackupUITests: XCTestCase {
         paste.tap()
         let review = app.navigationBars["Review import"]
         XCTAssertTrue(review.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Added"].exists)
+        XCTAssertEqual(app.staticTexts["backup.review.summary"].label, "1 pin")
         _ = bottomControl("Cancel import")
         bottomControl("backup.review.apply").tap()
         XCTAssertTrue(importConfirmation.waitForExistence(timeout: 5))
@@ -517,6 +517,7 @@ final class ElsepinBackupUITests: XCTestCase {
 
         paste.tap()
         XCTAssertTrue(review.waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["backup.review.summary"].label, "No changes selected")
         XCTAssertFalse(app.buttons["backup.review.apply"].isEnabled)
         bottomControl("Cancel import").tap()
         XCTAssertTrue(app.navigationBars["Import & export"].exists)
@@ -627,6 +628,8 @@ final class ElsepinBackupUITests: XCTestCase {
         let changed = try settings(snapshot())
         XCTAssertFalse(NSDictionary(dictionary: original).isEqual(to: changed))
         openImport(named: filename)
+        XCTAssertEqual(app.staticTexts["backup.review.summary"].label, "No changes selected")
+        XCTAssertTrue(app.buttons["Settings · Keep current"].exists)
         XCTAssertFalse(visible(app.buttons["backup.review.apply"]).isEnabled, "Settings must start unchecked")
         capture("34-import-starts-unchecked")
         // Back retains the valid preview. Canceling Files while choosing a
@@ -707,6 +710,7 @@ final class ElsepinBackupUITests: XCTestCase {
         visible(app.buttons["Select all settings"]).tap()
         XCTAssertEqual(visible(drive).value as? String, "Selected for import")
         XCTAssertTrue(visible(app.buttons["Settings · 1 selected"]).exists)
+        XCTAssertEqual(visible(app.staticTexts["backup.review.summary"]).label, "1 setting")
         applyImport()
         XCTAssertTrue(NSDictionary(dictionary: try settings(snapshot())).isEqual(to: original))
         app.terminate()
