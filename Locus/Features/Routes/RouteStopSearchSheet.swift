@@ -72,14 +72,19 @@ struct RouteStopSearchSheet: View {
                     }.frame(minHeight: 44)
                 }.shiftSettingsRows()
             }
-            if let message = model.message {
-                Section { Text(message).font(.subheadline).foregroundStyle(.secondary) }.shiftSettingsRows()
+            if let feedback = model.feedback {
+                Section {
+                    RouteStopSearchFeedback(scope: model.scope, feedback: feedback) {
+                        searchFocused = false
+                        model.scope = .everywhere
+                    }
+                }.shiftSettingsRows()
             }
             if !model.results.isEmpty {
                 Section {
                     ForEach(model.results) { result in resultRow(result) }
                 } header: {
-                    Text(model.scope == .alongRoute ? "Along your route" : model.scope == .mapArea ? "In selected area" : "Search results")
+                    Text(model.scope.resultsTitle)
                 } footer: {
                     Text(browsing ? "Choose Add stop to replan, or Save pin without changing the route. Your current route keeps going until you confirm editing." : "Distance from the path isn't extra travel distance. Adding a stop recalculates your route preview.")
                 }.shiftSettingsRows()
@@ -292,23 +297,61 @@ private struct RouteStopMapPicker: View {
         if !model.query.isEmpty && (pin == nil || searchFocused) {
             VStack(spacing: 0) {
                 if model.isSearching { ProgressView("Searching…").padding(8) }
-                if let message = model.message { Text(message).font(.caption).padding(8) }
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(model.results) { result in
-                            Button { select(result.place) } label: {
-                                Text(result.place.name).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            }.buttonStyle(.plain)
-                            Divider()
-                        }
-                    }.padding(.horizontal, 12)
-                }.frame(maxHeight: 180)
+                if let feedback = model.feedback {
+                    RouteStopSearchFeedback(scope: model.scope, feedback: feedback) {
+                        searchFocused = false
+                        model.scope = .everywhere
+                    }.padding(.horizontal, 12).padding(.vertical, 8)
+                }
+                if !model.results.isEmpty {
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            Text(model.scope.resultsTitle)
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 8)
+                                .accessibilityAddTraits(.isHeader)
+                            ForEach(model.results) { result in
+                                Button { select(result.place) } label: {
+                                    Text(result.place.name).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                }.buttonStyle(.plain)
+                                Divider()
+                            }
+                        }.padding(.horizontal, 12)
+                    }.frame(maxHeight: 180)
+                }
             }.background { ShiftSettingsCanvas() }
         }
     }
     private func select(_ place: RoutePlace) {
         pin = place; searchFocused = false
         position = .region(MKCoordinateRegion(center: place.coordinate, latitudinalMeters: 1200, longitudinalMeters: 1200))
+    }
+}
+
+private struct RouteStopSearchFeedback: View {
+    let scope: RouteStopSearchModel.Scope
+    let feedback: RouteStopSearchModel.Feedback
+    let searchEverywhere: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            switch feedback {
+            case .noMatches(let sampled):
+                Text(sampled ? "No matches in the sampled route sections" : scope.emptyTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("routeSearch.empty")
+                Text(scope.emptyDetail).font(.subheadline).foregroundStyle(.secondary)
+                if scope != .everywhere {
+                    Button(action: searchEverywhere) {
+                        Text("Search everywhere").frame(minHeight: 44)
+                    }.buttonStyle(.borderless)
+                }
+            case .note(let text):
+                Text(text).font(.subheadline).foregroundStyle(.secondary)
+            }
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -323,9 +366,11 @@ private struct RouteStopSearchScopeControls: View {
     var body: some View {
         VStack(spacing: 4) {
             Picker("Search area", selection: $model.scope) {
-                Text("Along route").tag(RouteStopSearchModel.Scope.alongRoute)
-                Text("Everywhere").tag(RouteStopSearchModel.Scope.everywhere)
-                if model.searchArea != nil { Text("Map area").tag(RouteStopSearchModel.Scope.mapArea) }
+                Text(RouteStopSearchModel.Scope.alongRoute.title).tag(RouteStopSearchModel.Scope.alongRoute)
+                Text(RouteStopSearchModel.Scope.everywhere.title).tag(RouteStopSearchModel.Scope.everywhere)
+                if model.searchArea != nil {
+                    Text(RouteStopSearchModel.Scope.mapArea.title).tag(RouteStopSearchModel.Scope.mapArea)
+                }
             }.pickerStyle(.segmented)
             Button("Choose map area", systemImage: "map") { choosingArea = true }
                 .buttonStyle(.borderless).font(.subheadline).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -342,7 +387,36 @@ private struct RouteStopSearchScopeControls: View {
 
 @MainActor
 private final class RouteStopSearchModel: ObservableObject {
-    enum Scope: Hashable { case alongRoute, everywhere, mapArea }
+    enum Scope: Hashable {
+        case alongRoute, everywhere, mapArea
+
+        var title: String {
+            switch self {
+            case .alongRoute: "Along route"
+            case .mapArea: "Map area"
+            case .everywhere: "Everywhere"
+            }
+        }
+        var resultsTitle: String { "Results · \(title)" }
+        var emptyTitle: String {
+            switch self {
+            case .alongRoute: "No matches along the route"
+            case .mapArea: "No matches in this map area"
+            case .everywhere: "No matching places"
+            }
+        }
+        var emptyDetail: String {
+            switch self {
+            case .alongRoute: "Try another category or choose a map area to search a specific section."
+            case .mapArea: "Try another category or choose a larger map area."
+            case .everywhere: "Try adding a city or a more specific address."
+            }
+        }
+    }
+    enum Feedback {
+        case noMatches(sampled: Bool)
+        case note(String)
+    }
     struct Result: Identifiable {
         let id = UUID()
         let place: RoutePlace
@@ -361,7 +435,7 @@ private final class RouteStopSearchModel: ObservableObject {
     @Published private(set) var searchArea: MKCoordinateRegion?
     @Published private(set) var results: [Result] = []
     @Published private(set) var isSearching = false
-    @Published private(set) var message: String?
+    @Published private(set) var feedback: Feedback?
     private let corridor: RouteSearchCorridor
     private var task: Task<Void, Never>?
     private var activeSearch: PlaceSearchRequest?
@@ -395,7 +469,7 @@ private final class RouteStopSearchModel: ObservableObject {
         task?.cancel(); task = nil
         isSearching = false
     }
-    private func clear() { cancel(); results = []; message = nil }
+    private func clear() { cancel(); results = []; feedback = nil }
 
     func search() {
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -405,12 +479,13 @@ private final class RouteStopSearchModel: ObservableObject {
         let alongRoute = scope == .alongRoute
         let chosenArea = scope == .mapArea ? searchArea : nil
         guard scope != .mapArea || chosenArea?.searchBounds.isValid == true else {
-            message = "Choose a map area first."; return
+            feedback = .note("Choose a map area first.")
+            return
         }
         let regions: [MKCoordinateRegion?] = alongRoute ? corridor.prioritizedRegions.map {
             MKCoordinateRegion(center: $0.center.coordinate, latitudinalMeters: $0.diameter, longitudinalMeters: $0.diameter)
         } : [chosenArea]
-        isSearching = true; results = []; message = nil
+        isSearching = true; results = []; feedback = nil
         task = Task { @MainActor [weak self] in
             guard let self else { return }
             var found: [Result] = []
@@ -464,15 +539,14 @@ private final class RouteStopSearchModel: ObservableObject {
             }
             guard !Task.isCancelled, ticket == generation else { return }
             activeSearch = nil; task = nil; isSearching = false
-            if failures == completed { message = "Map search couldn't finish. Try again, or choose a smaller Map area." }
-            else if failures > 0 || completed < regions.count { message = "Some areas couldn't be searched. Choose Map area to search a specific section, or try again." }
-            else if alongRoute && corridor.samplesLongRoute {
-                message = found.isEmpty ? "No matches in the sampled areas. Try another category or choose Map area to search a specific section."
-                    : "Results are from sampled sections of this long route. Choose Map area to search a specific section in detail."
-            }
-            else if found.isEmpty {
-                message = chosenArea != nil ? "No matches in this map area. Try another category or choose a larger area."
-                    : alongRoute ? "No matches near this path. Try another category or search Everywhere." : "No matches. Try adding a city or a more specific address."
+            if failures == completed {
+                feedback = .note("Map search couldn’t finish. Try again or choose a smaller map area.")
+            } else if failures > 0 || completed < regions.count {
+                feedback = .note("Some areas couldn’t be searched. Try again or choose a map area to search a specific section.")
+            } else if found.isEmpty {
+                feedback = .noMatches(sampled: alongRoute && corridor.samplesLongRoute)
+            } else if alongRoute && corridor.samplesLongRoute {
+                feedback = .note("Results come from sampled sections of this long route. Choose a map area to search one section in detail.")
             }
         }
     }

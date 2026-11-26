@@ -42,8 +42,11 @@ struct PlaceSearchResponse { let mapItems: [MKMapItem] }
                 else { pendingSlowResponse = continuation }
             }
         } else { try await Task.sleep(for: .milliseconds(150)) }
-        if ValidationFixture.scenario == "route-search-coverage", query == "Coffee" {
-            return .init(mapItems: corridorResults())
+        if ValidationFixture.scenario == "route-search-coverage" {
+            if query == "Coffee" { return .init(mapItems: corridorResults()) }
+            if query == "Groceries" || (query == "Parks" && requiredRegion != nil) {
+                return .init(mapItems: [])
+            }
         }
         // Keep search results away from named fixture pins: the real search flow
         // deliberately substitutes a saved name at matching coordinates.

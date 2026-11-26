@@ -799,17 +799,7 @@ struct MapHomeView: View {
                                 .accessibilityIdentifier("map.routeSearch")
                         }
                         undoJumpButton
-                        Button {
-                            routeOverview = nil
-                            followMovement = true
-                            selection = nil
-                            centerOnLocation()
-                        } label: {
-                            Image(systemName: followMovement ? "location.fill" : "location").font(.system(size: 20)).frame(width: 46, height: 46).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain).locusGlass(.interactive, in: Circle())
-                        .accessibilityLabel("Follow latest location")
-                        .accessibilityIdentifier("map.follow")
+                        cameraControls
                     }
                 }
                 MapScaleView(scope: mapScope)
@@ -839,10 +829,7 @@ struct MapHomeView: View {
                 mapButton("point.topleft.down.to.point.bottomright.curvepath", label: "Edit prepared route") { planner.editPreparedRoute() }
             }
             MapOptionsMenu()
-            if displayedRoute != nil {
-                mapButton(routeOverview == nil ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left",
-                          label: routeOverview == nil ? "Route overview" : "Return to route detail") { toggleRouteOverview() }
-            } else {
+            if displayedRoute == nil {
                 mapButton("pencil.tip", label: "Draw a route") { beginDrawing() }
             }
             MapFavoriteButton()
@@ -852,6 +839,32 @@ struct MapHomeView: View {
                 SessionSpotNameButton()
             }
         }.padding(4).locusGlass(.regular, in: Capsule())
+    }
+
+    private var cameraControls: some View {
+        let hasRoute = displayedRoute != nil
+        return HStack(spacing: 0) {
+            if hasRoute {
+                mapButton(routeOverview == nil ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left",
+                          label: routeOverview == nil ? "Route overview" : "Return to route detail") { toggleRouteOverview() }
+            }
+            Button {
+                routeOverview = nil
+                followMovement = true
+                selection = nil
+                centerOnLocation()
+            } label: {
+                Image(systemName: followMovement ? "location.fill" : "location")
+                    .font(.system(size: 20))
+                    .frame(width: 46, height: 46)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Follow latest location")
+            .accessibilityIdentifier("map.follow")
+        }
+        .padding(hasRoute ? 4 : 0)
+        .locusGlass(hasRoute ? .regular : .interactive, in: Capsule())
     }
 
     private func updateMarkerProjection(_ proxy: MapProxy) {

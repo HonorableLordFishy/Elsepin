@@ -160,7 +160,7 @@ jobs:
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinBackupUITests/testNativeGPXImportSizesSaveAndReopen")
             test_selection+=("-only-testing:LocusValidationUITests/ElsepinBackupUITests/testSettingsExportFileSelectiveImportAndRelaunch")
           elif [[ "$UI_FOCUS" == design-review ]]; then
-            for method in testResetReviewShowsLossAndRetentionBeforeConfirming testDroppedPinAddressSpacingAtStandardTextSize testDroppedPinAddressSpacingAtLargestTextSize; do
+            for method in testRouteSearchCoversStartMiddleAndDestination testRouteCameraStartsAtTheRouteAndRestoresDetailAfterFit testDarkAccessibilityFallbackPaused testResetReviewShowsLossAndRetentionBeforeConfirming testDroppedPinAddressSpacingAtStandardTextSize testDroppedPinAddressSpacingAtLargestTextSize; do
               test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$method")
             done
             for method in testSolidTabsLeaveSettingsAndPastedBackupReviewReachable testSettingsExportFileSelectiveImportAndRelaunch; do

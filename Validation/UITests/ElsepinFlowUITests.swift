@@ -932,7 +932,8 @@ final class ElsepinFlowUITests: XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 8), .completed, camera.label)
         }
 
-        app.buttons["map.follow"].tap()
+        let follow = app.buttons["map.follow"]
+        follow.tap()
         waitForCamera { offset, _ in offset > 1_000_000 }
         startRoute.tap()
         waitForCamera { offset, _ in offset < 250 }
@@ -941,6 +942,12 @@ final class ElsepinFlowUITests: XCTestCase {
 
         let overview = app.buttons["Route overview"]
         XCTAssertTrue(overview.waitForExistence(timeout: 5))
+        reachable("Route overview")
+        reachable("map.follow")
+        XCTAssertGreaterThanOrEqual(overview.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(follow.frame.width, 44)
+        XCTAssertEqual(overview.frame.midY, follow.frame.midY, accuracy: 1)
+        XCTAssertEqual(overview.frame.maxX, follow.frame.minX, accuracy: 1)
         overview.tap()
         let returnToDetail = app.buttons["Return to route detail"]
         XCTAssertTrue(returnToDetail.waitForExistence(timeout: 5))
@@ -1056,12 +1063,63 @@ final class ElsepinFlowUITests: XCTestCase {
         let count = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 3"), object: rows)
         XCTAssertEqual(XCTWaiter.wait(for: [count], timeout: 10), .completed, app.debugDescription)
         XCTAssertTrue(app.staticTexts["Searching places…"].waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Results · Along route"].exists)
         let labels = rows.allElementsBoundByIndex.map(\.label)
         XCTAssertEqual(labels.count, 3, "Off-route and duplicate provider results must be excluded")
         for (label, name) in zip(labels, ["Start cafe", "Middle cafe", "Destination cafe"]) {
             XCTAssertTrue(label.contains(name), "Expected \(name) in itinerary order, found \(label)")
         }
         capture("route-search-start-middle-destination")
+
+        let field = app.textFields["route.searchField"]
+        let empty = app.staticTexts["routeSearch.empty"]
+        let searchEverywhere = app.buttons["Search everywhere"]
+        func submit(_ query: String) {
+            app.buttons["Clear search"].tap()
+            field.tap()
+            field.typeText(query + "\n")
+        }
+        func expectEmpty(_ title: String) {
+            XCTAssertTrue(empty.waitForExistence(timeout: 10))
+            XCTAssertEqual(empty.label, title)
+        }
+        func reveal(_ button: XCUIElement, towardTop: Bool = false) {
+            // Drag in the list gutter to keep the route map from taking the gesture.
+            for _ in 0..<3 where !button.isHittable {
+                let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.38))
+                let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.72))
+                if towardTop { upper.press(forDuration: 0.05, thenDragTo: lower) }
+                else { lower.press(forDuration: 0.05, thenDragTo: upper) }
+            }
+            XCTAssertTrue(button.isHittable, app.debugDescription)
+        }
+        func broadenSearch() {
+            reveal(searchEverywhere)
+            searchEverywhere.tap()
+            XCTAssertTrue(app.staticTexts["Results · Everywhere"].waitForExistence(timeout: 10))
+            XCTAssertEqual(rows.count, 1)
+            XCTAssertTrue(rows.firstMatch.label.contains("Test cafe result for Parks"))
+            XCTAssertEqual(field.value as? String, "Parks")
+        }
+
+        submit("Parks")
+        expectEmpty("No matches along the route")
+        broadenSearch()
+
+        let mapArea = app.buttons["Choose map area"]
+        reveal(mapArea, towardTop: true)
+        mapArea.tap()
+        let useArea = app.buttons["Use this area"]
+        XCTAssertTrue(useArea.waitForExistence(timeout: 10))
+        useArea.tap()
+        expectEmpty("No matches in this map area")
+        broadenSearch()
+
+        submit("Groceries")
+        expectEmpty("No matching places")
+        XCTAssertFalse(searchEverywhere.exists)
+        capture("route-search-empty-scopes")
+
         app.buttons["Done"].tap()
         XCTAssertTrue(app.buttons["session.pause"].waitForExistence(timeout: 5), "Browsing places must keep the route active")
     }
@@ -1155,6 +1213,8 @@ final class ElsepinFlowUITests: XCTestCase {
         configureAccessibility(true)
         launch("paused", large: true, dark: true, fallback: true)
         reachable("session.stop"); reachable("session.pause")
+        reachable("Route overview")
+        reachable("map.follow")
         XCTAssertFalse(app.tabBars.buttons["Library"].isHittable, "Only the solid fallback navigation should be visible")
         XCTAssertLessThan(app.buttons["session.pause"].frame.height, 85, "Resume should fit on one line")
         capture("06-dark-reduced-motion-transparency-contrast")
