@@ -864,7 +864,12 @@ struct MapHomeView: View {
             .accessibilityIdentifier("map.follow")
         }
         .padding(hasRoute ? 4 : 0)
-        .locusGlass(hasRoute ? .regular : .interactive, in: Capsule())
+        .background {
+            Color.clear
+                .locusGlass(hasRoute ? .regular : .interactive, in: Capsule())
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 
     private func updateMarkerProjection(_ proxy: MapProxy) {

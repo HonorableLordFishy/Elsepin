@@ -71,7 +71,7 @@ final class ElsepinBackupUITests: XCTestCase {
         // its first-run indexing. Verify actual enumeration before opening an
         // export sheet; a blank system sheet is not a backup interaction result.
         let files = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
-        files.launch()
+        files.activate()
         let browse = files.tabBars["DOC.browsingModeTabBar"].buttons["Browse"]
         XCTAssertTrue(browse.waitForExistence(timeout: 60), "Simulator Files did not become ready")
         browse.tap()
