@@ -79,7 +79,7 @@ struct BackupImportReviewView: View {
                                     detail: exists ? "Already saved — keep current version" : "Add route · \(trip.points.count) points · \(trip.stops.count) stops\n\(trip.originName) → \(trip.destinationName)",
                                     isSelected: selected(trip.id, in: $selection.trips), enabled: !exists)
                             }
-                        }
+                        }.badge(selection.trips.intersection(available.trips).count)
                     }
                     if !backup.places.isEmpty {
                         DisclosureGroup("Pins") {
@@ -90,7 +90,7 @@ struct BackupImportReviewView: View {
                                     detail: exists ? "Already saved — keep current version" : "\(place.latitude.formatted(.number.precision(.fractionLength(5)))), \(place.longitude.formatted(.number.precision(.fractionLength(5))))",
                                     isSelected: selected(place.id, in: $selection.places), enabled: !exists)
                             }
-                        }
+                        }.badge(selection.places.intersection(available.places).count)
                     }
                     if let areas = backup.areas, !areas.isEmpty {
                         DisclosureGroup("Named areas") {
@@ -101,7 +101,7 @@ struct BackupImportReviewView: View {
                                     detail: exists ? "Already saved — keep current boundary" : "Add named area · \(area.points.count) boundary points",
                                     isSelected: selected(area.id, in: $selection.areas), enabled: !exists)
                             }
-                        }
+                        }.badge(selection.areas.intersection(available.areas).count)
                     }
                 }.shiftSettingsRows()
             }
@@ -129,7 +129,7 @@ struct BackupImportReviewView: View {
                     .frame(minHeight: 44)
             } footer: {
                 if plan?.needsStoppedSession(hasSession: session.hasSession, isBusy: session.isBusy) == true {
-                    Text("Stop spoofing to change movement settings, or import library items only.")
+                    Text("Stop spoofing before applying settings, or import library items only.")
                 }
             }.shiftSettingsRows()
             if let message { Section { Text(message).font(.footnote) }.shiftSettingsRows() }
@@ -143,17 +143,27 @@ struct BackupImportReviewView: View {
         })
     }
     private func selectionButtons<ID: Hashable>(all: Set<ID>, values: Binding<Set<ID>>, name: String) -> some View {
-        ViewThatFits(in: .horizontal) {
+        let selectAll = Button {
+            values.wrappedValue = all
+        } label: {
+            Text("Select all \(name)").frame(minHeight: 44)
+        }.disabled(all.isEmpty)
+        let selectNone = Button {
+            values.wrappedValue = []
+        } label: {
+            Text("Select none").frame(minHeight: 44)
+        }.disabled(values.wrappedValue.isEmpty)
+        return ViewThatFits(in: .horizontal) {
             HStack {
-                Button("Select all \(name)") { values.wrappedValue = all }.disabled(all.isEmpty)
+                selectAll
                 Spacer()
-                Button("Select none") { values.wrappedValue = [] }.disabled(values.wrappedValue.isEmpty)
+                selectNone
             }
             VStack(alignment: .leading, spacing: 8) {
-                Button("Select all \(name)") { values.wrappedValue = all }.disabled(all.isEmpty).frame(minHeight: 44)
-                Button("Select none") { values.wrappedValue = [] }.disabled(values.wrappedValue.isEmpty).frame(minHeight: 44)
+                selectAll
+                selectNone
             }
-        }.buttonStyle(.borderless).frame(minHeight: 44)
+        }.buttonStyle(.borderless)
     }
     private func apply() {
         guard library.isCurrentWorkspace, !DevModeController.shared.switching else {

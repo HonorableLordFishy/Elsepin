@@ -68,12 +68,12 @@ private struct AppResetReview: View {
                     }.shiftSettingsRows()
                 }
                 Section("Restored to defaults") {
-                    Text("App settings and the Home Screen icon.")
+                    Text("The Home Screen icon, appearance, movement, privacy, reminders, widget choices and experimental settings.")
                     if scope == .settings {
                         Text("Cloud and Windows helper checks turn off. Saved connections are kept.")
                     }
                 }.shiftSettingsRows()
-                Section("What you keep") {
+                Section {
                     if scope == .settings {
                         Text("Library, recent history, Recently Deleted, recovery copies and diagnostics.")
                     }
@@ -81,6 +81,14 @@ private struct AppResetReview: View {
                         Text("Device pairing, tunnel address and setup progress.")
                     }
                     Text("Exported files, helper server accounts, installed widgets and iOS settings.")
+                } header: {
+                    Text("What you keep")
+                } footer: {
+                    if preferences.appLockEnabled {
+                        Text("Open drafts close. Confirm with device authentication to turn off App Lock.")
+                    } else {
+                        Text("Open drafts close.")
+                    }
                 }.shiftSettingsRows()
                 Section {
                     Button(scope.title, role: .destructive) {
@@ -91,8 +99,6 @@ private struct AppResetReview: View {
                         }
                     }.frame(minHeight: 44).disabled(reset.isResetting || session.hasSession || session.isBusy || AppDataWorkspace.shared.isDemo)
                         .accessibilityIdentifier("reset.confirm")
-                } footer: {
-                    Text("Open drafts close.\(preferences.appLockEnabled ? " Confirm with device authentication to turn off App Lock." : "")")
                 }.shiftSettingsRows()
             }.shiftSettingsScreen().loggedNavigationTitle("Confirm reset").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
