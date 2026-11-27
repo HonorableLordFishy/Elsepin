@@ -230,12 +230,7 @@ final class SpoofSession: ObservableObject {
         stopRecoveryMonitor()
         recoveryAvailable = false
         recovery.discard()
-        if wasRestored {
-            routeSmoothMovement = nil
-            preparedRouteConfirmation = nil
-            activeRoute = nil; journey = nil; stopProgress = RouteStopProgress()
-            routeSectionSettingsEnabled = false; sectionSpeedOverrides = [:]; appliedSectionID = nil
-        }
+        if wasRestored { clearRouteDisplay() }
     }
 
     var restoredRouteAwaitingConnection: Bool { recoveryAvailable && journey != nil && !routeActive }
@@ -875,13 +870,7 @@ final class SpoofSession: ObservableObject {
                     self.motionSpeed = 0
                     self.routeTask = nil
                     if wasStopping {
-                        self.routeSmoothMovement = nil
-                        self.preparedRouteConfirmation = nil
-                        self.activeRoute = nil
-                        self.journey = nil
-                        self.routeSectionSettingsEnabled = false
-                        self.sectionSpeedOverrides = [:]
-                        self.appliedSectionID = nil
+                        self.clearRouteDisplay()
                     } else if let state = self.journey?.state, [.moving, .waiting, .paused, .pausing, .seeking].contains(state) {
                         self.journey?.state = .interrupted
                     }
@@ -985,11 +974,10 @@ final class SpoofSession: ObservableObject {
                         guard !Task.isCancelled, ticket == epoch, workerID == routeWorkerID else { return }
                         if !routePaused, pendingSeek == nil, effectivePhase == .active, revision == waitRevision, elapsed <= interval + 0.25 {
                             stopProgress.tick(elapsed, maximumElapsed: interval + 0.25)
-                            if stopProgress.currentID == nil {
-                                if next.signal != nil { saveTripCheckpoint(force: true) }
-                                resetMovementClock()
-                            }
+                            if stopProgress.currentID == nil, next.signal != nil { saveTripCheckpoint(force: true) }
                         }
+                        // A timeout and Continue now both start a fresh movement interval.
+                        if stopProgress.currentID == nil { resetMovementClock() }
                     }
                     continue
                 }
@@ -1326,14 +1314,23 @@ final class SpoofSession: ObservableObject {
         routePaused = false
         routeStopping = false
         if clearJourney {
-            preparedRouteConfirmation = nil
-            routeSmoothMovement = nil
             discardRecovery()
-            activeSavedTripID = nil
-            activeRoute = nil; journey = nil; stopProgress = RouteStopProgress()
-            routeSectionSettingsEnabled = false; sectionSpeedOverrides = [:]; appliedSectionID = nil
+            clearRouteDisplay()
         }
         else { journey?.state = .interrupted }
+    }
+
+    private func clearRouteDisplay() {
+        preparedRouteConfirmation = nil
+        routeSmoothMovement = nil
+        activeSavedTripID = nil
+        jumpUndo = nil
+        activeRoute = nil
+        journey = nil
+        stopProgress = RouteStopProgress()
+        routeSectionSettingsEnabled = false
+        sectionSpeedOverrides = [:]
+        appliedSectionID = nil
     }
 
     /// Clearing the queue never clears the currently held location or route.

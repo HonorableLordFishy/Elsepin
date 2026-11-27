@@ -294,28 +294,33 @@ private struct RouteStopMapPicker: View {
     }
 
     @ViewBuilder private var searchResults: some View {
-        if !model.query.isEmpty && (pin == nil || searchFocused) {
+        if !model.query.isEmpty, pin == nil || searchFocused,
+           model.isSearching || model.feedback != nil || !model.results.isEmpty {
             VStack(spacing: 0) {
                 if model.isSearching { ProgressView("Searching…").padding(8) }
-                if let feedback = model.feedback {
-                    RouteStopSearchFeedback(scope: model.scope, feedback: feedback) {
-                        searchFocused = false
-                        model.scope = .everywhere
-                    }.padding(.horizontal, 12).padding(.vertical, 8)
-                }
-                if !model.results.isEmpty {
+                if model.feedback != nil || !model.results.isEmpty {
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            Text(model.scope.resultsTitle)
-                                .font(.subheadline.weight(.semibold))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 8)
-                                .accessibilityAddTraits(.isHeader)
-                            ForEach(model.results) { result in
-                                Button { select(result.place) } label: {
-                                    Text(result.place.name).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                                }.buttonStyle(.plain)
-                                Divider()
+                            if let feedback = model.feedback {
+                                RouteStopSearchFeedback(scope: model.scope, feedback: feedback) {
+                                    searchFocused = false
+                                    model.scope = .everywhere
+                                }.padding(.vertical, 8)
+                            }
+                            if !model.results.isEmpty {
+                                Text(model.scope.resultsTitle)
+                                    .font(.subheadline.weight(.semibold))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 8)
+                                    .accessibilityAddTraits(.isHeader)
+                                ForEach(model.results) { result in
+                                    Button { select(result.place) } label: {
+                                        Text(result.place.name)
+                                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                            .contentShape(Rectangle())
+                                    }.buttonStyle(.plain)
+                                    Divider()
+                                }
                             }
                         }.padding(.horizontal, 12)
                     }.frame(maxHeight: 180)
@@ -345,7 +350,9 @@ private struct RouteStopSearchFeedback: View {
                 Text(scope.emptyDetail).font(.subheadline).foregroundStyle(.secondary)
                 if scope != .everywhere {
                     Button(action: searchEverywhere) {
-                        Text("Search everywhere").frame(minHeight: 44)
+                        Text("Search everywhere")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
                     }.buttonStyle(.borderless)
                 }
             case .note(let text):

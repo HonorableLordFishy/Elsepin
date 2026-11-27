@@ -754,6 +754,36 @@ final class ElsepinFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["session.stop"].waitForNonExistence(timeout: 10))
     }
 
+    func testEndingSavedRouteReleasesLibraryDelete() {
+        launch("route-pace", narrow: false, cellular: false)
+        openLibrary()
+        let trip = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Test straight drive")).firstMatch
+        XCTAssertTrue(trip.waitForExistence(timeout: 10))
+        trip.tap()
+        XCTAssertTrue(app.navigationBars["Plan a route"].waitForExistence(timeout: 10))
+        app.buttons["Show route"].tap()
+        let start = app.buttons["Start route"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
+
+        let routeMenu = app.buttons["Route controls and shortcuts"]
+        XCTAssertTrue(routeMenu.waitForExistence(timeout: 10))
+        routeMenu.tap()
+        let endRoute = app.buttons["End route and hold location"]
+        XCTAssertTrue(endRoute.waitForExistence(timeout: 5))
+        endRoute.tap()
+        XCTAssertTrue(routeMenu.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["session.stop"].exists)
+
+        openLibrary()
+        let options = app.buttons["Options for Test straight drive"]
+        XCTAssertTrue(options.waitForExistence(timeout: 10))
+        options.tap()
+        let deleteRoute = app.buttons["Delete route"]
+        XCTAssertTrue(deleteRoute.waitForExistence(timeout: 5))
+        XCTAssertTrue(deleteRoute.isEnabled)
+    }
+
     func testCellularStopFromMovingRouteKeepsThenClearsSession() {
         launch("moving", narrow: false, cellular: true)
         keepThenStopCellularSession(activeStatus: "Following route")

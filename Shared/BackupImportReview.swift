@@ -262,11 +262,12 @@ struct BackupImportReview {
             guard merged.isValid else { throw BackupError.invalid }
             preferences = merged
         }
-        // Validate capacity for the selected subset, never the entire unselected file.
-        guard current.places.count + places.count <= 1000,
-              current.trips.count + trips.count <= 50,
-              current.areas.count + areas.count <= 100,
-              current.trips.reduce(0, { $0 + $1.points.count }) + trips.reduce(0, { $0 + $1.points.count }) <= 500_000
+        // Check capacity only where this import adds items. Locally saved
+        // routes can already exceed the aggregate point limit for backups.
+        guard places.isEmpty || current.places.count + places.count <= 1000,
+              areas.isEmpty || current.areas.count + areas.count <= 100,
+              trips.isEmpty || (current.trips.count + trips.count <= 50 &&
+                  current.trips.reduce(0, { $0 + $1.points.count }) + trips.reduce(0, { $0 + $1.points.count }) <= 500_000)
         else { throw BackupError.capacity }
         return BackupImportPlan(places: places, trips: trips, areas: areas,
                                 preferences: preferences, settingKeys: keys)

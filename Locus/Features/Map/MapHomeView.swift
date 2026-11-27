@@ -841,35 +841,40 @@ struct MapHomeView: View {
         }.padding(4).locusGlass(.regular, in: Capsule())
     }
 
-    private var cameraControls: some View {
-        let hasRoute = displayedRoute != nil
-        return HStack(spacing: 0) {
-            if hasRoute {
+    @ViewBuilder private var cameraControls: some View {
+        if displayedRoute != nil {
+            HStack(spacing: 0) {
                 mapButton(routeOverview == nil ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left",
                           label: routeOverview == nil ? "Route overview" : "Return to route detail") { toggleRouteOverview() }
+                followButton
             }
-            Button {
-                routeOverview = nil
-                followMovement = true
-                selection = nil
-                centerOnLocation()
-            } label: {
-                Image(systemName: followMovement ? "location.fill" : "location")
-                    .font(.system(size: 20))
-                    .frame(width: 46, height: 46)
-                    .contentShape(Rectangle())
+            .padding(4)
+            .background {
+                Color.clear
+                    .locusGlass(.regular, in: Capsule())
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Follow latest location")
-            .accessibilityIdentifier("map.follow")
+        } else {
+            followButton.locusGlass(.interactive, in: Circle())
         }
-        .padding(hasRoute ? 4 : 0)
-        .background {
-            Color.clear
-                .locusGlass(hasRoute ? .regular : .interactive, in: Capsule())
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+    }
+
+    private var followButton: some View {
+        Button {
+            routeOverview = nil
+            followMovement = true
+            selection = nil
+            centerOnLocation()
+        } label: {
+            Image(systemName: followMovement ? "location.fill" : "location")
+                .font(.system(size: 20))
+                .frame(width: 46, height: 46)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Follow latest location")
+        .accessibilityIdentifier("map.follow")
     }
 
     private func updateMarkerProjection(_ proxy: MapProxy) {

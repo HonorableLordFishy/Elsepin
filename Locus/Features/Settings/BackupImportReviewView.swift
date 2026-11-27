@@ -181,7 +181,7 @@ struct BackupImportReviewView: View {
                 return
             }
             guard plan.count > 0 else { return }
-            let places = try LibraryMerge.places(local: context.places, incoming: plan.places)
+            let places = plan.places.isEmpty ? [] : try LibraryMerge.places(local: context.places, incoming: plan.places)
             let areas = plan.areas.isEmpty ? context.areas : try LibraryMerge.areas(local: context.areas, incoming: plan.areas)
             if !plan.trips.isEmpty {
                 guard try library.merge(plan.trips) else { message = library.error; return }

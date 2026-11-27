@@ -234,6 +234,30 @@ final class BackupImportReviewTests: XCTestCase {
         XCTAssertEqual(try review.plan(selected).trips, [backup.trips[0]])
         XCTAssertEqual(try review.plan(BackupImportSelection()).count, 0)
     }
+    func testLocalRoutesOverBackupPointLimitOnlyBlockImportingMoreRoutes() throws {
+        var backup = try sample("Shift-Routes-Areas-Test")
+        backup.preferences = try sample("Shift-Settings-Test").preferences
+        backup.categories = [.settings, .places, .trips]
+        var current = try context()
+        let points = (0..<100_000).map { RoutePoint(latitude: 40 + Double($0) / 100_000, longitude: -75) }
+        current.trips = (0..<6).map { _ in
+            var trip = fixtureTrip()
+            trip.points = points
+            return trip
+        }
+        XCTAssertTrue(TripLibraryDocument(trips: current.trips).isValid)
+        let review = BackupImportReview(backup: backup, current: current)
+        XCTAssertThrowsError(try review.plan(review.defaultSelection)) { error in
+            guard case BackupError.capacity = error else { return XCTFail("Unexpected error: \(error)") }
+        }
+        let settingsOnly = BackupImportSelection(settings: [.walkSpeed])
+        XCTAssertEqual(try review.plan(settingsOnly).settingKeys, [.walkSpeed])
+        var withoutRoutes = review.defaultSelection
+        withoutRoutes.trips.removeAll()
+        let plan = try review.plan(withoutRoutes)
+        XCTAssertEqual(plan.places, backup.places)
+        XCTAssertEqual(plan.areas, backup.areas ?? [])
+    }
     func testContextDetectsChangesMadeAfterConfirmationWasPresented() throws {
         let original = try context()
         var changed = original
