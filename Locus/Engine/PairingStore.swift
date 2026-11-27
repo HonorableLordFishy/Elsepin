@@ -41,6 +41,7 @@ final class PairingStore: ObservableObject {
 
     init() {
         refresh()
+        try? removeAbandonedStagingFiles()
     }
 
     func refresh() {
@@ -88,11 +89,18 @@ final class PairingStore: ObservableObject {
 
     func removePairing() throws {
         PairOnDeviceService.cancelCurrentAttempt()
+        try removeAbandonedStagingFiles()
         if FileManager.default.fileExists(atPath: pairingURL.path) {
             try FileManager.default.removeItem(at: pairingURL)
         }
         hasPairingFile = false
         revision = UUID()
+    }
+
+    private func removeAbandonedStagingFiles() throws {
+        // A canceled native worker can still write before its own final cleanup.
+        guard !PairOnDeviceService.nativeWorkOutstanding else { return }
+        try PairingFileImport.removeAbandonedStagingFiles(in: directoryURL)
     }
 
     func installOnDevicePairing(from stagedURL: URL) throws {

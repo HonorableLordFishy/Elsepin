@@ -52,6 +52,21 @@ final class SetupReadinessTests: XCTestCase {
         }
     }
 
+    func testWiFiReconnectionClearsOnlyTheWiFiFailure() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        var check = SetupCheckLifecycle()
+        let attempt = check.begin()
+        check.invalidate(.wifiRequired)
+        check.wifiDidReconnect()
+        XCTAssertEqual(check.state, .idle)
+        check.finish(attempt, issue: nil, now: now)
+        XCTAssertFalse(check.isVerified(now: now, prerequisite: nil))
+
+        check.invalidate(.tunnelUnavailable)
+        check.wifiDidReconnect()
+        XCTAssertEqual(check.state, .failed(.tunnelUnavailable))
+    }
+
     func testSuccessExpiresAndNeedsPrerequisitesToRemainPresent() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         var check = SetupCheckLifecycle()

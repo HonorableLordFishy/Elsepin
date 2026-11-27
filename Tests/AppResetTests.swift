@@ -31,6 +31,19 @@ final class AppResetTests: XCTestCase {
             for key in erased { XCTAssertNil(defaults.object(forKey: key), key) }
         }
     }
+    func testSmoothMovementChoiceMadeAfterResetSurvivesRelaunch() throws {
+        for scope in AppResetScope.allCases {
+            let defaults = try storage()
+            _ = MovementDefaults.loadSmoothMovement(from: defaults)
+            defaults.set(true, forKey: MovementDefaults.smoothKey)
+
+            AppResetRules.clearPreferences(in: defaults, scope: scope)
+            XCTAssertFalse(defaults.bool(forKey: MovementDefaults.smoothKey), scope.rawValue)
+            defaults.set(true, forKey: MovementDefaults.smoothKey)
+
+            XCTAssertTrue(MovementDefaults.loadSmoothMovement(from: defaults), scope.rawValue)
+        }
+    }
     func testSettingsScopeDoesNotDeleteAnyDataOrPairing() {
         XCTAssertEqual(AppResetScope.settings.stages, [.settings, .icon])
         XCTAssertFalse(AppResetScope.keepSetup.stages.contains(.pairingAndSetup))

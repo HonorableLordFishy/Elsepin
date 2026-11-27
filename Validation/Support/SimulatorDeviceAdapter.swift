@@ -108,6 +108,7 @@ enum PairingImportError: LocalizedError {
         case idle, stopping, advertising, deviceConnected, awaitingPIN(String), succeeded, failed(String)
     }
     static var nativeWorkOutstanding: Bool { false }
+    static func cancelCurrentAttempt() {}
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var pin: String?
     @Published private(set) var debugPort: UInt16?

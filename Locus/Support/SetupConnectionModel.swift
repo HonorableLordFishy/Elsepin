@@ -36,7 +36,10 @@ final class SetupConnectionModel: ObservableObject {
             let available = path.status == .satisfied && path.usesInterfaceType(.wifi)
             Task { @MainActor in
                 guard let self, self.monitorID == id else { return }
-                if self.wifiAvailable != available { self.wifiAvailable = available }
+                if self.wifiAvailable != available {
+                    self.wifiAvailable = available
+                    if available { self.lifecycle.wifiDidReconnect() }
+                }
                 if !available { self.invalidateIfNeeded(.wifiRequired) }
             }
         }

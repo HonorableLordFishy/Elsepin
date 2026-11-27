@@ -177,7 +177,8 @@ struct RoutePlannerSheet: View {
                 if let route { RoutePracticeSheet(route: route, mode: displayMode, speed: SpeedConversion.metresPerSecond(mph: displaySpeed)) }
             }
             .sheet(item: $editingStop) { item in
-                StopDurationSheet(name: item.name, seconds: item.seconds, signal: item.signal, stopCount: timelineStops.count) { seconds, signal, all in
+                StopDurationSheet(name: item.name, seconds: item.seconds, signal: item.signal, stopCount: timelineStops.count,
+                                  hasTrafficLights: timelineStops.contains { $0.signal != nil }) { seconds, signal, all in
                     guard !hasJourney, !planner.isLoading else { return }
                     if all { planner.setAllWaits(seconds: seconds) }
                     else { planner.setWait(item.id, seconds: seconds, signal: signal) }

@@ -39,4 +39,27 @@ final class PairingFileImportTests: XCTestCase {
             XCTAssertEqual(try Data(contentsOf: url), old)
         }
     }
+
+    func testSweepRemovesOnlyAbandonedPairingStages() throws {
+        let livePairing = try destination()
+        let directory = livePairing.deletingLastPathComponent()
+        let importedStage = PairingFileImport.StagingSource.imported.stagedURL(in: directory)
+        let onDeviceStage = PairingFileImport.StagingSource.onDevice.stagedURL(in: directory)
+        let unrelatedFile = directory.appendingPathComponent(".pairing-note.plist")
+        let unrelatedDirectory = PairingFileImport.StagingSource.imported.stagedURL(in: directory)
+        let data = try plist("pairing")
+        for file in [livePairing, importedStage, onDeviceStage, unrelatedFile] {
+            try data.write(to: file)
+        }
+        try FileManager.default.createDirectory(at: unrelatedDirectory, withIntermediateDirectories: false)
+
+        try PairingFileImport.removeAbandonedStagingFiles(in: directory)
+        try PairingFileImport.removeAbandonedStagingFiles(in: directory)
+
+        XCTAssertEqual(try Data(contentsOf: livePairing), data)
+        XCTAssertEqual(try Data(contentsOf: unrelatedFile), data)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelatedDirectory.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: importedStage.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: onDeviceStage.path))
+    }
 }

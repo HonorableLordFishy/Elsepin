@@ -393,8 +393,8 @@ final class PairCallbackBox {
     init(pairingStore: PairingStore) {
         self.pairingStore = pairingStore
         startingRevision = pairingStore.revision
-        stagedURL = pairingStore.pairingURL.deletingLastPathComponent()
-            .appendingPathComponent(".on-device-\(UUID().uuidString).plist")
+        stagedURL = PairingFileImport.StagingSource.onDevice.stagedURL(
+            in: pairingStore.pairingURL.deletingLastPathComponent())
     }
 
     func listening(on port: UInt16) {

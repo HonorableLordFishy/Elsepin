@@ -84,6 +84,9 @@ enum AppResetRules {
                 defaults.removeObject(forKey: key)
             }
         }
+        // Reset already restores smooth movement to off. Do not repeat the
+        // upgrade migration over a choice made after reset.
+        defaults.set(true, forKey: MovementDefaults.migrationKey)
     }
 
     @MainActor static func execute(_ scope: AppResetScope,

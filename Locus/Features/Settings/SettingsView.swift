@@ -178,6 +178,7 @@ struct ConnectionSettingsView: View {
     @State private var showSetupChecklist = false
     @State private var tunnelIP = TunnelConfig.targetIP
     @State private var localDevVPNInstalled = LocalDevVPN.isInstalled
+    private var pairingChangeBlocked: Bool { session.hasSession || session.isBusy }
     private var supportsOnDevicePairing: Bool {
         if #available(iOS 27.0, *) { return true }
         return false
@@ -196,22 +197,23 @@ struct ConnectionSettingsView: View {
                     .foregroundStyle(pairing.hasPairingFile ? LocusTheme.statusGood : LocusTheme.statusWarn)
                 if supportsOnDevicePairing {
                     Button("Pair on this iPhone") { showPairOnDevice = true }.frame(minHeight: 44)
-                        .disabled(session.hasSession || session.isBusy)
+                        .disabled(pairingChangeBlocked)
                 }
                 DisclosureGroup("Import or manage pairing") {
                     Button("Import pairing file") { showImporter = true }.frame(minHeight: 44)
                     Button("Paste pairing file") {
+                        guard canReplacePairing() else { return }
                         do { try pairing.importPairingFromClipboard() }
                         catch { session.lastError = error.localizedDescription }
                     }.frame(minHeight: 44)
                     if pairing.hasPairingFile {
                         Button("Remove pairing file", role: .destructive) { confirmRemovePairing = true }
-                            .frame(minHeight: 44).disabled(session.hasSession || session.isBusy)
+                            .frame(minHeight: 44)
                     }
                     Text("Use an RPPairing file from idevice_pair. A SideStore pairing file is different.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
-                .disabled(session.hasSession || session.isBusy)
+                .disabled(pairingChangeBlocked)
                 if session.hasSession { Text("Stop spoofing before changing this iPhone’s pairing.").font(.footnote).foregroundStyle(.secondary) }
                 SettingsHelp(title: "Pairing help", lines: [
                     supportsOnDevicePairing
@@ -226,10 +228,16 @@ struct ConnectionSettingsView: View {
                     else { LocalDevVPN.openAppStore() }
                 }.frame(minHeight: 44)
                 DisclosureGroup("Advanced connection settings") {
-                    TextField("Device tunnel IP", text: $tunnelIP)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled()
-                        .onSubmit { TunnelConfig.setTargetIP(tunnelIP) }
-                    Button("Save tunnel IP") { TunnelConfig.setTargetIP(tunnelIP) }
+                    Group {
+                        TextField("Device tunnel IP", text: $tunnelIP)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled()
+                            .onSubmit(saveTunnelAddress)
+                        Button("Save tunnel IP", action: saveTunnelAddress)
+                    }.disabled(!session.canChangeTunnelAddress)
+                    if !session.canChangeTunnelAddress {
+                        Text("Stop spoofing to change the tunnel IP.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                     Text("Default: 10.7.0.1. Only change this if your VPN setup needs it.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
@@ -239,13 +247,14 @@ struct ConnectionSettingsView: View {
         .sheet(isPresented: $showImporter) {
             PairingDocumentPicker(onPick: { url in
                 showImporter = false
+                guard canReplacePairing() else { return }
                 do { try pairing.importPairing(from: url) }
                 catch { session.lastError = error.localizedDescription }
             }, onCancel: { showImporter = false }).ignoresSafeArea()
         }
         .loggedConfirmationDialog("Remove this iPhone’s pairing?", isPresented: $confirmRemovePairing, titleVisibility: .visible) {
             Button("Remove pairing", role: .destructive) {
-                guard !session.hasSession, !session.isBusy else { return }
+                guard canReplacePairing() else { return }
                 do { try pairing.removePairing() } catch { session.lastError = error.localizedDescription }
             }
         } message: { Text("You’ll need to pair this iPhone again before sending another location. Saved places and routes stay here.") }
@@ -255,8 +264,24 @@ struct ConnectionSettingsView: View {
             }, onSkip: { showSetupChecklist = false })
         }
         .sheet(isPresented: $showPairOnDevice) { PairOnDeviceView().environmentObject(pairing) }
+        .onChange(of: pairingChangeBlocked) { _, blocked in
+            if blocked { showPairOnDevice = false }
+        }
         .onAppear { localDevVPNInstalled = LocalDevVPN.isInstalled }
         .onChange(of: scenePhase) { _, phase in if phase == .active { localDevVPNInstalled = LocalDevVPN.isInstalled } }
+    }
+
+    private func saveTunnelAddress() {
+        guard session.canChangeTunnelAddress else { return }
+        TunnelConfig.setTargetIP(tunnelIP)
+    }
+
+    private func canReplacePairing() -> Bool {
+        guard !pairingChangeBlocked else {
+            session.lastError = "Stop spoofing before changing this iPhone’s pairing."
+            return false
+        }
+        return true
     }
 }
 

@@ -395,6 +395,10 @@ final class SpoofSession: ObservableObject {
 
     var hasSession: Bool { sessionRequested || requiresClear || stopInFlight }
     var isStopping: Bool { stopInFlight }
+    var canChangeTunnelAddress: Bool {
+        status.phase.allowsTunnelAddressChange(sessionRequested: sessionRequested,
+                                              commandPending: isBusy || sendInFlight || stopInFlight)
+    }
     var statusTitle: String {
         if recoveringRoute && isBusy { return "Reconnecting route…" }
         if restoredRouteAwaitingConnection { return automaticRecoveryPending ? "Waiting to resume route" : "Saved route · Paused" }
@@ -1389,6 +1393,9 @@ final class SpoofSession: ObservableObject {
     }
 
     private func beginSession() {
+        // Automatic recovery can start while a pairing sheet is still open.
+        // Cancel before a queued native callback can replace this session’s credentials.
+        PairOnDeviceService.cancelCurrentAttempt()
         locationMayRemainBeforeAttempt = requiresClear || sendInFlight
         DeveloperLogStore.shared.record("session_start_requested", ["previous_location_may_remain": String(locationMayRemainBeforeAttempt)])
         // Freeze the pre-spoof fix. Core Location may now echo our simulation.

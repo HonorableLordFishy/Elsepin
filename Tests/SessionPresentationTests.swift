@@ -2,6 +2,17 @@ import XCTest
 @testable import SessionPresentation
 
 final class SessionPresentationTests: XCTestCase {
+    func testTunnelAddressEditingPreservesLiveConnectionAndAllowsRecovery() {
+        for phase in [SessionPhase.connecting, .active, .reconnecting, .stopping, .unverified] {
+            XCTAssertFalse(phase.allowsTunnelAddressChange(sessionRequested: true, commandPending: false))
+        }
+        XCTAssertFalse(SessionPhase.disconnected.allowsTunnelAddressChange(sessionRequested: true, commandPending: true))
+        XCTAssertFalse(SessionPhase.unverified.allowsTunnelAddressChange(sessionRequested: false, commandPending: true))
+        XCTAssertTrue(SessionPhase.disconnected.allowsTunnelAddressChange(sessionRequested: true, commandPending: false))
+        XCTAssertTrue(SessionPhase.unverified.allowsTunnelAddressChange(sessionRequested: false, commandPending: false))
+        XCTAssertTrue(SessionPhase.idle.allowsTunnelAddressChange(sessionRequested: false, commandPending: false))
+    }
+
     let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     func snapshot(_ phase: SessionPhase, expiry: Date?) -> SessionSnapshot {

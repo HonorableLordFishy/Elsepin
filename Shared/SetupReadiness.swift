@@ -125,6 +125,10 @@ struct SetupCheckLifecycle: Equatable {
         configuration = nil
     }
 
+    mutating func wifiDidReconnect() {
+        if state == .failed(.wifiRequired) { state = .idle }
+    }
+
     func isVerified(now: Date, prerequisite: SetupIssue?, configuration: SetupConfiguration? = nil) -> Bool {
         guard prerequisite == nil, self.configuration == configuration,
               case .verified(let date) = state else { return false }

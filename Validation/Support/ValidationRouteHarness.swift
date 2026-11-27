@@ -24,7 +24,8 @@ private final class ValidationRouteDriver: ObservableObject {
         result.origin = start; result.destination = end
         result.storedMode = mode
         result.stops = stops.enumerated().map { index, stop in
-            RouteStop(id: stop.id, name: stop.name, metres: result.track.length * Double(index + 1) / Double(stops.count + 1), waitSeconds: stop.waitSeconds)
+            RouteStop(id: stop.id, name: stop.name, metres: result.track.length * Double(index + 1) / Double(stops.count + 1),
+                      waitSeconds: stop.waitSeconds, signal: stop.signal)
         }
         let ids = stops.map(\.id) + [RouteLegChoice.destinationID]
         let boundaries = [0.0] + result.stops.map(\.metres) + [result.track.length]

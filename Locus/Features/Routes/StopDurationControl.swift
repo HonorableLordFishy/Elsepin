@@ -86,15 +86,18 @@ struct RouteStopWaitControl: View {
 struct StopDurationSheet: View {
     let name: String
     let stopCount: Int
+    let hasTrafficLights: Bool
     let onSave: (Double, SimulatedTrafficLight?, Bool) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var seconds: Double
     @State private var signal: SimulatedTrafficLight?
 
-    init(name: String, seconds: Double, signal: SimulatedTrafficLight?, stopCount: Int, onSave: @escaping (Double, SimulatedTrafficLight?, Bool) -> Void) {
+    init(name: String, seconds: Double, signal: SimulatedTrafficLight?, stopCount: Int,
+         hasTrafficLights: Bool, onSave: @escaping (Double, SimulatedTrafficLight?, Bool) -> Void) {
         self.name = name
         _signal = State(initialValue: signal)
         self.stopCount = stopCount
+        self.hasTrafficLights = hasTrafficLights
         self.onSave = onSave
         _seconds = State(initialValue: StopDuration.normalized(seconds))
     }
@@ -105,9 +108,17 @@ struct StopDurationSheet: View {
                 Section { RouteStopWaitControl(seconds: $seconds, signal: $signal) } header: { Text(name) }
                 if signal == nil, stopCount > 1 {
                     Section {
-                        Button("Apply to all \(stopCount) stops") { save(all: true) }
-                            .frame(minHeight: 44)
-                    } footer: { Text("Sets every stop in this draft to \(StopDuration.label(seconds).lowercased()).") }
+                        Button(hasTrafficLights ? "Apply fixed wait to all \(stopCount) stops" : "Apply to all \(stopCount) stops") {
+                            save(all: true)
+                        }.frame(minHeight: 44)
+                    } footer: {
+                        let duration = StopDuration.formatted(seconds)
+                        if hasTrafficLights {
+                            Text("Sets every stop’s wait to \(duration) and removes simulated traffic lights from this draft.")
+                        } else {
+                            Text("Sets every stop’s wait in this draft to \(duration).")
+                        }
+                    }
                 }
             }
             .shiftSettingsScreen().navigationTitle("Wait at stop").navigationBarTitleDisplayMode(.inline)

@@ -10,6 +10,7 @@ struct PairOnDeviceView: View {
 
     @EnvironmentObject private var pairing: PairingStore
     @EnvironmentObject private var preferences: SessionPreferences
+    @EnvironmentObject private var session: SpoofSession
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
@@ -207,6 +208,7 @@ struct PairOnDeviceView: View {
         switch host.phase {
         case .idle, .failed:
             Button {
+                guard !session.hasSession, !session.isBusy else { return }
                 host.acknowledgeFailure()
                 host.start(pairingStore: pairing, preferences: preferences)
             } label: {
@@ -214,6 +216,7 @@ struct PairOnDeviceView: View {
                     .frame(maxWidth: .infinity, minHeight: 52)
             }
             .buttonStyle(ShiftActionStyle())
+            .disabled(session.hasSession || session.isBusy)
         case .succeeded:
             Button {
                 if let onFinished {

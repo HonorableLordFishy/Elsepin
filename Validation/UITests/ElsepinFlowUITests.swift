@@ -402,6 +402,14 @@ final class ElsepinFlowUITests: XCTestCase {
         let countBefore = try XCTUnwrap(savedSnapshot()["count"] as? Int)
         let before = try savedTrip()
         app.buttons["Open saved route"].tap()
+        let cafeWait = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Wait at Test cafe,")).firstMatch
+        routeControl(cafeWait).tap()
+        let waitEditor = app.navigationBars["Wait at stop"]
+        XCTAssertTrue(waitEditor.waitForExistence(timeout: 5))
+        let lightToggle = app.switches["Simulate traffic light"]
+        lightToggle.switches.firstMatch.tap()
+        XCTAssertEqual(lightToggle.value as? String, "1")
+        waitEditor.buttons["Done"].tap()
         routeControl(app.buttons["Stop and route options"]).tap()
         app.buttons["Recalculate with another mode"].tap()
         app.buttons["E-bike"].tap()
@@ -429,6 +437,8 @@ final class ElsepinFlowUITests: XCTestCase {
             for key in ["id", "name"] { XCTAssertEqual(stops[index][key] as? String, originalStops[index][key] as? String) }
             XCTAssertEqual(stops[index]["waitSeconds"] as? Double, originalStops[index]["waitSeconds"] as? Double)
         }
+        XCTAssertEqual(stops[0]["signal"] as? String, "enabled")
+        XCTAssertNil(stops[1]["signal"])
         let points = try XCTUnwrap(saved["points"] as? [[String: Any]])
         let oldPoints = try XCTUnwrap(before["points"] as? [[String: Any]])
         XCTAssertTrue(NSDictionary(dictionary: points.first!).isEqual(to: oldPoints.first!))
@@ -440,6 +450,7 @@ final class ElsepinFlowUITests: XCTestCase {
             XCTAssertEqual(try XCTUnwrap(section["speedMPH"] as? Double), speed, accuracy: 0.11)
         }
         app.buttons["Reopen last saved route"].tap()
+        XCTAssertTrue(routeControl(app.buttons["Wait at Test cafe, Simulated traffic light"]).exists)
         routeControl(app.buttons["Movement to Test cafe"]).tap()
         XCTAssertEqual(try XCTUnwrap(Double((app.sliders.firstMatch.value as? String ?? "").components(separatedBy: " ")[0])), speed, accuracy: 0.11)
         capture("31-reopened-recalculated-route")

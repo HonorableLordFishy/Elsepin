@@ -16,6 +16,11 @@ enum LocationTrackingDemand: Equatable {
 enum SessionPhase: String, Codable, Hashable {
     case idle, connecting, active, reconnecting, stopping, unverified, disconnected
 
+    func allowsTunnelAddressChange(sessionRequested: Bool, commandPending: Bool) -> Bool {
+        // An unverified session may still have a working connection to clear.
+        !commandPending && (!sessionRequested || self == .disconnected)
+    }
+
     var title: String {
         switch self {
         case .idle: return "No active session"
