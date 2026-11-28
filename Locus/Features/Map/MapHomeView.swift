@@ -1169,19 +1169,31 @@ private struct RouteDirectionsCard: View {
                     }
                     .offset(y: offset)
                     .accessibilityHidden(searching)
-                    Button(action: openSearch) {
-                        Label("Search along route", systemImage: "magnifyingglass")
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    if searching || drag > 0 {
+                        Button(action: openSearch) {
+                            Label("Search along route", systemImage: "magnifyingglass")
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        }
+                        .offset(y: offset - height)
+                        .allowsHitTesting(searching)
+                        .accessibilityHidden(!searching)
+                        .accessibilityIdentifier("map.openRouteSearch")
                     }
-                    .offset(y: offset - height)
-                    .allowsHitTesting(searching)
-                    .accessibilityHidden(!searching)
-                    .accessibilityIdentifier("map.openRouteSearch")
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .clipped()
             }
             .frame(height: pageHeight)
+            .contentShape(Rectangle())
+        .simultaneousGesture(DragGesture(minimumDistance: 8)
+            .updating($drag) { value, state, _ in
+                if abs(value.translation.height) > abs(value.translation.width) { state = value.translation.height }
+            }
+            .onEnded { value in
+                let y = value.translation.height
+                guard abs(y) > min(36, pageHeight * 0.4), abs(y) > abs(value.translation.width) else { return }
+                setPage(y > 0)
+            })
             Button {
                 setPage(!searching)
             } label: {
@@ -1195,16 +1207,10 @@ private struct RouteDirectionsCard: View {
         }
         .padding(.horizontal, 14)
         .buttonStyle(.plain)
-        .locusGlass(.regular, in: RoundedRectangle(cornerRadius: 18))
-        .simultaneousGesture(DragGesture(minimumDistance: 8)
-            .updating($drag) { value, state, _ in
-                if abs(value.translation.height) > abs(value.translation.width) { state = value.translation.height }
-            }
-            .onEnded { value in
-                let y = value.translation.height
-                guard abs(y) > min(36, pageHeight * 0.4), abs(y) > abs(value.translation.width) else { return }
-                setPage(y > 0)
-            })
+        .background {
+            Color.clear.locusGlass(.regular, in: RoundedRectangle(cornerRadius: 18))
+                .allowsHitTesting(false).accessibilityHidden(true)
+        }
     }
 
     private func setPage(_ search: Bool) {

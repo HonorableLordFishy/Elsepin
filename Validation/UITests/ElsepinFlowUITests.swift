@@ -631,7 +631,7 @@ final class ElsepinFlowUITests: XCTestCase {
         reachable("Route details")
         XCTAssertFalse(app.buttons["map.follow"].frame.intersects(app.buttons["Route details"].frame))
         let pageSwitch = app.buttons["map.routeSearch"]
-        let insideCard = pageSwitch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+        let insideCard = pageSwitch.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.25)).withOffset(CGVector(dx: -35, dy: 0))
         insideCard.press(forDuration: 0.1, thenDragTo: insideCard.withOffset(CGVector(dx: 0, dy: 55)))
         XCTAssertTrue(app.buttons["map.openRouteSearch"].waitForExistence(timeout: 5))
         pageSwitch.tap()
