@@ -5,7 +5,7 @@ on:
       ui_focus:
         description: Run all validation, or a focused simulator recheck
         type: choice
-        options: [all, search, home, pins, routes, route-search, route-identity, review-fixes, backups, imports, import-text, phone-recheck, route-text, everyday, cellular-stop, map-feedback, route-history-backup, pace-and-signals, design-review, single]
+        options: [all, search, home, pins, routes, route-search, route-identity, review-fixes, backups, imports, import-text, phone-recheck, route-text, everyday, cellular-stop, map-feedback, route-history-backup, pace-and-signals, design-review, route-card, single]
         default: all
       ui_test:
         description: For single, use Class/testMethod from Validation/UITests
@@ -165,6 +165,10 @@ jobs:
             done
             for method in testSolidTabsLeaveSettingsAndPastedBackupReviewReachable testSettingsExportFileSelectiveImportAndRelaunch; do
               test_selection+=("-only-testing:LocusValidationUITests/ElsepinBackupUITests/$method")
+            done
+          elif [[ "$UI_FOCUS" == route-card ]]; then
+            for method in testMovingPauseResumeAndStop testRouteSearchCoversStartMiddleAndDestination testRouteCameraStartsAtTheRouteAndRestoresDetailAfterFit testLargestTextLongRouteAndWrappedControls; do
+              test_selection+=("-only-testing:LocusValidationUITests/ElsepinFlowUITests/$method")
             done
           elif [[ "$UI_FOCUS" == map-feedback ]]; then
             for method in testDroppedPinAddressSpacingAtStandardTextSize testDroppedPinAddressSpacingAtLargestTextSize testRouteSearchCoversStartMiddleAndDestination; do

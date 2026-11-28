@@ -768,6 +768,13 @@ struct MapHomeView: View {
     private var mapTools: some View {
         VStack(spacing: 10) {
             if session.hasSession || session.status.isDropped { StatusBarView(isVisible: visualUpdatesEnabled) }
+            if let route = session.activeRoute, let journey = session.journey, !planner.isDrawing {
+                RouteDirectionsCard(instruction: session.currentRouteInstruction?.text ?? route.destination.name,
+                                    remaining: JourneyText.distance(max(0, (session.currentRouteInstruction?.endDistance ?? route.track.length) - journey.travelledMetres))) {
+                    pendingBrowseStop = nil
+                    browsedRoute = RouteSearchContext(route: route, generation: session.commandGeneration)
+                }.id(route.id)
+            }
             if session.journey == nil && !planner.isDrawing {
                 Button { showSearch = true } label: {
                     HStack(spacing: 12) {
@@ -784,20 +791,6 @@ struct MapHomeView: View {
                     controls
                         .accessibilityIdentifier("map.primaryControls")
                     HStack(spacing: 8) {
-                        if session.journey != nil {
-                            Button {
-                                // An outside-tap cancellation of the native confirmation
-                                // must not leave an old stop queued for the next search.
-                                pendingBrowseStop = nil
-                                if let route = session.activeRoute {
-                                    browsedRoute = RouteSearchContext(route: route, generation: session.commandGeneration)
-                                }
-                            } label: {
-                                Image(systemName: "magnifyingglass").font(.system(size: 20)).frame(width: 46, height: 46)
-                            }.buttonStyle(.plain).locusGlass(.interactive, in: Circle())
-                                .accessibilityLabel("Search along route")
-                                .accessibilityIdentifier("map.routeSearch")
-                        }
                         undoJumpButton
                         cameraControls
                     }
@@ -1118,7 +1111,18 @@ struct MapHomeView: View {
     }
 
     private func routeDetailPosition(_ coordinate: CLLocationCoordinate2D) -> MapCameraPosition {
-        .region(MKCoordinateRegion(center: coordinate, latitudinalMeters: 1000, longitudinalMeters: 1000))
+        if let route = session.activeRoute, let journey = session.journey {
+            let progress = journey.travelledMetres
+            let ahead = route.track.point(at: min(route.track.length, progress + 30)).coordinate
+            let behind = route.track.point(at: max(0, progress - 5)).coordinate
+            let dx = MKMapPoint(ahead).x - MKMapPoint(behind).x
+            let dy = MKMapPoint(behind).y - MKMapPoint(ahead).y
+            if abs(dx) + abs(dy) > 0.01 {
+                let heading = atan2(dx, dy) * 180 / .pi
+                return .camera(MapCamera(centerCoordinate: ahead, distance: 1050, heading: heading, pitch: 0))
+            }
+        }
+        return .region(MKCoordinateRegion(center: coordinate, latitudinalMeters: 1000, longitudinalMeters: 1000))
     }
 
     private func previewPlace(_ place: RoutePlace) {
@@ -1141,6 +1145,67 @@ struct MapHomeView: View {
         let detail = routeDetailPosition(coordinate)
         if reduceMotion { position = detail }
         else { withAnimation(.linear(duration: 0.4)) { position = detail } }
+    }
+}
+
+private struct RouteDirectionsCard: View {
+    let instruction: String
+    let remaining: String
+    let openSearch: () -> Void
+    @State private var searching = false
+    @GestureState private var drag: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .subheadline) private var pageHeight: CGFloat = 56
+
+    var body: some View {
+        HStack(spacing: 6) {
+            GeometryReader { proxy in
+                let height = proxy.size.height
+                let offset = min(height, max(0, (searching ? height : 0) + drag))
+                ZStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(instruction).font(.subheadline.weight(.semibold)).lineLimit(2)
+                        Text(remaining).font(.caption).foregroundStyle(.secondary)
+                    }
+                    .offset(y: offset)
+                    .accessibilityHidden(searching)
+                    Button(action: openSearch) {
+                        Label("Search along route", systemImage: "magnifyingglass")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    }
+                    .offset(y: offset - height)
+                    .allowsHitTesting(searching)
+                    .accessibilityHidden(!searching)
+                    .accessibilityIdentifier("map.openRouteSearch")
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .clipped()
+            }
+            .frame(height: pageHeight)
+            Button {
+                setPage(!searching)
+            } label: {
+                Label(searching ? "Directions" : "Search", systemImage: searching ? "chevron.up" : "chevron.down")
+                    .font(.caption.weight(.semibold)).frame(minHeight: 44)
+            }
+            .accessibilityIdentifier("map.routeSearch")
+        }
+        .padding(.horizontal, 14)
+        .buttonStyle(.plain)
+        .locusGlass(.regular, in: RoundedRectangle(cornerRadius: 18))
+        .simultaneousGesture(DragGesture(minimumDistance: 8)
+            .updating($drag) { value, state, _ in
+                if abs(value.translation.height) > abs(value.translation.width) { state = value.translation.height }
+            }
+            .onEnded { value in
+                let y = value.translation.height
+                guard abs(y) > min(36, pageHeight * 0.4), abs(y) > abs(value.translation.width) else { return }
+                setPage(y > 0)
+            })
+    }
+
+    private func setPage(_ search: Bool) {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { searching = search }
     }
 }
 

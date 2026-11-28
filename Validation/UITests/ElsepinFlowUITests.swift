@@ -629,8 +629,13 @@ final class ElsepinFlowUITests: XCTestCase {
         reachable("session.pause"); reachable("session.stop")
         reachable("map.routeSearch"); reachable("map.follow")
         reachable("Route details")
-        XCTAssertGreaterThanOrEqual(app.buttons["map.follow"].frame.minY,
-                                    app.buttons["Route details"].frame.maxY)
+        XCTAssertFalse(app.buttons["map.follow"].frame.intersects(app.buttons["Route details"].frame))
+        let pageSwitch = app.buttons["map.routeSearch"]
+        let insideCard = pageSwitch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+        insideCard.press(forDuration: 0.1, thenDragTo: insideCard.withOffset(CGVector(dx: 0, dy: 55)))
+        XCTAssertTrue(app.buttons["map.openRouteSearch"].waitForExistence(timeout: 5))
+        pageSwitch.tap()
+        XCTAssertTrue(app.buttons["map.openRouteSearch"].waitForNonExistence(timeout: 5))
         capture("01-moving-narrow-light")
         app.buttons["session.pause"].tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier == 'session.pause' AND label CONTAINS 'Resume'")).firstMatch.waitForExistence(timeout: 10))
@@ -1018,7 +1023,8 @@ final class ElsepinFlowUITests: XCTestCase {
     }
 
     private func openAddStopConfirmation() -> XCUIElement {
-        app.buttons["map.routeSearch"].tap()
+        if !app.buttons["map.openRouteSearch"].exists { app.buttons["map.routeSearch"].tap() }
+        app.buttons["map.openRouteSearch"].tap()
         let expand = app.buttons["routeSearch.fullMap"]
         XCTAssertTrue(expand.waitForExistence(timeout: 10)); expand.tap()
         let center = app.buttons["Map center"]
@@ -1093,8 +1099,10 @@ final class ElsepinFlowUITests: XCTestCase {
 
     func testRouteSearchCoversStartMiddleAndDestination() {
         launch("route-search-coverage", narrow: false)
-        let search = app.buttons["map.routeSearch"]
-        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        let page = app.buttons["map.routeSearch"]
+        XCTAssertTrue(page.waitForExistence(timeout: 10))
+        if page.label == "Search" { page.tap() }
+        let search = app.buttons["map.openRouteSearch"]
         search.tap()
         let category = app.buttons["Coffee"]
         XCTAssertTrue(category.waitForExistence(timeout: 10))
@@ -1167,8 +1175,10 @@ final class ElsepinFlowUITests: XCTestCase {
 
     func testRouteSearchSeparatesAddStopFromSavePin() {
         launch("moving")
-        let search = app.buttons["map.routeSearch"]
-        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        let page = app.buttons["map.routeSearch"]
+        XCTAssertTrue(page.waitForExistence(timeout: 10))
+        if page.label == "Search" { page.tap() }
+        let search = app.buttons["map.openRouteSearch"]
         search.tap()
         let expand = app.buttons["routeSearch.fullMap"]
         XCTAssertTrue(expand.waitForExistence(timeout: 10))
