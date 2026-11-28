@@ -1186,7 +1186,10 @@ private struct RouteDirectionsCard: View {
                 setPage(!searching)
             } label: {
                 Label(searching ? "Directions" : "Search", systemImage: searching ? "chevron.up" : "chevron.down")
-                    .font(.caption.weight(.semibold)).frame(minHeight: 44)
+                    .labelStyle(.titleAndIcon)
+                    .font(.caption.weight(.semibold))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .accessibilityIdentifier("map.routeSearch")
         }
